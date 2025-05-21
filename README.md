@@ -39,4 +39,10 @@ pnpm dev
 ```bash
 docker compose up -d timescaledb
 pnpm --filter server db:generate
+```
+
+### Quick Start
+```bash
+docker compose up -d timescaledb redis
+pnpm --filter server dev     # will start polling CoinGecko every 5 s
 ``` 
