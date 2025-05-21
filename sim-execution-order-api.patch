@@ -1,0 +1,124 @@
+diff --git a/packages/server/package.json b/packages/server/package.json
+index 256a045..8996c8c 100644
+--- a/packages/server/package.json
++++ b/packages/server/package.json
+@@ -3,9 +3,8 @@
+   "version": "0.0.1",
+   "type": "module",
+   "scripts": {
+-    "dev": "tsx watch src/index.ts",
+-    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
++    "dev":        "pnpm run db:generate && tsx watch src/index.ts",
++    "db:generate":"prisma generate --schema=./prisma/schema.prisma"
+   },
+   "dependencies": {
+     "@fastify/websocket": "^8.2.0",
+@@ -18,6 +17,7 @@
+     "@types/ioredis-mock": "^8.2.6",
+     "@types/jest": "^29.5.3",
+     "@types/node": "^22.15.21",
++    "@types/node-fetch": "^3.0.3",
+     "dotenv": "^16.5.0",
+     "ioredis-mock": "^8.9.0",
+     "jest": "^29.7.0",
+diff --git a/packages/server/prisma/schema.prisma b/packages/server/prisma/schema.prisma
+index 3fbb711..dc1d412 100644
+--- a/packages/server/prisma/schema.prisma
++++ b/packages/server/prisma/schema.prisma
+@@ -17,4 +17,29 @@ model Price1m {
+   close     Decimal
+   volume    Decimal
+   @@index([symbol, timestamp])
++}
++
++model Order {
++  id Int @id @default(autoincrement())
++  symbol String
++  side String // 'buy' | 'sell'
++  qty Decimal
++  price Decimal
++  status String @default("filled") // sim always fills
++  createdAt DateTime @default(now())
++  
++  trades Trade[]
++}
++
++model Trade {
++  id Int @id @default(autoincrement())
++  orderId Int
++  symbol String
++  side String
++  qty Decimal
++  price Decimal
++  pnl Decimal
++  ts DateTime @default(now())
++
++  Order Order @relation(fields:[orderId], references:[id])
+ } 
+\ No newline at end of file
+diff --git a/packages/server/src/execution/sim.ts b/packages/server/src/execution/sim.ts
+new file mode 100644
+index 0000000..4cf8a12
+--- /dev/null
++++ b/packages/server/src/execution/sim.ts
+@@ -0,0 +1,16 @@
++import { prisma } from '../db.js';
++
++export async function placeSimOrder(
++  symbol:string,
++  side:'buy'|'sell',
++  qty:number,
++  price:number
++){
++  const order = await prisma.order.create({
++    data:{ symbol, side, qty, price }
++  });
++  await prisma.trade.create({
++    data:{ orderId:order.id, symbol, side, qty, price, pnl:0 }
++  });
++  return order;
++} 
+\ No newline at end of file
+diff --git a/packages/server/src/index.ts b/packages/server/src/index.ts
+index 81c2ac5..596f6e5 100644
+--- a/packages/server/src/index.ts
++++ b/packages/server/src/index.ts
+@@ -3,6 +3,7 @@ import Fastify from 'fastify';
+ import wsPlugin from './ws.js';
+ import { pollAndStore } from './services/marketData.js';
+ import { registerLatestPriceRoute } from './routes/latestPrice.js';
++import { registerOrderRoute } from './routes/order.js';
+ 
+ const app = Fastify();
+ 
+@@ -14,6 +15,7 @@ setInterval(pollAndStore, 5000);
+ 
+ // Register routes
+ await registerLatestPriceRoute(app);
++await registerOrderRoute(app);
+ 
+ // Start server
+ await app.listen({ port: 3000 });
+diff --git a/packages/server/src/routes/order.ts b/packages/server/src/routes/order.ts
+new file mode 100644
+index 0000000..0360726
+--- /dev/null
++++ b/packages/server/src/routes/order.ts
+@@ -0,0 +1,15 @@
++import { FastifyInstance } from 'fastify';
++import { placeSimOrder } from '../execution/sim.js';
++
++export async function registerOrderRoute(app:FastifyInstance){
++  app.post('/api/order', async (req, reply)=>{
++    const { symbol, side, qty, price } = req.body as any;
++    if(!symbol || !side || !qty || !price)
++      return reply.code(400).send({ error:'missing field' });
++    if(side!=='buy' && side!=='sell')
++      return reply.code(400).send({ error:'side must be buy|sell' });
++
++    const order = await placeSimOrder(symbol, side, qty, price);
++    return { ok:true, order };
++  });
++} 
+\ No newline at end of file

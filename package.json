@@ -1,13 +1,13 @@
 {
-  "name": "OceanView-v2",
+  "name": "oceanview-v2",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev:server": "pnpm --filter server run dev",
+    "dev:server": "pnpm --filter @oceanview/server run dev",
     "dev:ui": "pnpm --filter ui run dev",
-    "dev": "pnpm --parallel dev:server dev:ui",
-    "db:generate": "pnpm --filter server db:generate"
+    "dev": "pnpm run dev:server & pnpm run dev:ui",
+    "db:generate": "pnpm --filter @oceanview/server db:generate"
   },
   "keywords": [],
   "author": "",

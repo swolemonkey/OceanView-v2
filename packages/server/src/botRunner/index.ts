@@ -1,13 +1,15 @@
 import { Worker } from 'worker_threads';
 import { prisma } from '../db.js';
 // Import just the module for type checking workarounds
-import 'ioredis-mock';
+import IoRedisMock from 'ioredis-mock';
 import path from 'node:path';
+
+// Get API port from environment
+const API_PORT = process.env.PORT || '3334';
 
 // Mock Redis clients for development/testing
 // @ts-ignore - Working around type issues with ioredis-mock
-const RedisMock = require('ioredis-mock');
-const redis = new RedisMock();
+const redis = new IoRedisMock();
 
 async function spawnBot(botId:number, name:string){
   const worker = new Worker(path.resolve('src/botRunner/worker.ts'), {
@@ -16,7 +18,7 @@ async function spawnBot(botId:number, name:string){
 
   // pipe ticks
   // @ts-ignore - Working around type issues with ioredis-mock
-  const sub = new RedisMock();
+  const sub = new IoRedisMock();
   sub.subscribe('chan:ticks');
   sub.on('message', (channel: string, msg: string)=> worker.postMessage({ type:'tick', data:msg }));
 
@@ -24,7 +26,7 @@ async function spawnBot(botId:number, name:string){
   worker.on('message', async (m: any)=>{
     if(m.type==='order'){
       const { symbol, side, qty, price } = m;
-      const res = await fetch('http://localhost:3333/api/order',{
+      const res = await fetch(`http://localhost:${API_PORT}/api/order`,{
         method:'POST',
         headers:{'content-type':'application/json'},
         body: JSON.stringify({symbol, side, qty, price})

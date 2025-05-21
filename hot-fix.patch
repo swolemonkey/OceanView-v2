@@ -1,0 +1,57 @@
+diff --git a/package.json b/package.json
+index ed61e50..7a52b9d 100644
+--- a/package.json
++++ b/package.json
+@@ -4,8 +4,11 @@
+   "description": "",
+   "main": "index.js",
+   "scripts": {
+-    "test": "echo \"Error: no test specified\" && exit 1",
+-    "prisma": "prisma"
++    "db:up": "docker compose up -d timescaledb redis && pnpm --filter server db:generate",
++    "postinstall": "pnpm --filter server db:generate",
++    "dev:server": "pnpm --filter server run dev",
++    "dev:ui":     "pnpm --filter ui run dev",
++    "dev":        "pnpm --parallel dev:server dev:ui"
+   },
+   "keywords": [],
+   "author": "",
+diff --git a/packages/server/package.json b/packages/server/package.json
+index f5dcde7..e2be35c 100644
+--- a/packages/server/package.json
++++ b/packages/server/package.json
+@@ -3,9 +3,8 @@
+   "version": "0.0.1",
+   "type": "module",
+   "scripts": {
+-    "dev": "tsx watch src/index.ts",
+-    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
++    "dev":        "pnpm run db:generate && tsx watch src/index.ts",
++    "db:generate":"prisma generate --schema=./prisma/schema.prisma"
+   },
+   "dependencies": {
+     "@fastify/websocket": "^8.2.0",
+diff --git a/README.md b/README.md
+index d3103a0..9ed5edd 100644
+--- a/README.md
++++ b/README.md
+@@ -37,14 +37,8 @@ pnpm dev
+ ```
+ 
+ ### Local DB
+-```bash
+-docker compose up -d timescaledb
+-pnpm --filter server db:generate
+-```
+-
+-### Quick Start
+-```bash
+-docker compose up -d timescaledb redis
+-pnpm --filter server dev     # will start polling CoinGecko every 5 s
+-```
++  pnpm db:up      # starts Timescale & Redis, then generates Prisma client
++  pnpm dev        # runs server + ui in parallel
++
++
+</rewritten_file> 

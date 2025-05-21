@@ -5,19 +5,37 @@ export const prisma = {
       console.log('Mock upsert called');
       return { id: 1 };
     },
-    findFirst: async () => {
-      console.log('Mock findFirst called');
-      // Return a mock price record
-      return { 
-        id: 1, 
-        symbol: 'bitcoin', 
-        timestamp: new Date(), 
-        open: 50000, 
-        high: 51000, 
-        low: 49000, 
-        close: 50500, 
-        volume: 100 
-      };
+    findFirst: async (query: { where: any, orderBy: any }) => {
+      console.log('Mock findFirst called for symbol:', query.where.symbol);
+      
+      // Return different mock data based on the symbol
+      if (query.where.symbol === 'bitcoin') {
+        return { 
+          id: 1, 
+          symbol: 'bitcoin', 
+          timestamp: new Date(), 
+          open: 50000, 
+          high: 51000, 
+          low: 49000, 
+          close: 50500, 
+          volume: 100 
+        };
+      } else if (query.where.symbol === 'ethereum') {
+        return { 
+          id: 2, 
+          symbol: 'ethereum', 
+          timestamp: new Date(), 
+          open: 2500, 
+          high: 2600, 
+          low: 2400, 
+          close: 2540.33, 
+          volume: 50 
+        };
+      }
+      
+      // Return null if symbol is not found
+      console.log('No mock data for symbol:', query.where.symbol);
+      return null;
     }
   },
   order: {
