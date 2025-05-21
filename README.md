@@ -1,4 +1,4 @@
-# OceanView
+# OceanView-v2 - A modern monorepo application for ocean data visualization.
 
 A pnpm monorepo project.
 
