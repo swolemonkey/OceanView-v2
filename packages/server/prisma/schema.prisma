@@ -1,6 +1,6 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 generator client {
@@ -10,7 +10,7 @@ generator client {
 model Price1m {
   id        Int      @id @default(autoincrement())
   symbol    String
-  timestamp DateTime @db.Timestamp(6)
+  timestamp DateTime
   open      Decimal
   high      Decimal
   low       Decimal

@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "db:up": "docker compose up -d timescaledb redis && pnpm --filter server db:generate",
     "dev:server": "pnpm --filter server run dev",
     "dev:ui":     "pnpm --filter ui run dev",
-    "dev":        "pnpm --parallel dev:server dev:ui"
+    "dev":        "pnpm --parallel dev:server dev:ui",
+    "db:generate":"pnpm --filter server db:generate"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +18,7 @@
     "turbo": "^2.5.3"
   },
   "dependencies": {
-    "@prisma/client": "6.8.2",
+    "@prisma/client": "5.22.0",
     "fastify-plugin": "^5.0.1"
   }
 }
