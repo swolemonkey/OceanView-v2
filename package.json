@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "prisma": "prisma"
+    "db:up": "docker compose up -d timescaledb redis && pnpm --filter server db:generate",
+    "dev:server": "pnpm --filter server run dev",
+    "dev:ui":     "pnpm --filter ui run dev",
+    "dev":        "pnpm --parallel dev:server dev:ui"
   },
   "keywords": [],
   "author": "",
