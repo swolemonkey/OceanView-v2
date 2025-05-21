@@ -40,8 +40,8 @@ await registerOrderRoute(app);
 await registerHealthzRoute(app);
 
 // Start server
-await app.listen({ port: 3000 });
-logger.info("Server started on port 3000");
+await app.listen({ port: 3333 });
+logger.info("Server started on port 3333");
 
 // Start bots
 import { startBots } from './botRunner/index.js';

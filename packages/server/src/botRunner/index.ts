@@ -1,25 +1,26 @@
 import { Worker } from 'worker_threads';
 import { prisma } from '../db.js';
-import Redis from 'ioredis';
+import RedisMock from 'ioredis-mock';
 import path from 'node:path';
 
-const redis = new Redis(process.env.REDIS_URL!);
+// Create Redis clients correctly
+const redis = new RedisMock();
 
 async function spawnBot(botId:number, name:string){
-  const worker = new Worker(path.resolve('src/botRunner/worker.js'), {
+  const worker = new Worker(path.resolve('src/botRunner/worker.ts'), {
     workerData:{ botId, name }
   });
 
   // pipe ticks
-  const sub = new Redis(process.env.REDIS_URL!);
+  const sub = new RedisMock();
   sub.subscribe('chan:ticks');
-  sub.on('message', (_c, msg)=> worker.postMessage({ type:'tick', data:msg }));
+  sub.on('message', (channel: string, msg: string)=> worker.postMessage({ type:'tick', data:msg }));
 
   // handle IPC order requests
-  worker.on('message', async (m)=>{
+  worker.on('message', async (m: any)=>{
     if(m.type==='order'){
       const { symbol, side, qty, price } = m;
-      const res = await fetch('http://localhost:3000/api/order',{
+      const res = await fetch('http://localhost:3333/api/order',{
         method:'POST',
         headers:{'content-type':'application/json'},
         body: JSON.stringify({symbol, side, qty, price})
@@ -33,6 +34,8 @@ async function spawnBot(botId:number, name:string){
     sub.quit();
     console.log(`bot ${name} exited`, code);
   });
+  
+  console.log(`bot ${name} started (thread ${worker.threadId})`);
 }
 
 export async function startBots(){
