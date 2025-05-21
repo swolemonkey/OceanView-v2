@@ -1,0 +1,20 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Price1m {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  timestamp DateTime @db.Timestamp(6)
+  open      Decimal
+  high      Decimal
+  low       Decimal
+  close     Decimal
+  volume    Decimal
+  @@index([symbol, timestamp])
+} 

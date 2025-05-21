@@ -33,4 +33,10 @@ pnpm dev
 - `pnpm dev` - Start development servers
 - `pnpm lint` - Run linters
 - `pnpm test` - Run tests
+```
+
+### Local DB
+```bash
+docker compose up -d timescaledb
+pnpm --filter server db:generate
 ``` 
