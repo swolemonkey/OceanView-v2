@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": ".build",
     "esModuleInterop": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
-  "include": ["src/**/*", "__tests__/**/*"]
+  "include": ["src/**/*", "__tests__/**/*", "types/**/*"]
 } 

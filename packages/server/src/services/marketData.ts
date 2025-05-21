@@ -1,6 +1,17 @@
 import fetch from 'node-fetch';
 import RedisMock from 'ioredis-mock';
+import pino from 'pino';
 import { prisma } from '../db.js';
+
+// Initialize logger
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true
+    }
+  }
+});
 
 // Use Redis mock for development
 const redis = new RedisMock();
@@ -27,7 +38,7 @@ async function fetchPrices(source: Source){
     if (source === 'coingecko' && cache.isRateLimited) {
       const now = Date.now();
       if (now < cache.rateLimitResetTime) {
-        console.log(`CoinGecko rate limited, waiting until ${new Date(cache.rateLimitResetTime).toISOString()}`);
+        logger.warn(`CoinGecko rate limited, waiting until ${new Date(cache.rateLimitResetTime).toISOString()}`);
         throw new Error('Rate limited');
       } else {
         // Reset rate limit flag after the cooldown period
@@ -37,19 +48,19 @@ async function fetchPrices(source: Source){
 
     const url = endpoints[source];
     if (!url) {
-      console.error(`URL for ${source} is undefined`);
+      logger.error(`URL for ${source} is undefined`);
       throw new Error(`Invalid URL for ${source}`);
     }
     
     if(source==='coingecko'){
       const qs = SYMBOLS.map(s=>`ids=${s}`).join('&');
       const fullUrl = `${url}?${qs}&vs_currencies=usd`;
-      console.log(`Fetching from ${source}: ${fullUrl}`);
+      logger.info(`Fetching from ${source}: ${fullUrl}`);
       const res = await fetch(fullUrl);
       
       // Check for rate limiting
       if (res.status === 429) {
-        console.warn('CoinGecko rate limit exceeded!');
+        logger.warn('CoinGecko rate limit exceeded!');
         cache.isRateLimited = true;
         // Set a 60 second cooldown before next attempt
         cache.rateLimitResetTime = Date.now() + 60000;
@@ -60,7 +71,7 @@ async function fetchPrices(source: Source){
       
       // Detect rate limit error in the response (CoinGecko sometimes returns 200 with error body)
       if (data?.status?.error_code === 429) {
-        console.warn('CoinGecko rate limit exceeded (from response body)!');
+        logger.warn('CoinGecko rate limit exceeded (from response body)!');
         cache.isRateLimited = true;
         // Set a 60 second cooldown before next attempt
         cache.rateLimitResetTime = Date.now() + 60000;
@@ -70,7 +81,7 @@ async function fetchPrices(source: Source){
       return data;
     }
     if(source==='coincap'){
-      console.log(`Fetching from ${source}: ${url}`);
+      logger.info(`Fetching from ${source}: ${url}`);
       const res = await fetch(url);
       const json:any = await res.json();
       const map:Record<string,number> = {};
@@ -83,7 +94,7 @@ async function fetchPrices(source: Source){
     }
     return null;
   } catch (error) {
-    console.error(`Error fetching prices from ${source}:`, error);
+    logger.error({err: error}, `Error fetching prices from ${source}`);
     throw error;
   }
 }
@@ -95,13 +106,13 @@ export async function pollAndStore(){
   const now = Date.now();
   const cacheAge = now - cache.timestamp;
   if (cache.data && cacheAge < 60000) {
-    console.log(`Using cached data from ${Math.floor(cacheAge/1000)}s ago`);
+    logger.info(`Using cached data from ${Math.floor(cacheAge/1000)}s ago`);
     data = cache.data;
   } else {
     try { 
-      console.log('Attempting to fetch from CoinGecko...');
+      logger.info('Attempting to fetch from CoinGecko...');
       data = await fetchPrices('coingecko'); 
-      console.log('CoinGecko data:', data);
+      logger.info('CoinGecko data:', data);
       
       // Cache successful response
       if (data && Object.keys(data).length > 0) {
@@ -112,13 +123,13 @@ export async function pollAndStore(){
     catch(error){ 
       // If rate limited and we have cache, use the cache
       if (cache.isRateLimited && cache.data) {
-        console.log('Rate limited, using cached data');
+        logger.info('Rate limited, using cached data');
         data = cache.data;
       } else {
-        console.log('CoinGecko failed, falling back to CoinCap...');
+        logger.info('CoinGecko failed, falling back to CoinCap...');
         try {
           data = await fetchPrices('coincap'); 
-          console.log('CoinCap data:', data);
+          logger.info('CoinCap data:', data);
           
           // Cache successful response
           if (data && Object.keys(data).length > 0) {
@@ -128,10 +139,10 @@ export async function pollAndStore(){
         } catch (fallbackError) {
           // If everything failed but we have somewhat recent cache, use it
           if (cache.data && cacheAge < 300000) { // 5 minutes
-            console.log('Both APIs failed, using older cached data');
+            logger.info('Both APIs failed, using older cached data');
             data = cache.data;
           } else {
-            console.error('Both data sources failed and no valid cache available');
+            logger.error('Both data sources failed and no valid cache available');
             return; // Exit early if both sources fail and no cache
           }
         }
@@ -140,18 +151,23 @@ export async function pollAndStore(){
   }
 
   if (!data) {
-    console.log('No data received from API sources or cache');
+    logger.warn('No data received from API sources or cache');
     return;
   }
 
   const ts = new Date();
+  // Normalize timestamp to minute start by setting seconds and milliseconds to 0
+  ts.setSeconds(0, 0);
+  
   const pipe = redis.pipeline();
   for(const id of SYMBOLS){
     const price = data?.[id]?.usd;
     if(!price) continue;
     // 1) push to redis stream (ticks:crypto)
     pipe.xadd('ticks:crypto','*','symbol',id,'price',price);
-    // 2) write 1-min candle stub → DB (merge later)
+    // 2) Store latest price in a hash for O(1) lookup
+    pipe.hset('latest:crypto', id, price.toString());
+    // 3) write 1-min candle stub → DB (merge later)
     await prisma.price1m.upsert({
       where:{ symbol_timestamp:{symbol:id,timestamp:ts}},
       update:{ close: price },
@@ -163,3 +179,12 @@ export async function pollAndStore(){
   // publish compact JSON to WS channel
   redis.publish('chan:ticks', JSON.stringify({ ts, prices: data }));
 } 
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await redis.quit();
+  // prisma is a mock object without $disconnect
+  logger.info('Graceful shutdown completed');
+  process.exit(0);
+}); 
