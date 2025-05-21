@@ -1,9 +1,12 @@
 import { Worker } from 'worker_threads';
 import { prisma } from '../db.js';
-import RedisMock from 'ioredis-mock';
+// Import just the module for type checking workarounds
+import 'ioredis-mock';
 import path from 'node:path';
 
-// Create Redis clients correctly
+// Mock Redis clients for development/testing
+// @ts-ignore - Working around type issues with ioredis-mock
+const RedisMock = require('ioredis-mock');
 const redis = new RedisMock();
 
 async function spawnBot(botId:number, name:string){
@@ -12,6 +15,7 @@ async function spawnBot(botId:number, name:string){
   });
 
   // pipe ticks
+  // @ts-ignore - Working around type issues with ioredis-mock
   const sub = new RedisMock();
   sub.subscribe('chan:ticks');
   sub.on('message', (channel: string, msg: string)=> worker.postMessage({ type:'tick', data:msg }));

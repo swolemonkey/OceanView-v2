@@ -21,14 +21,24 @@ export const prisma = {
     }
   },
   order: {
-    create: async (args) => {
+    create: async (args: { data: any }) => {
       console.log('Mock order created:', args.data);
       return { id: 1, ...args.data };
     }
   },
   trade: {
-    create: async (args) => {
+    create: async (args: { data: any }) => {
       console.log('Mock trade created:', args.data);
+      return { id: 1, ...args.data };
+    }
+  },
+  bot: {
+    findMany: async (query: { where: any }) => {
+      console.log('Mock bot findMany called:', query);
+      return [{ id: 1, name: 'scalper', enabled: true }];
+    },
+    create: async (args: { data: any }) => {
+      console.log('Mock bot created:', args.data);
       return { id: 1, ...args.data };
     }
   }
