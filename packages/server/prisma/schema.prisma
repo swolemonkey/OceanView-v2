@@ -17,4 +17,29 @@ model Price1m {
   close     Decimal
   volume    Decimal
   @@index([symbol, timestamp])
+}
+
+model Order {
+  id Int @id @default(autoincrement())
+  symbol String
+  side String // 'buy' | 'sell'
+  qty Decimal
+  price Decimal
+  status String @default("filled") // sim always fills
+  createdAt DateTime @default(now())
+  
+  trades Trade[]
+}
+
+model Trade {
+  id Int @id @default(autoincrement())
+  orderId Int
+  symbol String
+  side String
+  qty Decimal
+  price Decimal
+  pnl Decimal
+  ts DateTime @default(now())
+
+  Order Order @relation(fields:[orderId], references:[id])
 } 
