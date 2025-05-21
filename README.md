@@ -35,19 +35,13 @@ pnpm dev
 - `pnpm test` - Run tests
 ```
 
-### Local DB
 ```bash
-docker compose up -d timescaledb
-pnpm --filter server db:generate
-```
+# first time
+pnpm --filter server db:generate    # creates dev.db & Prisma client
 
-### Quick Start
-```bash
-docker compose up -d timescaledb redis
-pnpm --filter server dev     # will start polling CoinGecko every 5 s
+# dev loop
+pnpm dev        # runs Fastify + Vite (SQLite – no Docker required)
 ```
-
-WebSocket stream at ws://localhost:3000/ws/ticks
 
 ### Testing
 ```bash
