@@ -38,6 +38,7 @@ pnpm dev
 ```bash
 # first time
 pnpm --filter server db:generate    # creates dev.db & Prisma client
+pnpm tsx scripts/seedBots.ts        # After first db:generate, run to insert the Scalper bot
 
 # dev loop
 pnpm dev        # runs Fastify + Vite (SQLite – no Docker required)

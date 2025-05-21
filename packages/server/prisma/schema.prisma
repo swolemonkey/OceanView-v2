@@ -42,4 +42,11 @@ model Trade {
   ts DateTime @default(now())
 
   Order Order @relation(fields:[orderId], references:[id])
+}
+
+model Bot {
+  id Int @id @default(autoincrement())
+  name String @unique
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
 } 
