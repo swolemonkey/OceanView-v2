@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import Redis from 'ioredis';
+import RedisMock from 'ioredis-mock';
 import { prisma } from '../db.js';
 
-const redis = new Redis(process.env.REDIS_URL!);
+// Use Redis mock for development
+const redis = new RedisMock();
 
 export async function registerLatestPriceRoute(app: FastifyInstance) {
   app.get('/api/prices/latest', async (req, reply) => {

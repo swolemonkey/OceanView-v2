@@ -1,14 +1,15 @@
 import fp from 'fastify-plugin';
 import Websocket from '@fastify/websocket';
-import Redis from 'ioredis';
+import RedisMock from 'ioredis-mock';
 
-const redis = new Redis(process.env.REDIS_URL!);
+// Use Redis mock for development
+const redis = new RedisMock();
 
 export default fp(async (app) => {
   await app.register(Websocket);
 
   app.get('/ws/ticks', { websocket: true }, (conn) => {
-    const sub = new Redis(process.env.REDIS_URL!);
+    const sub = new RedisMock();
     sub.subscribe('chan:ticks');
 
     sub.on('message', (_chan, msg) => {
