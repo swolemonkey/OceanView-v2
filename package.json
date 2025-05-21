@@ -16,6 +16,7 @@
     "turbo": "^2.5.3"
   },
   "dependencies": {
-    "@prisma/client": "6.8.2"
+    "@prisma/client": "6.8.2",
+    "fastify-plugin": "^5.0.1"
   }
 }

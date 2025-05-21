@@ -47,6 +47,8 @@ docker compose up -d timescaledb redis
 pnpm --filter server dev     # will start polling CoinGecko every 5 s
 ```
 
+WebSocket stream at ws://localhost:3000/ws/ticks
+
 ### Testing
 ```bash
 pnpm --filter server test

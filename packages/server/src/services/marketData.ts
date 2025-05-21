@@ -51,4 +51,7 @@ export async function pollAndStore(){
     });
   }
   await pipe.exec();
+  
+  // publish compact JSON to WS channel
+  redis.publish('chan:ticks', JSON.stringify({ ts, prices: data }));
 } 

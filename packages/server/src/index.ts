@@ -1,9 +1,13 @@
 import './db.js';
-import { pollAndStore } from './services/marketData.js';
 import Fastify from 'fastify';
+import wsPlugin from './ws.js';
+import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 
 const app = Fastify();
+
+// Register plugins
+await app.register(wsPlugin);
 
 // Start polling market data
 setInterval(pollAndStore, 5000);
