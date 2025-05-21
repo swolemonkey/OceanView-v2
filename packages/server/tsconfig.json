@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": ".build",
+    "esModuleInterop": true,
+    "isolatedModules": true
+  },
+  "include": ["src/**/*", "__tests__/**/*"]
+} 

@@ -1,13 +1,6 @@
 import Fastify from 'fastify';
 import { registerLatestPriceRoute } from '../src/routes/latestPrice.js';
-import Redis from 'ioredis';
-import RedisMock from 'ioredis-mock';
-
-// patch ioredis with mock
-jest.mock('ioredis', () => RedisMock);
-
-const redis = new Redis();                   // mock instance
-beforeAll(() => redis.xadd('ticks:crypto','*','symbol','bitcoin','price','12345'));
+import { test, expect } from '@jest/globals';
 
 test('returns latest price from redis', async () => {
   const app = Fastify();
