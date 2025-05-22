@@ -1,8 +1,10 @@
 import fetch from 'node-fetch';
+import { defaultConfig } from './config.js';
 
-const SLIPPAGE_LIMIT = 0.003;          // 0.3 %
-const VALUE_SPLIT    = 2000;           // USD
-const TIMEOUT_MS     = 3000;
+// Use values from config
+const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %
+const VALUE_SPLIT = defaultConfig.execution.valueSplit;        // USD
+const TIMEOUT_MS = defaultConfig.execution.timeoutMs;
 
 type TradeIdea = { symbol:string; side:'buy'|'sell'; qty:number; price:number };
 
