@@ -1,0 +1,35 @@
+# fly.toml app configuration file generated for oceanview-trade on 2025-05-22T21:02:51+10:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'oceanview-trade'
+primary_region = 'syd'
+
+[build]
+  dockerfile = 'Dockerfile.dev'
+
+[http_service]
+  internal_port = 3334
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[[mounts]]
+  source = "ovdata"
+  destination = "/app/packages/server/prisma"
+
+# Serve the frontend UI on port 5173
+[[services]]
+  internal_port = 5173
+  protocol = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port = 5173

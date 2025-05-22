@@ -2,4 +2,12 @@ FROM node:20
 WORKDIR /app
 COPY . .
 RUN corepack enable && pnpm install
-CMD ["pnpm","-r","dev"] 
+
+# Build the frontend UI
+RUN pnpm --filter ui build
+
+# Install a static server for UI
+RUN pnpm add -w serve
+
+# Start backend and serve frontend
+CMD ["bash", "-c", "pnpm --filter server run dev & serve packages/ui/dist --single -l 5173"] 
