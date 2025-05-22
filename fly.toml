@@ -1,9 +1,20 @@
-# fly.toml for backend only
-app = 'oceanview-backend'
+# fly.toml app configuration file generated for oceanview on 2025-05-22T22:27:33+10:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'oceanview'
 primary_region = 'syd'
 
 [build]
-  dockerfile = 'Dockerfile.backend'
+  dockerfile = 'Dockerfile.dev'
+
+[env]
+  PORT = '3334'
+
+[[mounts]]
+  source = 'ovbackend_data'
+  destination = '/app/packages/server/prisma'
 
 [http_service]
   internal_port = 3334
@@ -17,15 +28,3 @@ primary_region = 'syd'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-
-[[mounts]]
-  source = "ovbackend_data"
-  destination = "/app/packages/server/prisma"
-
-# Serve the frontend UI on port 5173
-[[services]]
-  internal_port = 5173
-  protocol = "tcp"
-  [[services.ports]]
-    handlers = ["http"]
-    port = 5173

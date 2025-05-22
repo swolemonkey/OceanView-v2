@@ -2,7 +2,21 @@ FROM node:20
 
 WORKDIR /app
 COPY . .
-RUN corepack enable && pnpm install
 
-# Start backend only for now
-CMD ["bash", "-c", "pnpm --filter server run dev"] 
+# Install dependencies
+RUN npm install
+RUN npm install -g pnpm
+RUN corepack enable
+RUN pnpm install
+
+# Build frontend
+RUN cd packages/ui && pnpm build
+
+# Remove any old scripts that might interfere
+RUN rm -f start.sh
+
+# Port for the server
+EXPOSE 3334
+
+# Use the simplified server
+CMD ["node", "server.js"] 
