@@ -20,9 +20,26 @@ export async function registerLatestPriceRoute(app) {
         logger.info(`Price request received for symbol: ${symbol}`);
         if (!symbol)
             return reply.code(400).send({ error: 'symbol required' });
+        // Inspect hash store first 
+        try {
+            const hashData = await redis.hgetall('latest:crypto');
+            logger.info(`Redis hash data for latest prices: ${JSON.stringify(hashData)}`);
+            if (hashData && hashData[symbol]) {
+                const price = Number(hashData[symbol]);
+                logger.info(`Found ${symbol} hash price in Redis: ${price}`);
+                return { symbol, price, source: 'redis-hash' };
+            }
+        }
+        catch (error) {
+            logger.error(`Error getting hash data: ${error}`);
+        }
         // 1) try Redis stream
         const res = await redis.xrevrange('ticks:crypto', '+', '-', 'COUNT', 100);
         logger.info(`Redis stream check for ${symbol}, found ${res.length} entries`);
+        // Debug log all stream entries
+        for (let i = 0; i < Math.min(res.length, 5); i++) {
+            logger.info(`Stream entry ${i}: ${JSON.stringify(res[i])}`);
+        }
         for (const [, fields] of res) {
             const idx = fields.indexOf('symbol');
             if (idx !== -1 && fields[idx + 1] === symbol) {

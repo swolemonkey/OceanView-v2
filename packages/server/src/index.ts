@@ -7,6 +7,7 @@ import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
+import { nightlyUpdate } from './bots/hypertrades/learner.js';
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
@@ -50,5 +51,21 @@ logger.info(`Server started on port ${port}`);
 // Start bots
 import { startBots } from './botRunner/index.js';
 await startBots();
+
+// Schedule nightly learning update - for demo, run every minute instead of midnight
+const scheduleUpdate = () => {
+  const now = new Date();
+  console.log(`[learner] Scheduling next update in 60 seconds`);
+  setTimeout(async () => {
+    try {
+      await nightlyUpdate();
+    } catch (err) {
+      console.error('[learner] Update error:', err);
+    }
+    scheduleUpdate();
+  }, 60 * 1000); // Run every minute for demo
+};
+
+scheduleUpdate();
 
 export {}; 

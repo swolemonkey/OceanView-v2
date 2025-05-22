@@ -1,4 +1,5 @@
 import { Perception } from './perception.js';
+import { loadConfig } from './config.js';
 
 interface TAConfig {
   rsiPeriod: number;

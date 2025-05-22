@@ -1,8 +1,10 @@
-import { defaultConfig } from './config.js';
+import { loadConfig } from './config.js';
 import { smcSignal } from './smc.js';
 import { taSignal } from './ta.js';
-export function decide(perception) {
-    const cfg = defaultConfig;
+export async function decide(perception, cfg) {
+    if (!cfg) {
+        cfg = await loadConfig();
+    }
     const s = smcSignal(perception, cfg);
     const t = taSignal(perception, cfg);
     if (s && s.type === 'stop-hunt-long' && t && t.type === 'ta-long') {

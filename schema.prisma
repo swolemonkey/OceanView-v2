@@ -1,0 +1,16 @@
+model Experience {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  price     Decimal
+  smcThresh Float
+  rsiOS     Float
+  reward    Float
+  ts        DateTime @default(now())
+}
+
+model HyperSettings {
+  id        Int      @id @default(1)
+  smcThresh Float    @default(0.002)
+  rsiOS     Float    @default(35)
+  updatedAt DateTime @updatedAt
+} 

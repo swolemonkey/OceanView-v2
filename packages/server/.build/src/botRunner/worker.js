@@ -1,3 +1,8 @@
+/**
+ * @deprecated This file is being kept for reference only.
+ * Use the type-specific worker files in the workers/ directory instead.
+ * The codebase now dynamically loads workers based on the bot type.
+ */
 import { parentPort, workerData } from 'worker_threads';
 let mode = workerData.name; // 'scalper' or 'hypertrades'
 let lastPrice = 0;

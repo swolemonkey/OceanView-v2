@@ -7,6 +7,8 @@ import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
+import cron from 'node-cron';
+import { nightlyUpdate } from './bots/hypertrades/learner.js';
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
 process.env.COINCAP_URL = process.env.COINCAP_URL || "https://api.coincap.io/v2/assets";
@@ -41,3 +43,5 @@ logger.info(`Server started on port ${port}`);
 // Start bots
 import { startBots } from './botRunner/index.js';
 await startBots();
+// Schedule nightly learning update at UTC midnight
+cron.schedule('0 0 * * *', nightlyUpdate);

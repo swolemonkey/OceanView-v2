@@ -1,10 +1,19 @@
-import { defaultConfig } from './config.js';
+import { loadConfig } from './config.js';
 import { smcSignal } from './smc.js';
 import { taSignal  } from './ta.js';
 import { Perception } from './perception.js';
 
-export function decide(perception: Perception){
-  const cfg = defaultConfig;
+interface Config {
+  smc: { thresh: number };
+  ta: { rsiPeriod: number; overSold: number; overBought: number };
+  riskPct: number;
+  symbol: string;
+}
+
+export async function decide(perception: Perception, cfg?: Config){
+  if (!cfg) {
+    cfg = await loadConfig();
+  }
   const s = smcSignal(perception, cfg);
   const t = taSignal(perception, cfg);
 
