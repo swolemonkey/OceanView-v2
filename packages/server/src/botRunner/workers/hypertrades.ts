@@ -44,7 +44,7 @@ parentPort?.on('message', async (m) => {
     const idea = await decide(perception, cfg);
     if (idea) {
       if (!risk.canTrade()) {
-        log('risk-blocked');
+        log('risk-blocked: openRisk '+risk.openRisk.toFixed(2)+'%');
         return;
       }
       const qty = risk.sizeTrade(idea.price);
