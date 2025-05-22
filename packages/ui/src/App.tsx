@@ -1,6 +1,6 @@
-import DirectPanel from './components/DirectPanel';
+import BotPanel from './components/BotPanel';
 
 export default function App() {
   // Directly use the DirectPanel
-  return <DirectPanel />;
+  return <BotPanel />;
 }
