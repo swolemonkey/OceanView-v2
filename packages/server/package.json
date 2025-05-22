@@ -6,7 +6,8 @@
     "dev": "pnpm run db:generate && tsx watch src/index.ts",
     "dev:no-prisma": "tsx watch src/index.ts",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "build": "tsc"
   },
   "dependencies": {
     "@fastify/websocket": "^8.2.0",

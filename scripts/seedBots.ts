@@ -14,7 +14,8 @@ const mockPrisma = {
 
 async function seedBots() {
   await mockPrisma.bot.create({ data:{ name:'scalper', enabled:true }});
-  console.log('bot inserted');
+  await mockPrisma.bot.create({ data:{ name:'hypertrades', enabled:true }});
+  console.log('bots inserted');
   exit(0);
 }
 
