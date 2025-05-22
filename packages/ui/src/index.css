@@ -1,9 +1,11 @@
+/* stylelint-disable */
 /* tailwind base */
 @tailwind base;
 /* tailwind components */
 @tailwind components;
 /* tailwind utilities */
 @tailwind utilities;
+/* stylelint-enable */
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
