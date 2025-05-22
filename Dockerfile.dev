@@ -7,7 +7,7 @@ RUN corepack enable && pnpm install
 RUN pnpm --filter ui build
 
 # Install a static server for UI
-RUN pnpm add -w serve
+RUN npm install -g serve
 
 # Start backend and serve frontend
 CMD ["bash", "-c", "pnpm --filter server run dev & serve packages/ui/dist --single -l 5173"] 
