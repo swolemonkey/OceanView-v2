@@ -1,14 +1,8 @@
 FROM node:20
 
-# Install serve globally first
-RUN npm install -g serve
-
 WORKDIR /app
 COPY . .
 RUN corepack enable && pnpm install
 
-# Build the frontend UI
-RUN pnpm --filter ui build
-
-# Start backend and serve frontend
-CMD ["bash", "-c", "pnpm --filter server run dev & /usr/local/bin/serve packages/ui/dist --single -l 5173"] 
+# Start backend only for now
+CMD ["bash", "-c", "pnpm --filter server run dev"] 
