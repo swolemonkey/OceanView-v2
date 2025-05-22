@@ -12,7 +12,11 @@ const API_PORT = process.env.PORT || '3334';
 const redis = new IoRedisMock();
 
 async function spawnBot(botId:number, name:string){
-  const worker = new Worker(path.resolve('src/botRunner/worker.ts'), {
+  const workerPath = name === 'hypertrades' 
+    ? path.resolve('src/botRunner/workers/hypertrades.ts')
+    : path.resolve('src/botRunner/worker.ts');
+    
+  const worker = new Worker(workerPath, {
     workerData:{ botId, name }
   });
 
