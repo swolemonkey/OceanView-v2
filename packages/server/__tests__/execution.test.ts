@@ -16,6 +16,6 @@ afterEach(() => {
 
 test('splits large order into 3 chunks', async () => {
   const logs: any = [];
-  await executeIdea({symbol: 'bitcoin', side: 'buy', qty: 0.05, price: 50000}, m => logs.push(m));
+  await executeIdea({symbol: 'bitcoin', side: 'buy', qty: 0.05, price: 50000}, m => logs.push(m), 0);
   expect(global.fetch).toHaveBeenCalledTimes(3);
 }); 
