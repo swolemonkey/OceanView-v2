@@ -2,18 +2,13 @@ import { parentPort, workerData } from 'worker_threads';
 import { Perception } from '../../bots/hypertrades/perception.js';
 import { decide } from '../../bots/hypertrades/decision.js';
 import { RiskManager } from '../../bots/hypertrades/risk.js';
+import { executeIdea } from '../../bots/hypertrades/execution.js';
 
 const perception = new Perception();
 const risk = new RiskManager();
+const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 
-// fire a tiny order once on startup for connectivity test
-parentPort?.postMessage({
-  type: 'order',
-  symbol: 'bitcoin',
-  side: 'buy',
-  qty: 0.0001,
-  price: 99999 // sentinel; SimExecution ignores price realism
-});
+// Remove the tiny order test
 
 parentPort?.on('message', (m) => {
   if (m.type === 'tick') {
@@ -25,11 +20,16 @@ parentPort?.on('message', (m) => {
     const idea = decide(perception);
     if (idea) {
       if (!risk.canTrade()) {
-        console.log(`[${workerData.name}] risk blocked trade`);
+        log('risk-blocked');
         return;
       }
       const qty = risk.sizeTrade(idea.price);
-      parentPort?.postMessage({ type: 'order', ...idea, qty });
+      const orderIdea = { 
+        ...idea, 
+        side: idea.side as 'buy'|'sell',
+        qty 
+      };
+      executeIdea(orderIdea, log);
       risk.registerOrder(idea.side as 'buy'|'sell', qty, idea.price);
     }
   }

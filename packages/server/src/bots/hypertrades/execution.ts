@@ -1,0 +1,42 @@
+import fetch from 'node-fetch';
+
+const SLIPPAGE_LIMIT = 0.003;          // 0.3 %
+const VALUE_SPLIT    = 2000;           // USD
+const TIMEOUT_MS     = 3000;
+
+type TradeIdea = { symbol:string; side:'buy'|'sell'; qty:number; price:number };
+
+export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void){
+  const chunks = idea.qty * idea.price > VALUE_SPLIT
+    ? [idea.qty/3, idea.qty/3, idea.qty - 2*(idea.qty/3)]
+    : [idea.qty];
+
+  for(const q of chunks){
+    const ctl = new AbortController();
+    const t = setTimeout(()=>ctl.abort(), TIMEOUT_MS);
+
+    try{
+      const res = await fetch('http://localhost:3334/api/order',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body: JSON.stringify({ ...idea, qty:q }),
+        signal: ctl.signal
+      });
+      clearTimeout(t);
+      if(!res.ok){ logger(`order failed (${res.status})`); continue; }
+      const json:any = await res.json();
+      const fill = json.order?.price ?? idea.price;
+      const slip = Math.abs(fill - idea.price)/idea.price;
+      if(slip > SLIPPAGE_LIMIT){
+        logger(`badFill slippage ${(slip*100).toFixed(2)}%`);
+      }
+    }catch(e: unknown){
+      logger(`timeout/cancel for chunk qty ${q}`);
+      // retry once
+      if(e instanceof Error && e.name==='AbortError'){
+        logger('retrying once…');
+        return executeIdea({ ...idea, qty:q }, logger);
+      }
+    }
+  }
+} 
