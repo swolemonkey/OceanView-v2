@@ -69,20 +69,61 @@ function App() {
       try {
         const data = JSON.parse(event.data)
         console.log('WebSocket message received:', data)
+        console.log('WebSocket raw data:', JSON.stringify(data))
+        
         if (data.prices) {
           const newPrices: Record<string, number> = {}
           
-          if (data.prices.bitcoin?.usd) {
-            newPrices.bitcoin = data.prices.bitcoin.usd
+          console.log('Bitcoin data structure:', JSON.stringify(data.prices.bitcoin))
+          console.log('Ethereum data structure:', JSON.stringify(data.prices.ethereum))
+          
+          // Handle Bitcoin price - supports multiple formats
+          const btcData = data.prices.bitcoin
+          if (btcData?.usd) {
+            // Standard format {bitcoin: {usd: 123}}
+            newPrices.bitcoin = btcData.usd
+            console.log('Setting Bitcoin price from WS (nested format):', btcData.usd)
+          } else if (typeof btcData === 'number') {
+            // Alternative format {bitcoin: 123}
+            newPrices.bitcoin = btcData
+            console.log('Setting Bitcoin price from WS (direct number):', btcData)
+          } else if (btcData) {
+            // Try to find any usable price format
+            const keys = Object.keys(btcData)
+            console.log('Bitcoin object keys:', keys)
+            if (keys.length > 0 && typeof btcData[keys[0]] === 'number') {
+              newPrices.bitcoin = btcData[keys[0]]
+              console.log('Setting Bitcoin price from first available key:', keys[0], btcData[keys[0]])
+            }
           }
           
-          if (data.prices.ethereum?.usd) {
-            newPrices.ethereum = data.prices.ethereum.usd
+          // Handle Ethereum price - supports multiple formats
+          const ethData = data.prices.ethereum
+          if (ethData?.usd) {
+            // Standard format {ethereum: {usd: 123}}
+            newPrices.ethereum = ethData.usd
+            console.log('Setting Ethereum price from WS (nested format):', ethData.usd)
+          } else if (typeof ethData === 'number') {
+            // Alternative format {ethereum: 123}
+            newPrices.ethereum = ethData
+            console.log('Setting Ethereum price from WS (direct number):', ethData)
+          } else if (ethData) {
+            // Try to find any usable price format
+            const keys = Object.keys(ethData)
+            console.log('Ethereum object keys:', keys)
+            if (keys.length > 0 && typeof ethData[keys[0]] === 'number') {
+              newPrices.ethereum = ethData[keys[0]]
+              console.log('Setting Ethereum price from first available key:', keys[0], ethData[keys[0]])
+            }
           }
           
           console.log('Updating prices from WebSocket:', newPrices)
-          setPrices(prevPrices => ({...prevPrices, ...newPrices}))
-          setLastUpdate(new Date().toLocaleTimeString())
+          if (Object.keys(newPrices).length > 0) {
+            setPrices(prevPrices => ({...prevPrices, ...newPrices}))
+            setLastUpdate(new Date().toLocaleTimeString())
+          } else {
+            console.warn('No valid price data found in WebSocket message')
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket data:', error)

@@ -55,8 +55,8 @@ async function fetchPrices(source: Source){
     }
     
     if(source==='coingecko'){
-      const qs = SYMBOLS.map(s=>`ids=${s}`).join('&');
-      const fullUrl = `${url}?${qs}&vs_currencies=usd`;
+      const qs = `ids=${SYMBOLS.join(',')}&vs_currencies=usd`;
+      const fullUrl = `${url}?${qs}`;
       logger.info(`Fetching from ${source}: ${fullUrl}`);
       const res = await fetch(fullUrl);
       
@@ -70,6 +70,25 @@ async function fetchPrices(source: Source){
       }
       
       const data = await res.json();
+      
+      // Add detailed logging of received data
+      logger.info(`CoinGecko raw response data: ${JSON.stringify(data)}`);
+      
+      // Normalize CoinGecko data format if needed
+      // This ensures consistent format for Bitcoin and Ethereum from different sources
+      if (data && Object.keys(data).length > 0) {
+        // Standard CoinGecko format is {bitcoin: {usd: 50000}, ethereum: {usd: 2500}}
+        // Ensure this exact format for every supported symbol
+        for (const symbol of SYMBOLS) {
+          if ((data as Record<string, any>)[symbol] && typeof (data as Record<string, any>)[symbol] === 'object') {
+            if (typeof (data as Record<string, any>)[symbol].usd !== 'number' && typeof (data as Record<string, any>)[symbol].USD === 'number') {
+              // Some versions capitalize USD - normalize it
+              (data as Record<string, any>)[symbol].usd = (data as Record<string, any>)[symbol].USD;
+              logger.info(`Normalized capitalized USD for ${symbol}`);
+            }
+          }
+        }
+      }
       
       // Detect rate limit error in the response (CoinGecko sometimes returns 200 with error body)
       // @ts-ignore - CoinGecko API can return a status object with an error_code
@@ -87,13 +106,26 @@ async function fetchPrices(source: Source){
       logger.info(`Fetching from ${source}: ${url}`);
       const res = await fetch(url);
       const json:any = await res.json();
+      
+      // Add detailed logging of received data
+      logger.info(`CoinCap raw response data: ${JSON.stringify(json)}`);
+      
       const map:Record<string,number> = {};
       json.data.forEach((d:any)=>{
-        if(SYMBOLS.includes(d.id)) map[d.id]=Number(d.priceUsd);
+        if(SYMBOLS.includes(d.id)) {
+          map[d.id]=Number(d.priceUsd);
+          logger.info(`CoinCap processed ${d.id}: ${d.priceUsd} -> ${map[d.id]}`);
+        }
       });
-      return Object.fromEntries(
+      
+      // Create properly formatted data with nested usd property
+      // This normalizes CoinCap to match CoinGecko's format
+      const formattedData = Object.fromEntries(
         Object.entries(map).map(([k,v])=>[k,{usd:v}])
       );
+      
+      logger.info(`CoinCap formatted data: ${JSON.stringify(formattedData)}`);
+      return formattedData;
     }
     return null;
   } catch (error) {
@@ -115,7 +147,7 @@ export async function pollAndStore(){
     try { 
       logger.info('Attempting to fetch from CoinGecko...');
       data = await fetchPrices('coingecko'); 
-      logger.info('CoinGecko data:', data);
+      logger.info(`CoinGecko data: ${JSON.stringify(data)}`);
       
       // Cache successful response
       if (data && Object.keys(data).length > 0) {
@@ -126,13 +158,13 @@ export async function pollAndStore(){
     catch(error){ 
       // If rate limited and we have cache, use the cache
       if (cache.isRateLimited && cache.data) {
-        logger.info('Rate limited, using cached data');
+        logger.info(`Rate limited, using cached data: ${JSON.stringify(cache.data)}`);
         data = cache.data;
       } else {
         logger.info('CoinGecko failed, falling back to CoinCap...');
         try {
           data = await fetchPrices('coincap'); 
-          logger.info('CoinCap data:', data);
+          logger.info(`CoinCap data: ${JSON.stringify(data)}`);
           
           // Cache successful response
           if (data && Object.keys(data).length > 0) {
@@ -142,7 +174,7 @@ export async function pollAndStore(){
         } catch (fallbackError) {
           // If everything failed but we have somewhat recent cache, use it
           if (cache.data && cacheAge < 300000) { // 5 minutes
-            logger.info('Both APIs failed, using older cached data');
+            logger.info(`Both APIs failed, using older cached data: ${JSON.stringify(cache.data)}`);
             data = cache.data;
           } else {
             logger.error('Both data sources failed and no valid cache available');
@@ -164,16 +196,47 @@ export async function pollAndStore(){
   
   const pipe = redis.pipeline();
   for(const id of SYMBOLS){
-    const price = data?.[id]?.usd;
+    let price = data?.[id]?.usd;
+    
     if(!price) {
-      logger.warn(`No price data for ${id} in response:`, data);
-      continue;
+      logger.warn(`No price data for ${id} in standard format: ${JSON.stringify(data)}`);
+      
+      // Debug info for tracking down the issue
+      logger.info(`Data structure for ${id}: ${JSON.stringify(data[id])}`);
+      
+      // Try to find alternative price formats
+      if (data[id]) {
+        const keys = Object.keys(data[id]);
+        logger.info(`All keys in data[${id}]: ${keys.join(', ')}`);
+        
+        // Try USD (uppercase) format
+        if (data[id] && typeof data[id] === 'object' && 'USD' in data[id] && typeof (data[id] as any).USD === 'number') {
+          price = (data[id] as any).USD;
+          logger.info(`Found price in uppercase USD format: ${price}`);
+        }
+        // Try first available numeric property
+        else if (keys.length > 0 && typeof (data[id] as any)[keys[0]] === 'number') {
+          price = (data[id] as any)[keys[0]];
+          logger.info(`Using first available numeric property ${keys[0]}: ${price}`);
+        }
+      }
+      // Try direct numeric value
+      else if (typeof data[id] === 'number') {
+        price = data[id];
+        logger.info(`Found direct numeric price for ${id}: ${price}`);
+      }
+      
+      // If still no price, skip this symbol
+      if (!price) {
+        logger.warn(`No usable price data found for ${id}, skipping`);
+        continue;
+      }
     }
     
     logger.info(`Processing price for ${id}: ${price}`);
     
     // 1) push to redis stream (ticks:crypto)
-    pipe.xadd('ticks:crypto','*','symbol',id,'price',price);
+    pipe.xadd('ticks:crypto','*','symbol',id,'price',price.toString());
     // 2) Store latest price in a hash for O(1) lookup
     pipe.hset('latest:crypto', id, price.toString());
     // 3) write 1-min candle stub → DB (merge later)
@@ -184,6 +247,10 @@ export async function pollAndStore(){
       create:{ symbol:id, timestamp:ts, open:price, high:price, low:price, close:price, volume:0 }
     });
   }
+  
+  // DEBUG: Log Redis commands before executing
+  logger.info(`Redis pipeline commands prepared for execution`);
+  
   await pipe.exec();
   
   // publish compact JSON to WS channel
