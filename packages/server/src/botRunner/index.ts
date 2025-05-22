@@ -18,6 +18,7 @@ async function spawnBot(botId:number, name:string, type:string){
   while (running) {
     try {
       const workerPath = path.resolve(`src/botRunner/workers/${type}.ts`);
+      console.log(`Attempting to spawn bot ${name} with worker path: ${workerPath}`);
       
       const worker = new Worker(workerPath, {
         workerData:{ botId, name, type }
@@ -77,6 +78,11 @@ async function spawnBot(botId:number, name:string, type:string){
 
 export async function startBots(){
   const bots = await prisma.bot.findMany({ where:{ enabled:true }});
+  console.log(`Found ${bots.length} enabled bots:`, bots.map(b => b.name).join(', '));
   // @ts-ignore - type field added to schema but not yet recognized by TypeScript
-  for(const b of bots) await spawnBot(b.id, b.name, b.type);
+  for(const b of bots) {
+    console.log(`Starting bot: ${b.name} (type: ${b.type})`);
+    // Start each bot in its own async process
+    spawnBot(b.id, b.name, b.type).catch(err => console.error(`Failed to spawn bot ${b.name}:`, err));
+  }
 } 

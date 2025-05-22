@@ -8,7 +8,7 @@
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "build": "rm -rf .build && tsc",
-    "clean": "find src -name \"*.js\" -type f -delete && echo 'Removed JS duplicates!'",
+    "clean": "find src -path 'src/bots/hypertrades/*.js' -prune -o -name \"*.js\" -type f -delete && echo 'Removed JS duplicates!'",
     "start": "node .build/src/index.js",
     "prepare": "concurrently \"pnpm run clean\" \"tsc\""
   },
