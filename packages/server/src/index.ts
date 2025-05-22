@@ -9,7 +9,6 @@ import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
 import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
-import cron from 'node-cron';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 
 // Set default environment variables if not set
@@ -72,10 +71,23 @@ const scheduleUpdate = () => {
 
 scheduleUpdate();
 
-// Schedule fork operations - run every minute/5 minutes for demo
-cron.schedule('* * * * *', weeklyEvaluate);   // every minute for demo
-cron.schedule('*/5 * * * *', weeklyFork);     // every 5 min for demo
-// For production: cron.schedule('0 0 * * 0', weeklyEvaluate); // Sunday midnight
-// For production: cron.schedule('0 0 * * 6', weeklyFork);     // Saturday midnight
+// Schedule fork operations - replace cron with setInterval
+// Run weeklyEvaluate every minute
+setInterval(async () => {
+  try {
+    await weeklyEvaluate();
+  } catch (err) {
+    console.error('[weeklyEvaluate] Error:', err);
+  }
+}, 60 * 1000); // every minute for demo
+
+// Run weeklyFork every 5 minutes
+setInterval(async () => {
+  try {
+    await weeklyFork();
+  } catch (err) {
+    console.error('[weeklyFork] Error:', err);
+  }
+}, 5 * 60 * 1000); // every 5 min for demo
 
 export {}; 

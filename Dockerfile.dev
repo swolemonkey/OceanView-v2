@@ -3,12 +3,6 @@ WORKDIR /app
 COPY . .
 RUN corepack enable && pnpm install
 
-# Install node-cron globally to ensure it's available
-RUN npm install -g node-cron
-RUN pnpm add -w node-cron
-RUN pnpm add -F server node-cron
-RUN pnpm add -F server @types/node-cron -D
-
 # Build the frontend UI
 RUN pnpm --filter ui build
 
