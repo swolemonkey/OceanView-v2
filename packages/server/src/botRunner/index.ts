@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 // Import just the module for type checking workarounds
 import IoRedisMock from 'ioredis-mock';
 import path from 'node:path';
+import { cronCfg } from '../bots/hypertrades/config.js';
 
 // Get API port from environment
 const API_PORT = process.env.PORT || '3334';

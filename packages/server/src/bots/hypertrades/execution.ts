@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { defaultConfig } from './config.js';
+import { defaultConfig, execCfg } from './config.js';
 
 // Use values from config
 const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %

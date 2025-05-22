@@ -1,5 +1,6 @@
 import { prisma } from '../../db.js';
 import IoRedisMock from 'ioredis-mock';
+import { forkCfg } from './config.js';
 
 // Use Redis mock for development
 // @ts-ignore - Working around type issues with ioredis-mock
@@ -46,8 +47,8 @@ export async function weeklyFork() {
   await prisma.hyperSettings.create({
     data: {
       id: child.id, // use botId as settings id
-      smcThresh: mutate(set.smcThresh, 0.1),
-      rsiOS: mutate(set.rsiOS, 0.1)
+      smcThresh: mutate(set.smcThresh, forkCfg.mutatePct),
+      rsiOS: mutate(set.rsiOS, forkCfg.mutatePct)
     }
   });
   

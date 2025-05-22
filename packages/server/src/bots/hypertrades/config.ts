@@ -20,4 +20,8 @@ export const defaultConfig = {
     valueSplit: 2000,       // USD threshold for splitting orders
     timeoutMs: 3000         // 3 second timeout for API calls
   }
-}; 
+};
+
+export const execCfg = { slippage:0.003, splitUSD:2000 };
+export const forkCfg = { mutatePct:0.10 };
+export const cronCfg = { fork:'0 0 * * 6', eval:'0 0 * * 0', learn:'0 0 * * *' }; 
