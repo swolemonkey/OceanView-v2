@@ -8,6 +8,8 @@ import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
+import cron from 'node-cron';
+import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
@@ -67,5 +69,11 @@ const scheduleUpdate = () => {
 };
 
 scheduleUpdate();
+
+// Schedule fork operations - run every minute/5 minutes for demo
+cron.schedule('* * * * *', weeklyEvaluate);   // every minute for demo
+cron.schedule('*/5 * * * *', weeklyFork);     // every 5 min for demo
+// For production: cron.schedule('0 0 * * 0', weeklyEvaluate); // Sunday midnight
+// For production: cron.schedule('0 0 * * 6', weeklyFork);     // Saturday midnight
 
 export {}; 

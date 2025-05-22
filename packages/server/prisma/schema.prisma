@@ -45,9 +45,21 @@ model Trade {
 }
 
 model Bot {
-  id Int @id @default(autoincrement())
-  name String @unique
-  type String @default("scalper") // 'scalper', 'hypertrades', etc.
-  enabled Boolean @default(true)
-  createdAt DateTime @default(now())
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  type      String    @default("scalper") // 'scalper', 'hypertrades', etc.
+  enabled   Boolean   @default(true)
+  parentId  Int?
+  createdAt DateTime  @default(now())
+  metrics   Metric[]
+}
+
+model Metric {
+  id        Int      @id @default(autoincrement())
+  botId     Int
+  date      DateTime @default(now())
+  equity    Float
+  pnl       Float
+  
+  bot       Bot      @relation(fields: [botId], references: [id])
 } 

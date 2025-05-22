@@ -35,6 +35,16 @@ async function spawnBot(botId, name, type) {
                     const json = await res.json();
                     worker.postMessage({ type: 'orderResult', data: json });
                 }
+                if (m.type === 'metric') {
+                    // @ts-ignore - New schema with Metric model not yet recognized by TypeScript
+                    await prisma.metric.create({
+                        data: {
+                            botId: botId,
+                            equity: m.equity,
+                            pnl: m.pnl
+                        }
+                    });
+                }
             });
             // Set up for auto-restart on unexpected exit
             await new Promise((resolve) => {

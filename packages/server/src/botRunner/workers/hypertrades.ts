@@ -21,6 +21,15 @@ const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 let cfg: Config;
 async function init() {
   cfg = await loadConfig();
+  
+  // Report metrics every minute
+  setInterval(() => {
+    parentPort?.postMessage({ 
+      type: 'metric', 
+      equity: risk.equity, 
+      pnl: risk.dayPnL 
+    });
+  }, 60000);
 }
 
 init().catch(err => console.error('[hypertrades] init error:', err));
