@@ -14,7 +14,7 @@ interface Config {
 }
 
 const perception = new Perception();
-const risk = new RiskManager();
+const risk = new RiskManager(workerData.botId);
 const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 
 // Initialize config
@@ -61,7 +61,7 @@ parentPort?.on('message', async (m) => {
   if (m.type === 'orderResult') {
     console.log(`[${workerData.name}] order result`, m.data);
     const { order } = m.data;
-    risk.closePosition(order.qty, order.price);
+    await risk.closePosition(order.qty, order.price);
     await prisma.experience.create({
       data:{
         symbol: order.symbol,

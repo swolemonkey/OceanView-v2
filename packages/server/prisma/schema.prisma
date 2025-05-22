@@ -49,6 +49,7 @@ model Bot {
   name      String    @unique
   type      String    @default("scalper") // 'scalper', 'hypertrades', etc.
   enabled   Boolean   @default(true)
+  equity    Float     @default(10000)
   parentId  Int?
   createdAt DateTime  @default(now())
   metrics   Metric[]
