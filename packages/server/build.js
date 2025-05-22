@@ -1,11 +1,18 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Ensure bots directory exists
-const botsDir = path.join(__dirname, 'dist/bots');
-if (!fs.existsSync(botsDir)) {
-  fs.mkdirSync(botsDir, { recursive: true });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Clean up any JS files in the source directory
+console.log('Removing any existing JS files from src directory...');
+try {
+  execSync('rm -rf src/**/*.js', { stdio: 'inherit' });
+  console.log('Existing JS files removed.');
+} catch (error) {
+  console.warn('Warning: Could not clean JS files:', error.message);
 }
 
 // Compile TypeScript files
@@ -14,6 +21,8 @@ try {
   execSync('tsc', { stdio: 'inherit' });
   console.log('TypeScript compilation complete.');
 } catch (error) {
-  console.error('Error compiling TypeScript:', error);
+  console.error('Error compiling TypeScript:', error.message);
   process.exit(1);
-} 
+}
+
+console.log('Build process completed successfully.'); 

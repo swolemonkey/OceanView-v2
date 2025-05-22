@@ -52,7 +52,10 @@ export const prisma = {
     bot: {
         findMany: async (query) => {
             console.log('Mock bot findMany called:', query);
-            return [{ id: 1, name: 'scalper', enabled: true }];
+            return [
+                { id: 1, name: 'scalper', enabled: true },
+                { id: 2, name: 'hypertrades', enabled: true }
+            ];
         },
         create: async (args) => {
             console.log('Mock bot created:', args.data);

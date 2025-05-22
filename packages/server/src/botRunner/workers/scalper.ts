@@ -1,11 +1,4 @@
-/**
- * @deprecated This file is being kept for reference only.
- * Use the type-specific worker files in the workers/ directory instead.
- * The codebase now dynamically loads workers based on the bot type.
- */
-
 import { parentPort, workerData } from 'worker_threads';
-let mode = workerData.name;   // 'scalper' or 'hypertrades'
 
 let lastPrice = 0;
 let lastTs    = 0;
@@ -24,11 +17,6 @@ parentPort!.on('message', (m:any)=>{
     const { prices, ts } = JSON.parse(m.data);
     const btc = prices.bitcoin?.usd;
     if(!btc){ return; }
-
-    if(mode==='hypertrades'){
-      // Hypertrades bot logic now moved to its own worker file
-      return;
-    }
 
     if(lastPrice && btc < lastPrice*0.997){  // drop >0.3 %
       parentPort!.postMessage({ type:'order',

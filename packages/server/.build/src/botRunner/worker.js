@@ -1,8 +1,5 @@
 import { parentPort, workerData } from 'worker_threads';
 let mode = workerData.name; // 'scalper' or 'hypertrades'
-import { Perception } from '../bots/hypertrades/perception.js';
-import { decide } from '../bots/hypertrades/decision.js';
-const perception = new Perception();
 let lastPrice = 0;
 let lastTs = 0;
 // fire a tiny order once on startup for connectivity test
@@ -21,11 +18,7 @@ parentPort.on('message', (m) => {
             return;
         }
         if (mode === 'hypertrades') {
-            perception.addTick(btc, Date.parse(ts));
-            const idea = decide(perception);
-            if (idea) {
-                parentPort.postMessage({ type: 'order', ...idea });
-            }
+            // Hypertrades bot logic now moved to its own worker file
             return;
         }
         if (lastPrice && btc < lastPrice * 0.997) { // drop >0.3 %

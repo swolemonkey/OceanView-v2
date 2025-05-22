@@ -47,6 +47,7 @@ model Trade {
 model Bot {
   id Int @id @default(autoincrement())
   name String @unique
+  type String @default("scalper") // 'scalper', 'hypertrades', etc.
   enabled Boolean @default(true)
   createdAt DateTime @default(now())
 } 

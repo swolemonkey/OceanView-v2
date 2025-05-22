@@ -4,7 +4,11 @@
     "outDir": ".build",
     "esModuleInterop": true,
     "isolatedModules": true,
-    "typeRoots": ["./node_modules/@types", "./types"]
+    "typeRoots": ["./node_modules/@types", "./types"],
+    "rootDir": ".",
+    "paths": {
+      "*": ["./node_modules/*"]
+    }
   },
   "include": ["src/**/*", "__tests__/**/*", "types/**/*"]
 } 

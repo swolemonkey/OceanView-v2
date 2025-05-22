@@ -9,7 +9,10 @@ const API_PORT = process.env.PORT || '3334';
 // @ts-ignore - Working around type issues with ioredis-mock
 const redis = new IoRedisMock();
 async function spawnBot(botId, name) {
-    const worker = new Worker(path.resolve('src/botRunner/worker.ts'), {
+    const workerPath = name === 'hypertrades'
+        ? path.resolve('src/botRunner/workers/hypertrades.ts')
+        : path.resolve('src/botRunner/worker.ts');
+    const worker = new Worker(workerPath, {
         workerData: { botId, name }
     });
     // pipe ticks

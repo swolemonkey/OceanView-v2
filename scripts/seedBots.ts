@@ -1,25 +1,30 @@
-import { prisma } from '../packages/server/src/db.js';
+import { PrismaClient } from '@prisma/client';
 import { exit } from 'node:process';
 
-// Update the db mock to include bot
-const mockPrisma = {
-  ...prisma,
-  bot: {
-    create: async (args: { data: any }) => {
-      console.log('Mock bot created:', args.data);
-      return { id: 1, ...args.data };
-    }
-  }
-};
+const prisma = new PrismaClient();
 
 async function seedBots() {
-  await mockPrisma.bot.create({ data:{ name:'scalper', enabled:true }});
-  await mockPrisma.bot.create({ data:{ name:'hypertrades', enabled:true }});
-  console.log('bots inserted');
+  // Delete existing bots if any
+  await prisma.bot.deleteMany({});
+  
+  // Create bots with types - using @ts-ignore to bypass type checking
+  await prisma.bot.create({ 
+    // @ts-ignore - type field added to schema but not yet recognized by TypeScript
+    data: { name: 'scalper', enabled: true, type: 'scalper' }
+  });
+  
+  await prisma.bot.create({ 
+    // @ts-ignore - type field added to schema but not yet recognized by TypeScript
+    data: { name: 'hypertrades', enabled: true, type: 'hypertrades' }
+  });
+  
+  console.log('Bots inserted');
+  await prisma.$disconnect();
   exit(0);
 }
 
-seedBots().catch(error => {
+seedBots().catch(async (error) => {
   console.error('Error seeding bots:', error);
+  await prisma.$disconnect();
   exit(1);
 }); 

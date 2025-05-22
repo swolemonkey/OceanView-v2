@@ -54,8 +54,8 @@ export const prisma = {
     findMany: async (query: { where: any }) => {
       console.log('Mock bot findMany called:', query);
       return [
-        { id: 1, name: 'scalper', enabled: true },
-        { id: 2, name: 'hypertrades', enabled: true }
+        { id: 1, name: 'scalper', type: 'scalper', enabled: true },
+        { id: 2, name: 'hypertrades', type: 'hypertrades', enabled: true }
       ];
     },
     create: async (args: { data: any }) => {
