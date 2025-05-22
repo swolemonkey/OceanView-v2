@@ -1,4 +1,9 @@
 import { prisma } from '../../db.js';
+import IoRedisMock from 'ioredis-mock';
+
+// Use Redis mock for development
+// @ts-ignore - Working around type issues with ioredis-mock
+const redis = new IoRedisMock();
 
 function mutate(x: number, pct = 0.1) { 
   return x * (1 + (Math.random() * 2 - 1) * pct); 
@@ -86,6 +91,9 @@ export async function weeklyEvaluate() {
         }
       });
       console.log(`[fork] promoted ${c.id} with Sharpe ${sharpe.toFixed(2)} vs ${pSharpe.toFixed(2)}`);
+      
+      // Publish promotion event
+      redis.publish('chan:metrics', JSON.stringify({ promotion: true, bot: c.id }));
     } else {
       console.log(`[fork] ${c.id} Sharpe ${sharpe.toFixed(2)} worse than parent`);
     }

@@ -52,6 +52,9 @@ async function spawnBot(botId:number, name:string, type:string){
               pnl: m.pnl
             }
           });
+          
+          // Publish metrics to Redis
+          redis.publish('chan:metrics', JSON.stringify({ botId: botId, ...m }));
         }
       });
 
