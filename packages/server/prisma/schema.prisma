@@ -38,6 +38,7 @@ model Trade {
   side String
   qty Decimal
   price Decimal
+  feePaid Decimal @default(0)
   pnl Decimal
   ts DateTime @default(now())
 
@@ -50,6 +51,7 @@ model Bot {
   type      String    @default("scalper") // 'scalper', 'hypertrades', etc.
   enabled   Boolean   @default(true)
   equity    Float     @default(10000)
+  pnlToday  Float     @default(0)
   parentId  Int?
   createdAt DateTime  @default(now())
   metrics   Metric[]

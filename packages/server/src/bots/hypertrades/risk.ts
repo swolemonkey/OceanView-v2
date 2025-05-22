@@ -51,15 +51,18 @@ export class RiskManager {
   }
 
   // simplistic close handling (fills always at price)
-  async closePosition(qty:number, price:number){
+  async closePosition(qty:number, price:number, fee:number = 0){
     const pos = this.positions.shift();
     if(!pos) return;
-    const pnl = pos.side==='buy'
+    let pnl = pos.side==='buy'
       ? (price-pos.entry)*qty
       : (pos.entry-price)*qty;
-    const fee = price * qty * 0.0004;
-    this.dayPnL += pnl - fee;
-    this.equity += pnl - fee;
+    
+    const totalFee = fee || price * qty * 0.0004;
+    pnl -= totalFee;             // subtract commission
+    
+    this.dayPnL += pnl;
+    this.equity += pnl;
     const stop = pos.entry*0.01;
     this.openRisk -= (qty*stop)/this.equity*100;
     
@@ -69,7 +72,10 @@ export class RiskManager {
         // @ts-ignore - Working with new schema field
         await prisma.bot.update({ 
           where: { id: this.botId },
-          data: { equity: this.equity }
+          data: { 
+            equity: this.equity,
+            pnlToday: this.dayPnL
+          }
         });
       } catch (err) {
         console.error('Failed to update equity:', err);

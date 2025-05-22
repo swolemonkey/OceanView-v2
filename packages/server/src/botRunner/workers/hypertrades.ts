@@ -61,7 +61,15 @@ parentPort?.on('message', async (m) => {
   if (m.type === 'orderResult') {
     console.log(`[${workerData.name}] order result`, m.data);
     const { order } = m.data;
-    await risk.closePosition(order.qty, order.price);
+    await risk.closePosition(order.qty, order.price, order.fee);
+    
+    // Send metrics update after position close
+    parentPort?.postMessage({ 
+      type: 'metric', 
+      equity: risk.equity, 
+      pnl: risk.dayPnL 
+    });
+    
     await prisma.experience.create({
       data:{
         symbol: order.symbol,

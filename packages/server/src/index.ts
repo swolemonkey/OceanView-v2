@@ -7,6 +7,7 @@ import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
+import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import cron from 'node-cron';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
@@ -42,6 +43,7 @@ setInterval(pollAndStore, 15000);
 await registerLatestPriceRoute(app);
 await registerOrderRoute(app);
 await registerHealthzRoute(app);
+await registerPortfolioRoute(app);
 
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);

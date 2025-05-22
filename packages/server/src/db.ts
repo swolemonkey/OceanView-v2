@@ -54,9 +54,24 @@ export const prisma = {
     findMany: async (query: { where: any }) => {
       if (process.env.NODE_ENV === 'test') console.log('Mock bot findMany called:', query);
       return [
-        { id: 1, name: 'scalper', type: 'scalper', enabled: true },
-        { id: 2, name: 'hypertrades', type: 'hypertrades', enabled: true }
+        { id: 1, name: 'scalper', type: 'scalper', enabled: true, equity: 10000, pnlToday: 0 },
+        { id: 2, name: 'hypertrades', type: 'hypertrades', enabled: true, equity: 10000, pnlToday: 0 }
       ];
+    },
+    findUnique: async (query: { where: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock bot findUnique called:', query);
+      return { 
+        id: query.where.id || 1, 
+        name: 'test-bot', 
+        type: 'hypertrades', 
+        enabled: true, 
+        equity: 10000,
+        pnlToday: 0
+      };
+    },
+    update: async (args: { where: any, data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock bot update called:', args);
+      return { id: args.where.id, ...args.data };
     },
     create: async (args: { data: any }) => {
       if (process.env.NODE_ENV === 'test') console.log('Mock bot created:', args.data);
