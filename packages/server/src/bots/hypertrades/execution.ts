@@ -8,7 +8,7 @@ const TIMEOUT_MS = defaultConfig.execution.timeoutMs;
 
 type TradeIdea = { symbol:string; side:'buy'|'sell'; qty:number; price:number };
 
-export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, retryDepth: number = 0){
+export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, attempt: number = 0){
   const chunks = idea.qty * idea.price > VALUE_SPLIT
     ? [idea.qty/3, idea.qty/3, idea.qty - 2*(idea.qty/3)]
     : [idea.qty];
@@ -35,10 +35,10 @@ export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, re
     }catch(e: unknown){
       logger(`timeout/cancel for chunk qty ${q}`);
       // retry once
-      if(e instanceof Error && e.name==='AbortError' && retryDepth === 0){
+      if(e instanceof Error && e.name==='AbortError' && attempt < 1){
         logger('retrying once…');
-        return executeIdea({ ...idea, qty:q }, logger, retryDepth + 1);
-      } else if(retryDepth > 0) {
+        return executeIdea({ ...idea, qty:q }, logger, attempt + 1);
+      } else if(attempt >= 1) {
         logger('max retries reached, aborting');
       }
     }
