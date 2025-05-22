@@ -57,8 +57,9 @@ export class RiskManager {
     const pnl = pos.side==='buy'
       ? (price-pos.entry)*qty
       : (pos.entry-price)*qty;
-    this.dayPnL += pnl;
-    this.equity += pnl;
+    const fee = price * qty * 0.0004;
+    this.dayPnL += pnl - fee;
+    this.equity += pnl - fee;
     const stop = pos.entry*0.01;
     this.openRisk -= (qty*stop)/this.equity*100;
     

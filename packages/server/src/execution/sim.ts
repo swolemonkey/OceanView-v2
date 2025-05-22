@@ -9,8 +9,9 @@ export async function placeSimOrder(
   const order = await prisma.order.create({
     data:{ symbol, side, qty, price }
   });
+  const fee = price * qty * 0.0004;
   await prisma.trade.create({
-    data:{ orderId:order.id, symbol, side, qty, price, pnl:0 }
+    data:{ orderId:order.id, symbol, side, qty, price, pnl:0, fee }
   });
   return order;
 } 
