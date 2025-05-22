@@ -1,0 +1,17 @@
+FROM node:20
+
+WORKDIR /app
+COPY . .
+RUN corepack enable && pnpm install
+
+# Create minimal Prisma directory structure
+RUN mkdir -p /app/packages/server/prisma
+
+# Create a minimal schema.prisma file
+RUN echo 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\ngenerator client {\n  provider = "prisma-client-js"\n}' > /app/packages/server/prisma/schema.prisma
+
+# Set environment variables
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+
+# Start the backend service with no-prisma to skip the Prisma generation
+CMD ["bash", "-c", "pnpm --filter server run dev:no-prisma"] 
