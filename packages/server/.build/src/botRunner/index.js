@@ -44,6 +44,8 @@ async function spawnBot(botId, name, type) {
                             pnl: m.pnl
                         }
                     });
+                    // Publish metrics to Redis
+                    redis.publish('chan:metrics', JSON.stringify({ botId: botId, ...m }));
                 }
             });
             // Set up for auto-restart on unexpected exit
