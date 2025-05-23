@@ -19,7 +19,15 @@ const endpoints = {
     coingecko: process.env.COINGECKO_URL || 'https://api.coingecko.com/api/v3/simple/price',
     coincap: process.env.COINCAP_URL || 'https://api.coincap.io/v2/assets',
 };
-const SYMBOLS = ['bitcoin', 'ethereum']; // start small; expand later
+// Modified to add more trading pairs
+const SYMBOLS = ['bitcoin', 'ethereum', 'solana', 'avalanche-2'];
+// Mapping of full symbol names to short symbols for internal use
+const SYMBOL_MAP = {
+    'bitcoin': 'BTC',
+    'ethereum': 'ETH',
+    'solana': 'SOL',
+    'avalanche-2': 'AVAX'
+};
 // Simple in-memory cache
 const cache = {
     data: null,
@@ -225,6 +233,63 @@ export async function pollAndStore() {
     const wsPayload = JSON.stringify({ ts, prices: data });
     logger.info(`Publishing to WebSocket channel: ${wsPayload}`);
     redis.publish('chan:ticks', wsPayload);
+}
+/**
+ * Gets the latest prices for all supported symbols
+ * @returns A record of symbol to price mapping
+ */
+export async function getLatestPrices() {
+    try {
+        // First try to get prices from Redis
+        const latestPrices = await redis.hgetall('latest:crypto');
+        if (latestPrices && Object.keys(latestPrices).length > 0) {
+            // Convert Redis strings to numbers and map to short symbol names
+            const prices = {};
+            for (const [symbol, priceStr] of Object.entries(latestPrices)) {
+                const shortSymbol = SYMBOL_MAP[symbol] || symbol.toUpperCase();
+                // Handle the unknown type properly by ensuring priceStr is a string
+                prices[shortSymbol] = parseFloat(String(priceStr));
+            }
+            logger.info(`Retrieved latest prices from Redis: ${JSON.stringify(prices)}`);
+            return prices;
+        }
+        // If no Redis data, try to get from cache
+        if (cache.data) {
+            const prices = {};
+            for (const symbol of SYMBOLS) {
+                const price = cache.data[symbol]?.usd;
+                if (price !== undefined) {
+                    const shortSymbol = SYMBOL_MAP[symbol] || symbol.toUpperCase();
+                    prices[shortSymbol] = price;
+                }
+            }
+            if (Object.keys(prices).length > 0) {
+                logger.info(`Using cached price data: ${JSON.stringify(prices)}`);
+                return prices;
+            }
+        }
+        // If no data from cache, poll the APIs
+        await pollAndStore();
+        // Now try Redis again
+        const refreshedPrices = await redis.hgetall('latest:crypto');
+        if (refreshedPrices && Object.keys(refreshedPrices).length > 0) {
+            // Convert Redis strings to numbers and map to short symbol names
+            const prices = {};
+            for (const [symbol, priceStr] of Object.entries(refreshedPrices)) {
+                const shortSymbol = SYMBOL_MAP[symbol] || symbol.toUpperCase();
+                // Handle the unknown type properly by ensuring priceStr is a string
+                prices[shortSymbol] = parseFloat(String(priceStr));
+            }
+            logger.info(`Retrieved refreshed prices from Redis: ${JSON.stringify(prices)}`);
+            return prices;
+        }
+        logger.warn('Failed to get latest prices');
+        return null;
+    }
+    catch (error) {
+        logger.error('Error getting latest prices:', error);
+        return null;
+    }
 }
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {

@@ -10,6 +10,7 @@ import { registerHealthzRoute } from './routes/healthz.js';
 import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
+import { run_bot } from './agent.js'; // HyperTrades bot implementation
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
@@ -44,6 +45,18 @@ await registerOrderRoute(app);
 await registerHealthzRoute(app);
 await registerPortfolioRoute(app);
 
+// Add startup event handler to run the bot using the requested pattern
+app.addHook('onReady', async () => {
+  // Start the HyperTrades bot in a background task using Promise to not block the main server
+  Promise.resolve().then(() => {
+    run_bot().catch((err: Error) => {
+      console.error('HyperTrades bot error:', err);
+    });
+  });
+  
+  logger.info('HyperTrades bot started in background');
+});
+
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);
 
@@ -51,9 +64,8 @@ const port = parseInt(process.env.PORT || '3334', 10);
 await app.listen({ port, host: '0.0.0.0' });
 logger.info(`Server started on port ${port}`);
 
-// Start bots
-import { startBots } from './botRunner/index.js';
-await startBots();
+// We don't need to start the bot workers anymore as we've integrated HyperTrades directly
+// Keeping these schedules for learning and evaluation
 
 // Schedule nightly learning update - for demo, run every minute instead of midnight
 const scheduleUpdate = () => {

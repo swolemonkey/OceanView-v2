@@ -9,8 +9,8 @@ import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
 import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
-import cron from 'node-cron';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
+import { run_bot } from './agent.js'; // HyperTrades bot implementation
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
 process.env.COINCAP_URL = process.env.COINCAP_URL || "https://api.coincap.io/v2/assets";
@@ -38,14 +38,23 @@ await registerLatestPriceRoute(app);
 await registerOrderRoute(app);
 await registerHealthzRoute(app);
 await registerPortfolioRoute(app);
+// Add startup event handler to run the bot using the requested pattern
+app.addHook('onReady', async () => {
+    // Start the HyperTrades bot in a background task using Promise to not block the main server
+    Promise.resolve().then(() => {
+        run_bot().catch((err) => {
+            console.error('HyperTrades bot error:', err);
+        });
+    });
+    logger.info('HyperTrades bot started in background');
+});
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);
 // Start server
 await app.listen({ port, host: '0.0.0.0' });
 logger.info(`Server started on port ${port}`);
-// Start bots
-import { startBots } from './botRunner/index.js';
-await startBots();
+// We don't need to start the bot workers anymore as we've integrated HyperTrades directly
+// Keeping these schedules for learning and evaluation
 // Schedule nightly learning update - for demo, run every minute instead of midnight
 const scheduleUpdate = () => {
     const now = new Date();
@@ -61,6 +70,22 @@ const scheduleUpdate = () => {
     }, 60 * 1000); // Run every minute for demo
 };
 scheduleUpdate();
-// Schedule fork operations - run every minute/5 minutes for demo
-cron.schedule('* * * * *', weeklyEvaluate); // every minute for demo
-cron.schedule('*/5 * * * *', weeklyFork); // every 5 min for demo
+// Schedule fork operations - replace cron with setInterval
+// Run weeklyEvaluate every minute
+setInterval(async () => {
+    try {
+        await weeklyEvaluate();
+    }
+    catch (err) {
+        console.error('[weeklyEvaluate] Error:', err);
+    }
+}, 60 * 1000); // every minute for demo
+// Run weeklyFork every 5 minutes
+setInterval(async () => {
+    try {
+        await weeklyFork();
+    }
+    catch (err) {
+        console.error('[weeklyFork] Error:', err);
+    }
+}, 5 * 60 * 1000); // every 5 min for demo

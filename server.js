@@ -4,6 +4,8 @@ import { createServer } from 'http';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { run_bot } from './packages/server/.build/src/agent.js';
+import { pollAndStore } from './packages/server/.build/src/services/marketData.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -45,6 +47,23 @@ app.get('*', (req, res) => {
 });
 
 // Start the server
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
   console.log(`Server running at http://${HOST}:${PORT}`);
+  
+  // Start market data polling
+  console.log('Starting market data polling...');
+  setInterval(pollAndStore, 15000);
+  
+  // Initial poll to get market data
+  await pollAndStore();
+  
+  // Start the HyperTrades bot in background
+  console.log('Starting HyperTrades bot...');
+  Promise.resolve().then(() => {
+    run_bot().catch(err => {
+      console.error('HyperTrades bot error:', err);
+    });
+  });
+  
+  console.log('Server initialization complete');
 }); 

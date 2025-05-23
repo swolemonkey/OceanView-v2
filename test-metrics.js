@@ -1,5 +1,5 @@
 // Import the Redis mock library
-const IoRedisMock = require('ioredis-mock');
+import IoRedisMock from 'ioredis-mock';
 
 // Create a Redis client
 const redis = new IoRedisMock();

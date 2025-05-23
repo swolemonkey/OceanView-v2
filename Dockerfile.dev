@@ -9,6 +9,9 @@ RUN npm install -g pnpm
 RUN corepack enable
 RUN pnpm install
 
+# Build backend TypeScript
+RUN cd packages/server && pnpm build
+
 # Build frontend
 RUN cd packages/ui && pnpm build
 
