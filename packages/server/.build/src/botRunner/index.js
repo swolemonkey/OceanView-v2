@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 // Import just the module for type checking workarounds
 import IoRedisMock from 'ioredis-mock';
 import path from 'node:path';
+import { getStrategyVersion } from '../lib/getVersion.js';
 // Get API port from environment
 const API_PORT = process.env.PORT || '3334';
 // Mock Redis clients for development/testing
@@ -10,13 +11,14 @@ const API_PORT = process.env.PORT || '3334';
 const redis = new IoRedisMock();
 async function spawnBot(botId, name, type) {
     let running = true;
+    const STRAT_VERSION = getStrategyVersion();
     // Keep respawning the worker as long as the bot should be running
     while (running) {
         try {
             const workerPath = path.resolve(`src/botRunner/workers/${type}.ts`);
             console.log(`Attempting to spawn bot ${name} with worker path: ${workerPath}`);
             const worker = new Worker(workerPath, {
-                workerData: { botId, name, type }
+                workerData: { botId, name, type, stratVersion: STRAT_VERSION }
             });
             // pipe ticks
             // @ts-ignore - Working around type issues with ioredis-mock

@@ -65,4 +65,44 @@ model Metric {
   pnl       Float
   
   bot       Bot      @relation(fields: [botId], references: [id])
+}
+
+model StrategyVersion {
+  id        Int      @id @default(autoincrement())
+  hash      String   @unique       // git commit or config hash
+  createdAt DateTime @default(now())
+  description String?
+  trades    StrategyTrade[]
+  metrics   DailyMetric[]
+}
+
+model StrategyTrade {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  botName   String
+  strategyVersionId Int
+  symbol    String
+  side      String    // buy | sell
+  price     Float
+  size      Float
+  entryReason String
+  exitReason  String?
+  pnl       Float
+  durationMs Int
+  @@index([symbol, ts])
+  StrategyVersion StrategyVersion @relation(fields: [strategyVersionId], references: [id])
+}
+
+model DailyMetric {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique
+  strategyVersionId Int
+  botName   String
+  trades    Int
+  grossPnl  Float
+  netPnl    Float
+  winRate   Float
+  sharpe    Float
+  maxDrawdown Float
+  StrategyVersion StrategyVersion @relation(fields: [strategyVersionId], references: [id])
 } 

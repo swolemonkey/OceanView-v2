@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import IoRedisMock from 'ioredis-mock';
 import path from 'node:path';
 import { cronCfg } from '../bots/hypertrades/config.js';
+import { getStrategyVersion } from '../lib/getVersion.js';
 
 // Get API port from environment
 const API_PORT = process.env.PORT || '3334';
@@ -14,6 +15,7 @@ const redis = new IoRedisMock();
 
 async function spawnBot(botId:number, name:string, type:string){
   let running = true;
+  const STRAT_VERSION = getStrategyVersion();
 
   // Keep respawning the worker as long as the bot should be running
   while (running) {
@@ -22,7 +24,7 @@ async function spawnBot(botId:number, name:string, type:string){
       console.log(`Attempting to spawn bot ${name} with worker path: ${workerPath}`);
       
       const worker = new Worker(workerPath, {
-        workerData:{ botId, name, type }
+        workerData:{ botId, name, type, stratVersion: STRAT_VERSION }
       });
 
       // pipe ticks

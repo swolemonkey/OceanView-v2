@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { defaultConfig, execCfg } from './config.js';
+import { prisma } from '../../db.js';
 
 // Use values from config
 const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %
@@ -42,5 +43,40 @@ export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, at
         logger('max retries reached, aborting');
       }
     }
+  }
+}
+
+/**
+ * Log a completed trade to the database
+ */
+export async function logCompletedTrade(order: {
+  symbol: string;
+  side: string;
+  price: number;
+  qty: number;
+  reason?: string;
+  exitReason?: string;
+  pnl: number;
+  entryTs: number;
+}, botName: string, versionId: number) {
+  try {
+    // Use type assertion to work around TypeScript errors with new Prisma models
+    await (prisma as any).strategyTrade.create({
+      data: {
+        ts: new Date(),
+        botName,
+        strategyVersionId: versionId,
+        symbol: order.symbol,
+        side: order.side,
+        price: order.price,
+        size: order.qty,
+        entryReason: order.reason ?? 'n/a',
+        exitReason: order.exitReason ?? 'n/a',
+        pnl: order.pnl,
+        durationMs: Date.now() - order.entryTs
+      }
+    });
+  } catch (error) {
+    console.error('[logCompletedTrade] Error logging trade:', error);
   }
 } 

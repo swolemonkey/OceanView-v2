@@ -11,6 +11,7 @@ import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 import { run_bot } from './agent.js'; // HyperTrades bot implementation
+import './cron/index.js'; // Initialize cron jobs
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
