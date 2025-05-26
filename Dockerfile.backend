@@ -11,7 +11,7 @@ RUN mkdir -p /app/packages/server/prisma
 RUN echo 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\ngenerator client {\n  provider = "prisma-client-js"\n}' > /app/packages/server/prisma/schema.prisma
 
 # Add runtime dependencies for ONNX
-RUN apk add --no-cache libstdc++
+RUN apt-get update && apt-get install -y libstdc++6
 # ensure onnxruntime-node native binaries installed
 RUN pnpm i --filter @oceanview/server onnxruntime-node
 
