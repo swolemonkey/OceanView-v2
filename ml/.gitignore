@@ -1,0 +1,19 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# ONNX model files (optional - you may want to commit these)
+# *.onnx
+
+# Training data
+data_export.csv
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/ 

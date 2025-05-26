@@ -79,19 +79,30 @@ model PortfolioMetric {
 }
 
 model RLModel {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  version   String   @unique
-  path      String
+  id          Int      @id @default(autoincrement())
+  version     String   @unique
+  path        String
   description String?
+  createdAt   DateTime @default(now())
+  dataset     RLDataset[]
 }
 
 model RLDataset {
-  id        Int      @id @default(autoincrement())
-  ts        DateTime @default(now())
-  symbol    String
-  featureVec Json
-  action    String  // buy|sell|skip
-  outcome   Float   // realised pnl
-  strategyVersionId Int
+  id           Int      @id @default(autoincrement())
+  symbol       String
+  ts           DateTime @default(now())
+  featureVec   Json
+  action       String   // 'buy' or 'skip'
+  outcome      Float    // P&L
+  gateScore    Float?   // Score from gatekeeper
+  strategyVersionId Int?
+  modelId      Int?
+  model        RLModel? @relation(fields: [modelId], references: [id])
+}
+
+// Account state for equity bootstrapping
+model AccountState {
+  id         Int      @id @default(autoincrement())
+  equity     Float
+  updatedAt  DateTime @default(now()) @updatedAt
 } 

@@ -160,7 +160,24 @@ export const prisma = {
     },
     findMany: async () => {
       if (process.env.NODE_ENV === 'test') console.log('Mock RLModel findMany called');
-      return [];  // Empty for now as we're in shadow mode
+      // Return a properly typed model with required properties
+      return [{ 
+        id: 1, 
+        version: 'gatekeeper_v1', 
+        path: './ml/gatekeeper_v1.onnx', 
+        description: 'Mock model',
+        createdAt: new Date()
+      }];
+    },
+    findFirst: async (args?: { orderBy?: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLModel findFirst called');
+      return { 
+        id: 1, 
+        version: 'gatekeeper_v1', 
+        path: './ml/gatekeeper_v1.onnx', 
+        description: 'Mock model',
+        createdAt: new Date()
+      };
     }
   },
   rLDataset: {
@@ -168,13 +185,37 @@ export const prisma = {
       if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset created:', args.data);
       return { id: 1, ...args.data };
     },
-    findMany: async (args: { where: any, orderBy: any, take: number }) => {
+    findMany: async (args?: { where?: any, orderBy?: any, take?: number }) => {
       if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset findMany called:', args);
-      return [{ id: 1, symbol: args.where.symbol, ts: new Date(), featureVec: '{}', action: 'buy', outcome: 0, strategyVersionId: 1 }];
+      // Return mock data with properly structured featureVec
+      return [{ 
+        id: 1, 
+        symbol: 'bitcoin', 
+        ts: new Date(), 
+        featureVec: {
+          rsi14: 35.5,
+          fastMA: 48000,
+          slowMA: 45000,
+          smcPattern: 0.75
+        }, 
+        action: 'buy', 
+        outcome: 100, 
+        strategyVersionId: 1 
+      }];
     },
     update: async (args: { where: any, data: any }) => {
       if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset update called:', args);
       return { id: args.where.id, ...args.data };
+    }
+  },
+  accountState: {
+    findFirst: async () => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock accountState findFirst called');
+      return { id: 1, equity: 10000 };
+    },
+    upsert: async (args: { where: any, update: any, create: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock accountState upsert called:', args);
+      return { id: args.where.id, ...args.update };
     }
   }
 }; 
