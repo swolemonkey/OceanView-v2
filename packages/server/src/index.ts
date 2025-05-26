@@ -8,6 +8,7 @@ import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
 import { registerPortfolioRoute } from './routes/portfolio.js';
+import registerApiRoutes from './routes/index.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 import { run_bot } from './agent.js'; // HyperTrades bot implementation
@@ -49,6 +50,7 @@ await registerLatestPriceRoute(app);
 await registerOrderRoute(app);
 await registerHealthzRoute(app);
 await registerPortfolioRoute(app);
+await registerApiRoutes(app);
 
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {

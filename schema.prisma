@@ -91,7 +91,7 @@ model RLDataset {
   id           Int      @id @default(autoincrement())
   symbol       String
   ts           DateTime @default(now())
-  featureVec   Json
+  featureVec   String   // JSON stored as string
   action       String   // 'buy' or 'skip'
   outcome      Float    // P&L
   gateScore    Float?   // Score from gatekeeper

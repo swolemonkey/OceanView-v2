@@ -1,8 +1,9 @@
 {
   "venvPath": ".",
-  "venv": ".venv",
+  "venv": "venv",
+  "extraPaths": [],
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
   "reportMissingImports": false,
-  "reportMissingModuleSource": false,
-  "pythonVersion": "3.8",
-  "typeCheckingMode": "basic"
+  "reportMissingModuleSource": false
 } 

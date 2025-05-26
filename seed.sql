@@ -1,0 +1,1 @@
+insert into "AccountState"(equity) values (10000) on conflict do nothing; 

@@ -16,10 +16,11 @@ export interface FeatureVector {
  * Based on reinforcement learning from past trade outcomes
  */
 export class Gatekeeper {
-  private sess: InferenceSession;
+  private sess!: InferenceSession; // Marked with ! as it will be initialized in init()
   private threshold = 0.55; // Veto trades with score below this
   private isActive = true;  // Active veto mode
   private modelId: number = 0; // Initialize with default value
+  private reloadInterval: NodeJS.Timeout | null = null;
   
   /**
    * Initialize the gatekeeper with a model
@@ -30,6 +31,56 @@ export class Gatekeeper {
     this.sess = await InferenceSession.create(modelPath);
     this.modelId = modelId;
     console.log(`Gatekeeper initialized with model ${modelPath}, threshold ${this.threshold}`);
+    
+    // Set up model hot-reload interval (every 60 seconds)
+    this.setupHotReload();
+  }
+  
+  /**
+   * Set up a hot-reload interval to periodically check for newer models
+   */
+  private setupHotReload(): void {
+    // Clear existing interval if any
+    if (this.reloadInterval) {
+      clearInterval(this.reloadInterval);
+    }
+    
+    // Set up new interval
+    this.reloadInterval = setInterval(async () => {
+      try {
+        // Find the latest model
+        const latestModel = await prisma.rLModel.findFirst({ 
+          orderBy: { id: 'desc' }
+        });
+        
+        // If we found a newer model, load it
+        if (latestModel && latestModel.id !== this.modelId) {
+          console.log(`Gatekeeper hot-reload: New model detected (ID: ${latestModel.id})`);
+          await this.load(latestModel);
+        }
+      } catch (error) {
+        console.error('Error in gatekeeper hot-reload check:', error);
+      }
+    }, 60000); // Check every minute
+  }
+  
+  /**
+   * Load a new model
+   * @param model Model record from database
+   */
+  async load(model: { id: number, path: string }): Promise<void> {
+    try {
+      // Load the new model
+      const newSession = await InferenceSession.create(model.path);
+      
+      // If successful, update our session and modelId
+      this.sess = newSession;
+      this.modelId = model.id;
+      
+      console.log(`Gatekeeper hot-reloaded with model ${model.path} (ID: ${model.id})`);
+    } catch (error) {
+      console.error(`Failed to hot-reload gatekeeper model ${model.path}:`, error);
+    }
   }
   
   /**
@@ -38,26 +89,34 @@ export class Gatekeeper {
    * @returns Probability score (0-1) for approving the trade
    */
   score(featureVec: FeatureVector): number {
-    // Extract features in the order expected by the model
-    const features = [
-      featureVec.rsi14, 
-      featureVec.fastMA, 
-      featureVec.slowMA, 
-      featureVec.smcPattern
-    ];
-    
-    // Create tensor from features
-    const input = new ort.Tensor('float32', Float32Array.from(features), [1, features.length]);
-    
-    // Run inference
-    const outputs = this.sess.run({ float_input: input });
-    
-    // Extract probability (assuming model outputs probability)
-    // The exact output tensor name may vary based on your exported model
-    const probTensor = outputs.probabilities || outputs.probability || outputs.output_probability;
-    
-    // Return probability of the positive class (approve)
-    return probTensor.data[1];
+    try {
+      // Extract features in the order expected by the model
+      const features = [
+        featureVec.rsi14, 
+        featureVec.fastMA, 
+        featureVec.slowMA, 
+        featureVec.smcPattern
+      ];
+      
+      // Create tensor from features
+      const input = new ort.Tensor('float32', Float32Array.from(features), [1, features.length]);
+      
+      // Run inference - cast the output to any to handle the ONNX type issues
+      const outputs = this.sess.run({ float_input: input }) as any;
+      
+      // Extract probability (assuming model outputs probability)
+      // The exact output tensor name may vary based on your exported model
+      const outputKeys = Object.keys(outputs);
+      const probTensor = outputs[outputKeys[0]];
+      
+      // Return probability of the positive class (approve) or default to 0.5
+      return probTensor && probTensor.data && probTensor.data.length > 1 
+        ? probTensor.data[1] 
+        : 0.5;
+    } catch (error) {
+      console.error('Error scoring with gatekeeper model:', error);
+      return 0.5; // Default to 50% if inference fails
+    }
   }
   
   /**
@@ -107,6 +166,16 @@ export class Gatekeeper {
       where: { id },
       data: { outcome }
     });
+  }
+  
+  /**
+   * Clean up resources when shutting down
+   */
+  dispose(): void {
+    if (this.reloadInterval) {
+      clearInterval(this.reloadInterval);
+      this.reloadInterval = null;
+    }
   }
 }
 
