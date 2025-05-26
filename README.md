@@ -5,6 +5,8 @@
 
 A modern trading bot with modular strategy architecture, enhanced SMC logic, and shared risk/reward management.
 
+**Author**: Ricky Jury (swolemonkey)
+
 ## Proprietary Software
 
 This software is proprietary. All rights reserved by the author. The code may not be used, copied, modified, merged, published, distributed, sublicensed, or sold without explicit permission from the author.
@@ -87,7 +89,7 @@ fly deploy
 
 ## License
 
-This project is under a proprietary license. The author retains sole rights to any content or products built using this code. No rights are granted to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the software.
+This project is under a proprietary license. The author retains sole rights to any content or products built using this code. No rights are granted to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the software. See the LICENSE file for complete details.
 
 ## Acknowledgments
 
