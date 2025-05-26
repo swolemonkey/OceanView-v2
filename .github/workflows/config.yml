@@ -1,0 +1,5 @@
+# GitHub Actions configuration
+# This file disables all GitHub Actions for this repository
+
+# Set to true to disable all GitHub Actions
+enabled: false 
