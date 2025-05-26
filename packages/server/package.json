@@ -10,7 +10,8 @@
     "build": "rm -rf .build && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node .build/src/index.js",
-    "prepare": "concurrently \"pnpm run clean\" \"tsc\""
+    "prepare": "concurrently \"pnpm run clean\" \"tsc\"",
+    "test-multi-asset": "tsx test-multi-asset.ts"
   },
   "dependencies": {
     "@fastify/websocket": "^8.2.0",

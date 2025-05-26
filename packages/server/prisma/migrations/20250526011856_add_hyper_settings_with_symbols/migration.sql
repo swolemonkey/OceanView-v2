@@ -1,0 +1,9 @@
+-- CreateTable
+CREATE TABLE "HyperSettings" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT DEFAULT 1,
+    "smcThresh" REAL NOT NULL DEFAULT 0.002,
+    "rsiOS" REAL NOT NULL DEFAULT 35,
+    "riskPct" REAL NOT NULL DEFAULT 1,
+    "symbols" TEXT NOT NULL DEFAULT 'bitcoin',
+    "updatedAt" DATETIME NOT NULL
+);

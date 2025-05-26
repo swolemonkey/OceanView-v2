@@ -1,7 +1,8 @@
 import { defaultConfig } from './config.js';
 import { prisma } from '../../db.js';
+import type { Config } from './config.js';
 
-type Position = { qty:number; entry:number; side:'buy'|'sell' };
+type Position = { qty:number; entry:number; side:'buy'|'sell'; stop?: number };
 
 export class RiskManager {
   equity = 10_000;                // account equity USD
@@ -9,9 +10,12 @@ export class RiskManager {
   dayPnL   = 0;                   // realised profit today
   positions: Position[] = [];
   botId?: number;                 // bot id for database updates
+  config: Config;                 // configuration 
+  versionId?: number;             // strategy version for logging
 
-  constructor(botId?: number) {
+  constructor(botId?: number, config?: Config) {
     this.botId = botId;
+    this.config = config || defaultConfig;
     this.loadEquity();
   }
 
@@ -29,12 +33,16 @@ export class RiskManager {
     }
   }
 
-  sizeTrade(price:number){
-    const cfg = defaultConfig;
-    const stop = price * 0.01;                  // 1 % ATR proxy
-    const risk$ = this.equity * (cfg.riskPct/100);
-    const qty   = risk$ / stop;
+  sizeTrade(stop: number, price: number) {
+    const risk$ = this.equity * (this.config.riskPct/100);
+    const priceDiff = Math.abs(price - stop);
+    const qty = risk$ / priceDiff;
     return qty;
+  }
+
+  updateStops(price: number) {
+    // No-op for now, can be implemented for trailing stops
+    return;
   }
 
   canTrade(){
@@ -43,11 +51,11 @@ export class RiskManager {
     return true;
   }
 
-  registerOrder(side:'buy'|'sell', qty:number, price:number){
-    const stop = price*0.01;
-    const riskPct = (qty*stop)/this.equity*100;
+  registerOrder(side:'buy'|'sell', qty:number, price:number, stop?: number) {
+    const effectiveStop = stop || price * 0.01;  // 1% default if not provided
+    const riskPct = (qty * Math.abs(price - effectiveStop)) / this.equity * 100;
     this.openRisk += riskPct;
-    this.positions.push({ qty, entry:price, side });
+    this.positions.push({ qty, entry: price, side, stop: effectiveStop });
   }
 
   // simplistic close handling (fills always at price)

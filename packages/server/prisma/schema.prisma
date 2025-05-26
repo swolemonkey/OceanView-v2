@@ -105,4 +105,13 @@ model DailyMetric {
   sharpe    Float
   maxDrawdown Float
   StrategyVersion StrategyVersion @relation(fields: [strategyVersionId], references: [id])
+}
+
+model HyperSettings {
+  id        Int      @id @default(1)
+  smcThresh Float    @default(0.002)
+  rsiOS     Float    @default(35)
+  riskPct   Float    @default(1)
+  symbols   String   @default("bitcoin") // comma‑sep list e.g. "bitcoin,ethereum,solana"
+  updatedAt DateTime @updatedAt
 } 
