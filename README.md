@@ -94,4 +94,12 @@ This project is under a proprietary license. The author retains sole rights to a
 ## Acknowledgments
 
 - Thanks to all contributors who have helped shape this project
-- Built with modern JavaScript/TypeScript tooling and libraries 
+- Built with modern JavaScript/TypeScript tooling and libraries
+
+## Sprint 4.1 - Gatekeeper Improvements
+
+Sprint 4.1 added the following features:
+- AccountState model for equity tracking
+- Baseline gatekeeper model
+- Automated model retraining (scheduled and on-demand)
+- Hot-reload capability for models 
