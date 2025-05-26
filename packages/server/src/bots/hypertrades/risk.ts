@@ -85,6 +85,13 @@ export class RiskManager {
             pnlToday: this.dayPnL
           }
         });
+        
+        // Persist equity to accountState
+        await prisma.accountState.upsert({ 
+          where: { id: 1 }, 
+          update: { equity: this.equity },
+          create: { id: 1, equity: this.equity }
+        });
       } catch (err) {
         console.error('Failed to update equity:', err);
       }
