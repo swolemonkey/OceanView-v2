@@ -37,7 +37,7 @@ export async function loadConfig(){
   // Cast row to the extended type
   const extendedRow = row as unknown as ExtendedHyperSettings;
   
-  const symbols = (extendedRow?.symbols ?? process.env.HYPER_SYMBOLS ?? 'bitcoin')
+  const symbols = (extendedRow?.symbols ?? 'bitcoin')
                   .split(',').map((s: string)=>s.trim().toLowerCase());
   return {
     symbols,

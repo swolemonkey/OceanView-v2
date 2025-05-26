@@ -3,7 +3,7 @@ export async function loadConfig() {
     const row = await prisma.hyperSettings.findUnique({ where: { id: 1 } });
     // Cast row to the extended type
     const extendedRow = row;
-    const symbols = (extendedRow?.symbols ?? process.env.HYPER_SYMBOLS ?? 'bitcoin')
+    const symbols = (extendedRow?.symbols ?? 'bitcoin')
         .split(',').map((s) => s.trim().toLowerCase());
     return {
         symbols,

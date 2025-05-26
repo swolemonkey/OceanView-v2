@@ -2,7 +2,7 @@ import { Perception, Candle } from './perception.js';
 import { RiskManager } from './risk.js';
 import { executeIdea } from './execution.js';
 import type { Config } from './config.js';
-import { IndicatorCache } from './indicators/cache.js';
+import * as Indicators from './indicators/index.js';
 import { BaseStrategy } from './strategies/baseStrategy.js';
 import { SMCReversal } from './strategies/smcReversal.js';
 import { passRR } from './utils/riskReward.js';
@@ -28,7 +28,7 @@ export class AssetAgent {
   perception: Perception;
   risk: RiskManager;
   cfg: Config;
-  indCache: IndicatorCache;
+  indCache: Indicators.Default;
   strategies: BaseStrategy[] = [];
   
   constructor(symbol: string, cfg: Config, botId: number, versionId: number) {
@@ -36,7 +36,7 @@ export class AssetAgent {
     this.cfg = cfg;
     this.perception = new Perception();
     this.risk = new RiskManager(botId, cfg);
-    this.indCache = new IndicatorCache();
+    this.indCache = new Indicators.Default();
     
     // store versionId inside risk for trade logging
     (this.risk as any).versionId = versionId;
@@ -85,6 +85,27 @@ export class AssetAgent {
     }
     
     console.log(`[${new Date().toISOString()}] DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
+    
+    // Import the RLGatekeeper dynamically to avoid circular dependencies
+    const gatekeeper = await import('../../rl/gatekeeper.js').then(
+      module => new module.RLGatekeeper((this.risk as any).versionId || 1)
+    );
+    
+    // Prepare feature vector for RL model
+    const features = {
+      symbol: this.symbol,
+      price: candle.c,
+      rsi: this.indCache.rsi14 || 50,
+      adx: 25, // Default value since we don't have ADX implemented yet
+      volatility: Math.abs(candle.h - candle.l) / candle.c,
+      recentTrend: (candle.c - candle.o) / candle.o,
+      dayOfWeek: new Date().getDay(),
+      hourOfDay: new Date().getHours()
+    };
+    
+    // Score the trade idea with the RL gatekeeper (shadow mode)
+    const score = gatekeeper.scoreIdea(features, tradeIdea.side);
+    console.log(`[${new Date().toISOString()}] RL Score: ${score.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
     
     // Process the trade idea
     if (this.risk.canTrade()) {

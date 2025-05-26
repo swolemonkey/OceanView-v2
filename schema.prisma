@@ -66,4 +66,32 @@ model DailyMetric {
 
   @@id([date, symbol, strategyVersionId])
   @@map("daily_metrics")
+}
+
+model PortfolioMetric {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique
+  equityStart Float
+  equityEnd   Float
+  dailyPnl    Float
+  maxOpenRisk Float
+  maxDrawdown Float
+}
+
+model RLModel {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  version   String   @unique
+  path      String
+  description String?
+}
+
+model RLDataset {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  symbol    String
+  featureVec Json
+  action    String  // buy|sell|skip
+  outcome   Float   // realised pnl
+  strategyVersionId Int
 } 

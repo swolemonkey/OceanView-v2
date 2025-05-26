@@ -141,5 +141,40 @@ export const prisma = {
       if (process.env.NODE_ENV === 'test') console.log('Mock dailyMetric upsert called:', args);
       return { id: 1, date: args.where.date, ...args.update };
     }
+  },
+  // New models for portfolio-wide metrics and RL
+  portfolioMetric: {
+    create: async (args: { data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock portfolioMetric created:', args.data);
+      return { id: 1, ...args.data };
+    },
+    upsert: async (args: { where: any, update: any, create: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock portfolioMetric upsert called:', args);
+      return { id: 1, date: args.where.date, ...args.update };
+    }
+  },
+  rLModel: {
+    create: async (args: { data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLModel created:', args.data);
+      return { id: 1, ...args.data };
+    },
+    findMany: async () => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLModel findMany called');
+      return [];  // Empty for now as we're in shadow mode
+    }
+  },
+  rLDataset: {
+    create: async (args: { data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset created:', args.data);
+      return { id: 1, ...args.data };
+    },
+    findMany: async (args: { where: any, orderBy: any, take: number }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset findMany called:', args);
+      return [{ id: 1, symbol: args.where.symbol, ts: new Date(), featureVec: '{}', action: 'buy', outcome: 0, strategyVersionId: 1 }];
+    },
+    update: async (args: { where: any, data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLDataset update called:', args);
+      return { id: args.where.id, ...args.data };
+    }
   }
 }; 

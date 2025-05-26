@@ -4,6 +4,8 @@ import { AssetAgent } from '../../bots/hypertrades/assetAgent.js';
 import { logCompletedTrade } from '../../bots/hypertrades/execution.js';
 import { prisma } from '../../db.js';
 import type { Candle } from '../../bots/hypertrades/perception.js';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
+import { RLGatekeeper, FeatureVector } from '../../rl/gatekeeper.js';
 
 const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 
@@ -12,6 +14,12 @@ let versionId: number;
 const agents = new Map<string, AssetAgent>();
 // Track last candle times for each symbol
 const lastCandleTimes = new Map<string, number>();
+// Portfolio risk manager
+let portfolio: PortfolioRiskManager;
+// RL Gatekeeper
+let rlGatekeeper: RLGatekeeper;
+// Trading halted flag
+let tradingHalted = false;
 
 async function init() {
   // Get config and bot info
@@ -34,6 +42,12 @@ async function init() {
     lastCandleTimes.set(symbol, 0);
   }
   
+  // Initialize portfolio risk manager
+  portfolio = new PortfolioRiskManager();
+  
+  // Initialize RL Gatekeeper
+  rlGatekeeper = new RLGatekeeper(versionId);
+  
   // Report metrics every minute - combined from all agents
   setInterval(() => {
     let totalEquity = 0;
@@ -42,6 +56,17 @@ async function init() {
     for (const agent of agents.values()) {
       totalEquity += agent.risk.equity;
       totalPnl += agent.risk.dayPnL;
+    }
+    
+    // Update portfolio risk manager
+    portfolio.recalc(agents);
+    
+    // Check if trading should be halted due to risk limits
+    const canTrade = portfolio.canTrade();
+    if (!canTrade && !tradingHalted) {
+      log('TRADING HALTED - Risk limits exceeded');
+      log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
+      tradingHalted = true;
     }
     
     parentPort?.postMessage({ 
@@ -80,7 +105,21 @@ parentPort?.on('message', async (m) => {
         if (lastCandles.length > 0) {
           const closedCandle: Candle = lastCandles[0];
           
-          // Call onCandleClose with the closed candle
+          // Update portfolio risk metrics before processing trade ideas
+          portfolio.recalc(agents);
+          
+          // Check if we can trade based on portfolio risk limits
+          if (!portfolio.canTrade()) {
+            tradingHalted = true;
+            log(`Trading halted for ${symbol} - Portfolio risk limits exceeded`);
+            log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
+            
+            // Skip trade processing
+            lastCandleTimes.set(symbol, currentMinute);
+            continue;
+          }
+          
+          // Call onCandleClose with the closed candle to process trade ideas
           await agent.onCandleClose(closedCandle);
           log(`Closed candle for ${symbol} at ${new Date(closedCandle.ts).toISOString()}`);
         }
@@ -109,6 +148,13 @@ parentPort?.on('message', async (m) => {
     
     await agent.risk.closePosition(order.qty, order.price, order.fee);
     
+    // Update RL Dataset with outcome (PnL)
+    try {
+      await rlGatekeeper.updateOutcome(order.symbol, order.entryTs, agent.risk.dayPnL);
+    } catch (error) {
+      console.error('Error updating RL outcome:', error);
+    }
+    
     // Send metrics update after position close - combined from all agents
     let totalEquity = 0;
     let totalPnl = 0;
@@ -117,6 +163,9 @@ parentPort?.on('message', async (m) => {
       totalEquity += a.risk.equity;
       totalPnl += a.risk.dayPnL;
     }
+    
+    // Update portfolio risk manager
+    portfolio.recalc(agents);
     
     parentPort?.postMessage({ 
       type: 'metric', 

@@ -55,7 +55,7 @@ export async function computeYesterdayMetrics() {
       update: { 
         grossPnl: gross, 
         netPnl: gross, 
-        winRate: wins/tradeBatch.length,
+        winRate: wins/tradeBatch.length as number,
         sharpe, 
         maxDrawdown: maxDD, 
         trades: tradeBatch.length 
@@ -68,7 +68,7 @@ export async function computeYesterdayMetrics() {
         trades: tradeBatch.length, 
         grossPnl: gross, 
         netPnl: gross,
-        winRate: wins/tradeBatch.length, 
+        winRate: wins/tradeBatch.length as number, 
         sharpe, 
         maxDrawdown: maxDD 
       }

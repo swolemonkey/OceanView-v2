@@ -114,4 +114,32 @@ model HyperSettings {
   riskPct   Float    @default(1)
   symbols   String   @default("bitcoin") // comma‑sep list e.g. "bitcoin,ethereum,solana"
   updatedAt DateTime @updatedAt
+}
+
+model PortfolioMetric {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique
+  equityStart Float
+  equityEnd   Float
+  dailyPnl    Float
+  maxOpenRisk Float
+  maxDrawdown Float
+}
+
+model RLModel {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  version   String   @unique
+  path      String
+  description String?
+}
+
+model RLDataset {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  symbol    String
+  featureVec String   // JSON string representation
+  action    String  // buy|sell|skip
+  outcome   Float   // realised pnl
+  strategyVersionId Int
 } 
