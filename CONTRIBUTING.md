@@ -2,6 +2,10 @@
 
 Thank you for your interest in contributing to OceanView-v2! This document provides guidelines and instructions for contributing.
 
+## Intellectual Property Notice
+
+By contributing to this project, you agree that your contributions become the property of the repository owner. All intellectual property rights to your contributions are transferred to the repository owner upon submission. The repository owner retains sole rights to any content or products built using this code.
+
 ## Code of Conduct
 
 Please be respectful and considerate of others when contributing to this project.
@@ -52,4 +56,8 @@ When suggesting features, please include:
 
 ## Questions
 
-If you have any questions, please open an issue with the "question" label. 
+If you have any questions, please open an issue with the "question" label.
+
+## License
+
+All contributions to this project are subject to the project's proprietary license. By contributing, you acknowledge that you have read and agree to the license terms, which prohibit any use, copying, modification, merging, publishing, distribution, sublicensing, or selling of the software without explicit permission from the repository owner. 

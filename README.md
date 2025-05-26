@@ -1,10 +1,13 @@
 # OceanView-v2
 
-[![GitHub license](https://img.shields.io/github/license/swolemonkey/OceanView-v2)](https://github.com/swolemonkey/OceanView-v2/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/swolemonkey/OceanView-v2)](https://github.com/swolemonkey/OceanView-v2/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/swolemonkey/OceanView-v2)](https://github.com/swolemonkey/OceanView-v2/issues)
+[![GitHub stars](https://img.shields.io/github/stars/swolemonkey/OceanView-v2)](https://github.com/swolemonkey/OceanView-v2/stargazers)
 
 A modern trading bot with modular strategy architecture, enhanced SMC logic, and shared risk/reward management.
+
+## Proprietary Software
+
+This software is proprietary. All rights reserved by the author. The code may not be used, copied, modified, merged, published, distributed, sublicensed, or sold without explicit permission from the author.
 
 ## Features
 
@@ -84,7 +87,7 @@ fly deploy
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is under a proprietary license. The author retains sole rights to any content or products built using this code. No rights are granted to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of the software.
 
 ## Acknowledgments
 
