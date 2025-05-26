@@ -1,14 +1,14 @@
+# Disabled workflow
 name: CI
 
+# This workflow will not run as we're not targeting any branches or events
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  # Trigger manually only
+  workflow_dispatch:
 
 jobs:
-  dummy-job:
+  skip:
     runs-on: ubuntu-latest
     steps:
-      - name: Success
-        run: echo "CI check successful" && exit 0 
+      - name: Skip
+        run: echo "Workflow skipped intentionally" 

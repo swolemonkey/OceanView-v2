@@ -1,0 +1,14 @@
+# This workflow is intentionally disabled
+name: CI (Disabled)
+
+# No triggers defined - this workflow will never run automatically
+on:
+  # Manual trigger only
+  workflow_dispatch:
+
+jobs:
+  disabled:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI Disabled
+        run: echo "CI has been disabled" 

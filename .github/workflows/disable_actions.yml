@@ -1,0 +1,15 @@
+# This workflow is intentionally empty and does nothing.
+# It exists only to prevent GitHub from running default workflows.
+
+name: Disable Actions
+
+on:
+  # This ensures the workflow is never triggered automatically
+  workflow_dispatch:
+
+jobs:
+  disable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Do nothing
+        run: echo "GitHub Actions disabled" 
