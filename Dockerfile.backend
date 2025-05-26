@@ -10,6 +10,11 @@ RUN mkdir -p /app/packages/server/prisma
 # Create a minimal schema.prisma file
 RUN echo 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\ngenerator client {\n  provider = "prisma-client-js"\n}' > /app/packages/server/prisma/schema.prisma
 
+# Add runtime dependencies for ONNX
+RUN apk add --no-cache libstdc++
+# ensure onnxruntime-node native binaries installed
+RUN pnpm i --filter @oceanview/server onnxruntime-node
+
 # Set environment variables
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
 
