@@ -105,5 +105,41 @@ export const prisma = {
       if (process.env.NODE_ENV === 'test') console.log('Mock hyperSettings upsert called:', args);
       return { id: 1, ...args.update };
     }
+  },
+  // New models added for strategy tracking
+  strategyVersion: {
+    upsert: async (args: { where: any, update: any, create: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock strategyVersion upsert called:', args);
+      return { id: 1, hash: args.where.hash, description: args.create.description };
+    }
+  },
+  strategyTrade: {
+    create: async (args: { data: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock strategyTrade created:', args.data);
+      return { id: 1, ...args.data };
+    },
+    findMany: async (args: { where: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock strategyTrade findMany called:', args);
+      return Array(5).fill({ 
+        id: 1, 
+        ts: new Date(),
+        botName: 'hypertrades',
+        strategyVersionId: 1,
+        symbol: 'bitcoin', 
+        side: 'buy',
+        price: 50000,
+        size: 0.1,
+        entryReason: 'test',
+        exitReason: 'test',
+        pnl: 100,
+        durationMs: 5000
+      });
+    }
+  },
+  dailyMetric: {
+    upsert: async (args: { where: any, update: any, create: any }) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock dailyMetric upsert called:', args);
+      return { id: 1, date: args.where.date, ...args.update };
+    }
   }
 }; 
