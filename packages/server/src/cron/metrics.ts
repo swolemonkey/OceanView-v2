@@ -6,6 +6,7 @@ interface TradeData {
   strategyVersionId: number;
   botName: string;
   ts: Date;
+  symbol: string;
 }
 
 export async function computeYesterdayMetrics() {
@@ -19,35 +20,58 @@ export async function computeYesterdayMetrics() {
   
   if (!trades.length) return;
   
-  const gross = trades.reduce((s, t) => s + t.pnl, 0);
-  const wins  = trades.filter(t => t.pnl > 0).length;
-  const stdev = Math.sqrt(trades.reduce((s, t) => s + ((t.pnl - gross/trades.length) ** 2), 0) / trades.length);
-  const sharpe = stdev ? (gross/trades.length)/stdev : 0;
-  const maxDD = trades.reduce((dd, t) => Math.min(dd, t.pnl), 0);
-  const strat = trades[0].strategyVersionId;
-  const bot = trades[0].botName;
+  // Group trades by symbol and strategyVersionId
+  const groupedTrades = new Map<string, TradeData[]>();
   
-  // Save daily metrics
-  await prisma.dailyMetric.upsert({
-    where: { date: yesterday },
-    update: { 
-      grossPnl: gross, 
-      netPnl: gross, 
-      winRate: wins/trades.length,
-      sharpe, 
-      maxDrawdown: maxDD, 
-      trades: trades.length 
-    },
-    create: { 
-      date: yesterday, 
-      strategyVersionId: strat, 
-      botName: bot,
-      trades: trades.length, 
-      grossPnl: gross, 
-      netPnl: gross,
-      winRate: wins/trades.length, 
-      sharpe, 
-      maxDrawdown: maxDD 
+  trades.forEach(trade => {
+    const key = `${trade.symbol}:${trade.strategyVersionId}`;
+    if (!groupedTrades.has(key)) {
+      groupedTrades.set(key, []);
     }
+    groupedTrades.get(key)!.push(trade);
   });
+  
+  // Process metrics for each group
+  for (const [key, tradeBatch] of groupedTrades.entries()) {
+    const [symbol, versionIdStr] = key.split(':');
+    const versionId = parseInt(versionIdStr);
+    
+    const gross = tradeBatch.reduce((s, t) => s + t.pnl, 0);
+    const wins = tradeBatch.filter(t => t.pnl > 0).length;
+    const stdev = Math.sqrt(tradeBatch.reduce((s, t) => s + ((t.pnl - gross/tradeBatch.length) ** 2), 0) / tradeBatch.length);
+    const sharpe = stdev ? (gross/tradeBatch.length)/stdev : 0;
+    const maxDD = tradeBatch.reduce((dd, t) => Math.min(dd, t.pnl), 0);
+    const bot = tradeBatch[0].botName;
+    
+    // Save daily metrics for this group
+    await prisma.dailyMetric.upsert({
+      where: { 
+        date_symbol_strategyVersionId: {
+          date: yesterday,
+          symbol,
+          strategyVersionId: versionId
+        } 
+      },
+      update: { 
+        grossPnl: gross, 
+        netPnl: gross, 
+        winRate: wins/tradeBatch.length,
+        sharpe, 
+        maxDrawdown: maxDD, 
+        trades: tradeBatch.length 
+      },
+      create: { 
+        date: yesterday, 
+        symbol,
+        strategyVersionId: versionId, 
+        botName: bot,
+        trades: tradeBatch.length, 
+        grossPnl: gross, 
+        netPnl: gross,
+        winRate: wins/tradeBatch.length, 
+        sharpe, 
+        maxDrawdown: maxDD 
+      }
+    });
+  }
 } 

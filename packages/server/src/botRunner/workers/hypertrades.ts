@@ -3,12 +3,15 @@ import { loadConfig } from '../../bots/hypertrades/config.js';
 import { AssetAgent } from '../../bots/hypertrades/assetAgent.js';
 import { logCompletedTrade } from '../../bots/hypertrades/execution.js';
 import { prisma } from '../../db.js';
+import type { Candle } from '../../bots/hypertrades/perception.js';
 
 const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 
 // Initialize config
 let versionId: number;
 const agents = new Map<string, AssetAgent>();
+// Track last candle times for each symbol
+const lastCandleTimes = new Map<string, number>();
 
 async function init() {
   // Get config and bot info
@@ -28,6 +31,7 @@ async function init() {
   for (const symbol of cfg.symbols) {
     log(`Creating agent for ${symbol}`);
     agents.set(symbol, new AssetAgent(symbol, cfg, botId, versionId));
+    lastCandleTimes.set(symbol, 0);
   }
   
   // Report metrics every minute - combined from all agents
@@ -55,12 +59,35 @@ parentPort?.on('message', async (m) => {
     const { prices, ts } = JSON.parse(m.data);
     const epoch = Date.parse(ts);
     
+    // Get current minute timestamp (truncated to minute)
+    const currentMinute = Math.floor(epoch / 60000) * 60000;
+    
     // Process ticks for each agent if price data is available
     for (const [symbol, agent] of agents.entries()) {
       const price = prices[symbol]?.usd;
-      if (price) {
-        await agent.onTick(price, epoch);
+      if (!price) continue;
+      
+      // Process the tick
+      await agent.onTick(price, epoch);
+      
+      // Get the last recorded candle time for this symbol
+      const lastCandleTime = lastCandleTimes.get(symbol) || 0;
+      
+      // If we've moved to a new minute, the previous candle has closed
+      if (currentMinute > lastCandleTime && lastCandleTime > 0) {
+        // Get the last candle from perception (the one that just closed)
+        const lastCandles = agent.perception.last(1);
+        if (lastCandles.length > 0) {
+          const closedCandle: Candle = lastCandles[0];
+          
+          // Call onCandleClose with the closed candle
+          await agent.onCandleClose(closedCandle);
+          log(`Closed candle for ${symbol} at ${new Date(closedCandle.ts).toISOString()}`);
+        }
       }
+      
+      // Update the last candle time for this symbol
+      lastCandleTimes.set(symbol, currentMinute);
     }
   }
   

@@ -1,8 +1,11 @@
-import { Perception } from './perception.js';
+import { Perception, Candle } from './perception.js';
 import { RiskManager } from './risk.js';
-import { decide } from './decision.js';
 import { executeIdea } from './execution.js';
 import type { Config } from './config.js';
+import { IndicatorCache } from './indicators/cache.js';
+import { BaseStrategy } from './strategies/baseStrategy.js';
+import { SMCReversal } from './strategies/smcReversal.js';
+import { passRR } from './utils/riskReward.js';
 
 // Define TradeIdea type to match what executeIdea expects
 type TradeIdea = { 
@@ -25,13 +28,21 @@ export class AssetAgent {
   perception: Perception;
   risk: RiskManager;
   cfg: Config;
+  indCache: IndicatorCache;
+  strategies: BaseStrategy[] = [];
+  
   constructor(symbol: string, cfg: Config, botId: number, versionId: number) {
     this.symbol = symbol;
     this.cfg = cfg;
     this.perception = new Perception();
     this.risk = new RiskManager(botId, cfg);
+    this.indCache = new IndicatorCache();
+    
     // store versionId inside risk for trade logging
     (this.risk as any).versionId = versionId;
+    
+    // Initialize strategies
+    this.strategies.push(new SMCReversal(symbol));
   }
 
   async onTick(price: number, ts: number) {
@@ -44,38 +55,71 @@ export class AssetAgent {
       console.log(`[${new Date().toISOString()}] ${this.symbol.toUpperCase()}: Not enough data yet, need at least 2 candles`);
       return; // Need at least 2 candles
     }
+  }
+  
+  async onCandleClose(candle: Candle) {
+    // Update the candle in perception
+    this.perception.onCandleClose(candle);
     
-    const decision = await decide(this.perception, { ...this.cfg, symbol: this.symbol });
+    // Update indicator cache
+    this.indCache.updateOnClose(candle.c);
     
-    // Decision is now always defined and has a reason
-    if (!decision) {
-      return; // Just in case decide returns null (shouldn't happen with our updates)
+    // Prepare strategy context
+    const ctx = {
+      perception: this.perception,
+      ind: this.indCache,
+      cfg: this.cfg
+    };
+    
+    // Get first non-null trade idea from strategies
+    let tradeIdea = null;
+    for (const strategy of this.strategies) {
+      tradeIdea = strategy.onCandle(candle, ctx);
+      if (tradeIdea) break;
     }
     
-    // Check if it's a trade or a hold action
-    if ('action' in decision && decision.action === 'hold') {
-      // Log the hold action with reason
-      console.log(`[${new Date().toISOString()}] DECISION: HOLD ${this.symbol.toUpperCase()} @ $${price.toFixed(2)} | ${decision.reason}`);
+    // If no trade idea, return
+    if (!tradeIdea) {
+      console.log(`[${new Date().toISOString()}] DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals`);
       return;
     }
     
-    // It's a trade idea
-    const idea = decision as TradeIdea;
-    console.log(`[${new Date().toISOString()}] DECISION: ${idea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${price.toFixed(2)} | ${idea.reason || 'Technical analysis signals'}`);
+    console.log(`[${new Date().toISOString()}] DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
     
+    // Process the trade idea
     if (this.risk.canTrade()) {
-      const stop = idea.side === 'buy' 
+      const lastCandles = this.perception.last(2);
+      const stop = tradeIdea.side === 'buy' 
         ? lastCandles[0].l * 0.99  // 1% below recent low for long
         : lastCandles[0].h * 1.01; // 1% above recent high for short
-        
-      const qty = this.risk.sizeTrade(stop, idea.price);
+      
+      // Check risk-reward ratio using our helper
+      const target = tradeIdea.side === 'buy'
+        ? candle.c + (candle.c - stop) * 2  // 1:2 risk-reward for now
+        : candle.c - (stop - candle.c) * 2;
+      
+      if (!passRR(tradeIdea.side, candle.c, stop, target, 2)) {
+        console.log(`[${new Date().toISOString()}] BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
+        return;
+      }
+      
+      const qty = this.risk.sizeTrade(stop, candle.c);
       
       // Log trade execution
-      console.log(`[${new Date().toISOString()}] EXECUTING: ${idea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${idea.price.toFixed(2)}`);
+      console.log(`[${new Date().toISOString()}] EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)}`);
       
-      // Cast idea to ensure side is the correct type
-      executeIdea({ ...idea, side: idea.side as 'buy' | 'sell', qty }, console.log);
-      this.risk.registerOrder(idea.side as 'buy' | 'sell', qty, idea.price, stop);
+      // Create full trade idea for execution
+      const idea: TradeIdea = {
+        symbol: this.symbol,
+        side: tradeIdea.side,
+        qty,
+        price: candle.c,
+        reason: tradeIdea.reason
+      };
+      
+      // Execute the trade
+      executeIdea(idea, console.log);
+      this.risk.registerOrder(idea.side, qty, idea.price, stop);
       
       // Log trade completion
       console.log(`[${new Date().toISOString()}] COMPLETED: ${idea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${idea.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);

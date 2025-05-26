@@ -18,7 +18,7 @@ try {
 // Compile TypeScript files
 console.log('Compiling TypeScript files...');
 try {
-  execSync('tsc', { stdio: 'inherit' });
+  execSync('npx tsc', { stdio: 'inherit' });
   console.log('TypeScript compilation complete.');
 } catch (error) {
   console.error('Error compiling TypeScript:', error.message);

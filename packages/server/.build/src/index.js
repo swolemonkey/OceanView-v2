@@ -11,11 +11,15 @@ import { registerPortfolioRoute } from './routes/portfolio.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 import { run_bot } from './agent.js'; // HyperTrades bot implementation
+import './cron/index.js'; // Initialize cron jobs
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
 process.env.COINCAP_URL = process.env.COINCAP_URL || "https://api.coincap.io/v2/assets";
 process.env.REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
+// Log configured symbols
+const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
+console.log(`[INIT] HyperTrades configured with symbols: ${configuredSymbols}`);
 // Initialize logger
 const logger = pino({
     transport: {
@@ -40,13 +44,14 @@ await registerHealthzRoute(app);
 await registerPortfolioRoute(app);
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {
+    console.log('[INIT] Starting Multi-Asset HyperTrades bot with symbols:', configuredSymbols);
     // Start the HyperTrades bot in a background task using Promise to not block the main server
     Promise.resolve().then(() => {
         run_bot().catch((err) => {
             console.error('HyperTrades bot error:', err);
         });
     });
-    logger.info('HyperTrades bot started in background');
+    logger.info('Multi-Asset HyperTrades bot started in background');
 });
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);

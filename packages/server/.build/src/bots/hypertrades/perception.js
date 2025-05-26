@@ -16,4 +16,18 @@ export class Perception {
     last(n) {
         return this.candles.slice(-n);
     }
+    onCandleClose(candle) {
+        // This method will be called when a candle is closed
+        // Used for updating strategies
+        const existingIndex = this.candles.findIndex(c => c.ts === candle.ts);
+        if (existingIndex >= 0) {
+            this.candles[existingIndex] = candle;
+        }
+        else {
+            this.candles.push(candle);
+            if (this.candles.length > 500)
+                this.candles.shift();
+        }
+        return candle;
+    }
 }
