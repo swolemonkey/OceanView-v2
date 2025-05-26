@@ -67,4 +67,16 @@ export class PortfolioRiskManager {
       console.error('Failed to update equity in DB:', error);
     }
   }
+  
+  /**
+   * Handles the closing of a position and updates equity in database
+   */
+  async closePosition() {
+    // Update the equity in the database
+    await prisma.accountState.upsert({
+      where: { id: 1 },
+      update: { equity: this.equity },
+      create: { id: 1, equity: this.equity }
+    });
+  }
 } 
