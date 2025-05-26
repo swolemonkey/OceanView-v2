@@ -1,0 +1,9 @@
+# These owners will be the default owners for everything in the repo
+# unless a later match takes precedence.
+* @swolemonkey
+
+# App directories
+/apps/ @swolemonkey 
+
+# Package directories
+/packages/ @swolemonkey 

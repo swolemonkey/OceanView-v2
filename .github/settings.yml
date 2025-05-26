@@ -1,0 +1,71 @@
+repository:
+  # See https://docs.github.com/en/rest/reference/repos#update-a-repository for all available settings.
+
+  # The name of the repository. Changing this will rename the repository
+  name: OceanView-v2
+
+  # A short description of the repository that will show up on GitHub
+  description: Trading bot with modular strategy architecture
+
+  # A URL with more information about the repository
+  homepage: https://github.com/swolemonkey/OceanView-v2
+
+  # Possible values are `true` to make the repository private, or `false` to make it public.
+  private: false
+
+  # Either `true` to enable issues for this repository, `false` to disable them.
+  has_issues: true
+
+  # Either `true` to enable projects for this repository, or `false` to disable them.
+  has_projects: true
+
+  # Either `true` to enable the wiki for this repository, `false` to disable it.
+  has_wiki: true
+
+  # Either `true` to enable downloads for this repository, `false` to disable them.
+  has_downloads: true
+
+  # Updates the default branch for this repository.
+  default_branch: main
+
+  # Either `true` to allow squash-merging pull requests, or `false` to prevent
+  # squash-merging.
+  allow_squash_merge: true
+
+  # Either `true` to allow merging pull requests with a merge commit, or `false`
+  # to prevent merging pull requests with merge commits.
+  allow_merge_commit: true
+
+  # Either `true` to allow rebase-merging pull requests, or `false` to prevent
+  # rebase-merging.
+  allow_rebase_merge: true
+
+  # Set to `true` to mark this as a template repository
+  is_template: false
+
+# Labels: define labels for Issues and Pull Requests
+labels:
+  - name: bug
+    color: d73a4a
+    description: Something isn't working
+  - name: documentation
+    color: 0075ca
+    description: Improvements or additions to documentation
+  - name: enhancement
+    color: a2eeef
+    description: New feature or request
+  - name: good first issue
+    color: 7057ff
+    description: Good for newcomers
+  - name: help wanted
+    color: 008672
+    description: Extra attention is needed
+
+# Collaborators: give specific users access to this repository.
+# See https://docs.github.com/en/rest/reference/repos#add-a-repository-collaborator for available options
+collaborators:
+  # Note: Only valid on organization-owned repositories.
+  # The permission to grant the collaborator. Can be one of:
+  # * `pull` - can pull, but not push to or administer this repository.
+  # * `push` - can pull and push, but not administer this repository.
+  # * `admin` - can pull, push and administer this repository. 
