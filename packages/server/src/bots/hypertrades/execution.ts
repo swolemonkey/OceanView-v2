@@ -60,8 +60,7 @@ export async function logCompletedTrade(order: {
   entryTs: number;
 }, botName: string, versionId: number) {
   try {
-    // Use type assertion to work around TypeScript errors with new Prisma models
-    await (prisma as any).strategyTrade.create({
+    await prisma.strategyTrade.create({
       data: {
         ts: new Date(),
         botName,
