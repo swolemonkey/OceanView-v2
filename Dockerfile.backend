@@ -34,6 +34,10 @@ RUN npm install -g typescript
 # Build the server
 RUN pnpm --filter server run build
 
+# Copy the seed script to scripts directory in the Docker image
+RUN mkdir -p /app/packages/server/scripts/
+COPY packages/server/scripts/register_rl_model.ts /app/packages/server/scripts/
+
 # Debug: List compiled files
 RUN ls -la /app/packages/server/dist
 RUN ls -la /app/packages/server/dist/src || echo "src directory not found in dist"
