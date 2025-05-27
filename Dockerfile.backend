@@ -22,12 +22,14 @@ COPY . .
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libstdc++6
 
+# Make sure server dependencies are installed
+RUN cd packages/server && pnpm install
+
 # Generate server-specific Prisma client
 RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
 
-# Skip the seed process during build - will be handled at runtime
-# We'll run migrations and seed at runtime instead of build time
-# This avoids errors when the database isn't available during build
+# Install TypeScript globally
+RUN npm install -g typescript
 
 # Build the server
 RUN pnpm --filter server run build
