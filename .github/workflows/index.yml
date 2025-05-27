@@ -22,7 +22,8 @@ jobs:
           cache-dependency-path: 'pnpm-lock.yaml'
 
       # 3️⃣ Install deps & type-check
-      - run: pnpm install --frozen-lockfile --prod
+      - run: pnpm install --frozen-lockfile --prod --ignore-scripts
+      - run: pnpm -F server run clean
       - run: pnpm -F server run build:types
 
       # 4️⃣ Prisma-model check
