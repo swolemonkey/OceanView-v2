@@ -79,6 +79,8 @@ docker build -f Dockerfile.backend -t oceanview-v2 .
 fly deploy
 ```
 
+For CI/CD setup with GitHub Actions, see the [Deployment Guide](docs/DEPLOYMENT.md).
+
 ## Contributing
 
 1. Fork the repository
