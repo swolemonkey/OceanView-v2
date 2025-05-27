@@ -24,16 +24,21 @@ FROM base AS build
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential node-gyp openssl pkg-config python-is-python3
 
-# Install node modules
-COPY package.json pnpm-lock.yaml ./
+# Copy package files first for better caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+
+# Copy all package.json files for workspace packages
+COPY packages/*/package.json ./packages/
+COPY apps/*/package.json ./apps/
+
+# Install dependencies in a single pass
 RUN pnpm install --frozen-lockfile
 
-# Generate Prisma Client
-COPY prisma .
-RUN npx prisma generate
-
-# Copy application code
+# Copy the rest of the application code
 COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate
 
 
 # Final stage for app image
