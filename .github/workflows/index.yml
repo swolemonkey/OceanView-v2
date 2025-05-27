@@ -32,10 +32,4 @@ jobs:
       
       # 6️⃣ Check for required model (simplified check)
       - name: Verify presence of AccountState model
-        run: |
-          if grep -q "model AccountState" packages/server/prisma/schema.prisma; then
-            echo "✅ AccountState model found"
-            exit 0
-          else
-            echo "❌ AccountState model missing"
-            exit 1 
+        run: grep -q "model AccountState" packages/server/prisma/schema.prisma || exit 1 
