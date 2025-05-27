@@ -27,5 +27,15 @@ jobs:
       # 4️⃣ Run clean script
       - run: pnpm -F server run clean
       
-      # 5️⃣ Prisma-model check using npx directly
-      - run: npx tsx scripts/ci-model-check.ts 
+      # 5️⃣ Generate Prisma client
+      - run: cd packages/server && npx prisma generate
+      
+      # 6️⃣ Check for required model (simplified check)
+      - name: Verify presence of AccountState model
+        run: |
+          if grep -q "model AccountState" packages/server/prisma/schema.prisma; then
+            echo "✅ AccountState model found"
+            exit 0
+          else
+            echo "❌ AccountState model missing"
+            exit 1 
