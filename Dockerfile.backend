@@ -8,7 +8,9 @@ RUN corepack enable
 # copy prisma schema once for generate & runtime
 COPY prisma ./prisma
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+
+# Install all dependencies to ensure build tools are available
+RUN pnpm install
 
 # Generate Prisma client at root level with correct schema path
 RUN pnpm prisma generate --schema=./prisma/schema.prisma
