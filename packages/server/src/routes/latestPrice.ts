@@ -2,10 +2,10 @@ import { FastifyInstance } from 'fastify';
 // Import only the default function from ioredis-mock
 import IoRedisMock from 'ioredis-mock';
 import { prisma } from '../db.js';
-import pino from 'pino';
+import * as pino from 'pino';
 
 // Initialize logger
-const logger = pino({
+const logger = pino.pino({
   transport: {
     target: 'pino-pretty',
     options: {

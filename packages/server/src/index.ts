@@ -2,7 +2,7 @@ import 'dotenv/config';
 import './db.js';
 import Fastify from 'fastify';
 import wsPlugin from './ws.js';
-import pino from 'pino';
+import * as pino from 'pino';
 import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
@@ -25,7 +25,7 @@ const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
 console.log(`[INIT] HyperTrades configured with symbols: ${configuredSymbols}`);
 
 // Initialize logger
-const logger = pino({
+const logger = pino.pino({
   transport: {
     target: 'pino-pretty',
     options: {

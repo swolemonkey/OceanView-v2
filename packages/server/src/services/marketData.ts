@@ -1,11 +1,11 @@
 import fetch from 'node-fetch';
 // Import only the default function from ioredis-mock
 import IoRedisMock from 'ioredis-mock';
-import pino from 'pino';
+import * as pino from 'pino';
 import { prisma } from '../db.js';
 
 // Initialize logger
-const logger = pino({
+const logger = pino.pino({
   transport: {
     target: 'pino-pretty',
     options: {
