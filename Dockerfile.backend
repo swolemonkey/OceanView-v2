@@ -25,8 +25,9 @@ RUN apt-get update && \
 # Generate server-specific Prisma client
 RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
 
-# Seed the database with initial data including the RLModel
-RUN cd packages/server && pnpm db:seed
+# Skip the seed process during build - will be handled at runtime
+# We'll run migrations and seed at runtime instead of build time
+# This avoids errors when the database isn't available during build
 
 # Build the server
 RUN pnpm --filter server run build
