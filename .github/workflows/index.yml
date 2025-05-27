@@ -25,6 +25,9 @@ jobs:
       - run: pnpm install --frozen-lockfile --prod --ignore-scripts
       - run: pnpm -F server run clean
       - run: pnpm -F server run build:types
+      
+      # Install ts-node explicitly for the CI script
+      - run: pnpm install -g ts-node
 
       # 4️⃣ Prisma-model check
       - run: pnpm ts-node scripts/ci-model-check.ts 
