@@ -2,18 +2,31 @@ FROM node:20
 
 WORKDIR /app
 
+# Setup pnpm first
+RUN corepack enable
+
 # copy prisma schema once for generate & runtime
 COPY prisma ./prisma
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+# Generate Prisma client at root level with correct schema path
+RUN pnpm prisma generate --schema=./prisma/schema.prisma
+
+# Copy the rest of the codebase
 COPY . .
-RUN corepack enable && pnpm install
+RUN pnpm install
 
 # Install onnxruntime-node & system libs
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libstdc++6 && \
     pnpm --filter server add onnxruntime-node@1.17.3
 
-# Generate Prisma client during build (not at runtime)
+# Generate server-specific Prisma client
 RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
+
+# Seed the database with initial data including the RLModel
+RUN cd packages/server && pnpm db:seed
 
 # Build the server
 RUN pnpm --filter server run build
