@@ -13,7 +13,10 @@ RUN apt-get update && \
     pnpm --filter server add onnxruntime-node@1.17.3
 
 # Generate Prisma client during build (not at runtime)
-RUN pnpm --filter server prisma generate --schema=./prisma/schema.prisma
+RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
+
+# Build the server
+RUN pnpm --filter server run build
 
 # Set environment variables
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
