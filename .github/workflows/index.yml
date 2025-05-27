@@ -10,19 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Set up Node with pnpm lock support
-      - name: Use Node 20 + pnpm
-        uses: actions/setup-node@v3
+      # 1️⃣ Setup Node + cache
+      - uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      - run: corepack enable   # ensures pnpm is available
+      # 2️⃣ Install pnpm (corepack)
+      - name: Enable pnpm via corepack
+        run: corepack enable
 
-      # Install deps (prod only – no dev) & type-check
+      # 3️⃣ Install deps & type-check
       - run: pnpm install --frozen-lockfile --prod
       - run: pnpm -F server run build:types
 
-      # Lint the Prisma schema models presence
+      # 4️⃣ Prisma-model check
       - run: pnpm ts-node scripts/ci-model-check.ts 
