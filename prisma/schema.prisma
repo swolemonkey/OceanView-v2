@@ -105,4 +105,25 @@ model AccountState {
   id         Int      @id @default(autoincrement())
   equity     Float
   updatedAt  DateTime @default(now()) @updatedAt
+}
+
+// Bot model for forkManager
+model Bot {
+  id       Int      @id @default(autoincrement())
+  name     String
+  type     String   @default("hypertrades")
+  enabled  Boolean  @default(true)
+  parentId Int?
+  equity   Float    @default(10000)
+  pnlToday Float    @default(0)
+  ts       DateTime @default(now())
+}
+
+// Metric model for bot performance tracking
+model Metric {
+  id     Int      @id @default(autoincrement())
+  botId  Int
+  equity Float
+  pnl    Float
+  date   DateTime @default(now())
 } 

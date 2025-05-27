@@ -1,33 +1,35 @@
 name: Index Repository
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   index:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm install -g @sourcegraph/src-cli
 
-      - name: Index repository
-        run: |
-          src code-intel upload \
-            --github-token ${{ secrets.GITHUB_TOKEN }} \
-            --repo github.com/${{ github.repository }} \
-            --commit ${{ github.sha }} \
-            --root . 
+      # 1️⃣ Install pnpm (corepack)
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      # 2️⃣ Setup Node + cache
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      # 3️⃣ Install deps with dev dependencies needed for CI
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      
+      # 4️⃣ Run clean script
+      - run: pnpm -F server run clean
+      
+      # 5️⃣ Generate Prisma client
+      - run: cd packages/server && npx prisma generate
+      
+      # 6️⃣ Check for required model (simplified check)
+      - name: Verify presence of AccountState model
+        run: grep -q "model AccountState" packages/server/prisma/schema.prisma || exit 1 

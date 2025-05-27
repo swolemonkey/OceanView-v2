@@ -9,7 +9,10 @@
     "dev:ui": "pnpm --filter ui run dev",
     "dev": "pnpm run dev:server & pnpm run dev:ui",
     "db:generate": "pnpm --filter @oceanview/server db:generate",
-    "start": "node server.js"
+    "start": "node server.js",
+    "gatekeeper": "tsx scripts/gatekeeper.ts",
+    "gatekeeper:retrain": "tsx scripts/gatekeeper.ts retrain",
+    "gatekeeper:register": "tsx scripts/gatekeeper.ts register"
   },
   "keywords": [],
   "author": "",
