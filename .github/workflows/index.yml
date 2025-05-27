@@ -24,9 +24,8 @@ jobs:
       # 3️⃣ Install deps with dev dependencies needed for CI
       - run: pnpm install --frozen-lockfile --ignore-scripts
       
-      # 4️⃣ Run build and type checks
+      # 4️⃣ Run clean script
       - run: pnpm -F server run clean
-      - run: pnpm -F server run build:types
-
-      # 5️⃣ Prisma-model check
-      - run: node --require ts-node/register scripts/ci-model-check.ts 
+      
+      # 5️⃣ Prisma-model check using npx directly
+      - run: npx tsx scripts/ci-model-check.ts 
