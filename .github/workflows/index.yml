@@ -1,33 +1,28 @@
 name: Index Repository
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   index:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Node.js
+
+      # Set up Node with pnpm lock support
+      - name: Use Node 20 + pnpm
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm install -g @sourcegraph/src-cli
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
-      - name: Index repository
-        run: |
-          src code-intel upload \
-            --github-token ${{ secrets.GITHUB_TOKEN }} \
-            --repo github.com/${{ github.repository }} \
-            --commit ${{ github.sha }} \
-            --root . 
+      - run: corepack enable   # ensures pnpm is available
+
+      # Install deps (prod only – no dev) & type-check
+      - run: pnpm install --frozen-lockfile --prod
+      - run: pnpm -F server run build:types
+
+      # Lint the Prisma schema models presence
+      - run: pnpm ts-node scripts/ci-model-check.ts 
