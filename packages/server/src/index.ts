@@ -3,6 +3,7 @@ import './db.js';
 import Fastify from 'fastify';
 import wsPlugin from './ws.js';
 import * as pino from 'pino';
+import { prisma } from './db.js';
 import { pollAndStore } from './services/marketData.js';
 import { registerLatestPriceRoute } from './routes/latestPrice.js';
 import { registerOrderRoute } from './routes/order.js';
@@ -34,6 +35,44 @@ const logger = pino.pino({
   }
 });
 
+// Initialize RLModel in the database
+async function initializeRLModel() {
+  try {
+    // Check if the model exists already
+    const existingModels = await prisma.rLModel.findMany();
+    const gatekeeperModel = existingModels.find(model => model.version === 'gatekeeper_v1');
+    
+    // If model doesn't exist, create it
+    if (!gatekeeperModel) {
+      await prisma.rLModel.create({
+        data: {
+          version: 'gatekeeper_v1',
+          description: 'baseline LR',
+          path: 'ml/gatekeeper_v1.onnx',
+        }
+      });
+      console.log(`[gatekeeper] initialized with model ml/gatekeeper_v1.onnx, threshold 0.55`);
+    } else {
+      console.log(`[gatekeeper] using existing model ${gatekeeperModel.path}, threshold 0.55`);
+    }
+
+    // Check and initialize account state
+    const accountState = await prisma.accountState.findFirst();
+    if (accountState) {
+      console.log(`[portfolio] Loaded starting equity from DB: ${accountState.equity}`);
+    } else {
+      await prisma.accountState.upsert({
+        where: { id: 1 },
+        update: { equity: 10000 },
+        create: { equity: 10000 }
+      });
+      console.log(`[portfolio] Initialized starting equity: 10000`);
+    }
+  } catch (error) {
+    console.error('Error initializing RLModel:', error);
+  }
+}
+
 // Create Fastify instance with logger enabled
 const app = Fastify({
   logger: true // Use Fastify's built-in logger instead of passing our logger
@@ -55,6 +94,9 @@ await registerApiRoutes(app);
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {
   console.log('[INIT] Starting Multi-Asset HyperTrades bot with symbols:', configuredSymbols);
+  
+  // Initialize RLModel before starting the bot
+  await initializeRLModel();
   
   // Start the HyperTrades bot in a background task using Promise to not block the main server
   Promise.resolve().then(() => {
