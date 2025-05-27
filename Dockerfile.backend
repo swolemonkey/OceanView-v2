@@ -15,12 +15,10 @@ RUN pnpm prisma generate --schema=./prisma/schema.prisma
 
 # Copy the rest of the codebase
 COPY . .
-RUN pnpm install
 
-# Install onnxruntime-node & system libs
+# Install system libs only
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libstdc++6 && \
-    pnpm --filter server add onnxruntime-node@1.17.3
+    apt-get install -y --no-install-recommends libstdc++6
 
 # Generate server-specific Prisma client
 RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
