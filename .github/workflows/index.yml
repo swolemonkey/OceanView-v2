@@ -21,13 +21,12 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      # 3️⃣ Install deps & type-check
-      - run: pnpm install --frozen-lockfile --prod --ignore-scripts
+      # 3️⃣ Install deps with dev dependencies needed for CI
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      
+      # 4️⃣ Run build and type checks
       - run: pnpm -F server run clean
       - run: pnpm -F server run build:types
-      
-      # Install ts-node locally for the CI script
-      - run: pnpm add ts-node typescript @prisma/client
 
-      # 4️⃣ Prisma-model check
+      # 5️⃣ Prisma-model check
       - run: npx ts-node scripts/ci-model-check.ts 
