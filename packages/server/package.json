@@ -10,6 +10,7 @@
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
+    "start:docker": "node dist/src/index.js",
     "prepare": "concurrently \"pnpm run clean\" \"tsc\"",
     "test-multi-asset": "tsx test-multi-asset.ts"
   },

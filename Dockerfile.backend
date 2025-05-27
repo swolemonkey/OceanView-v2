@@ -26,5 +26,5 @@ RUN cat /app/packages/server/package.json | grep start
 # Set environment variables
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
 
-# Switch CMD to production start
-CMD ["pnpm", "--filter", "server", "run", "start"] 
+# Switch CMD to production start using the Docker-specific start script
+CMD ["pnpm", "--filter", "server", "run", "start:docker"] 
