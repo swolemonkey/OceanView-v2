@@ -1,0 +1,108 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Experience {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  price     Float
+  smcThresh Float
+  rsiOS     Float
+  reward    Float
+  ts        DateTime @default(now())
+}
+
+model HyperSettings {
+  id            Int      @id @default(1)
+  smcThresh     Float    @default(0.002)
+  rsiOS         Float    @default(35)
+  rsiOB         Float    @default(65)
+  symbols       String   @default("bitcoin")
+  riskPct       Float    @default(1)
+  smcMinRetrace Float    @default(0.5)
+  updatedAt     DateTime @updatedAt
+}
+
+model StrategyVersion {
+  id          Int          @id @default(autoincrement())
+  hash        String       @unique
+  description String
+  trades      StrategyTrade[]
+  metrics     DailyMetric[]
+}
+
+model StrategyTrade {
+  id                Int      @id @default(autoincrement())
+  symbol            String
+  side              String
+  qty               Float
+  price             Float
+  fee               Float    @default(0)
+  pnl               Float
+  entryTs           DateTime
+  ts                DateTime @default(now())
+  botName           String
+  strategyVersionId Int
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id])
+}
+
+model DailyMetric {
+  date              DateTime
+  symbol            String
+  strategyVersionId Int
+  botName           String
+  trades            Int
+  grossPnl          Float
+  netPnl            Float
+  winRate           Float
+  sharpe            Float
+  maxDrawdown       Float
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id])
+
+  @@id([date, symbol, strategyVersionId])
+  @@map("daily_metrics")
+}
+
+model PortfolioMetric {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique
+  equityStart Float
+  equityEnd   Float
+  dailyPnl    Float
+  maxOpenRisk Float
+  maxDrawdown Float
+}
+
+model RLModel {
+  id          Int      @id @default(autoincrement())
+  version     String   @unique
+  path        String
+  description String?
+  createdAt   DateTime @default(now())
+  dataset     RLDataset[]
+}
+
+model RLDataset {
+  id           Int      @id @default(autoincrement())
+  symbol       String
+  ts           DateTime @default(now())
+  featureVec   String   // JSON stored as string
+  action       String   // 'buy' or 'skip'
+  outcome      Float    // P&L
+  gateScore    Float?   // Score from gatekeeper
+  strategyVersionId Int?
+  modelId      Int?
+  model        RLModel? @relation(fields: [modelId], references: [id])
+}
+
+// Account state for equity bootstrapping
+model AccountState {
+  id         Int      @id @default(autoincrement())
+  equity     Float
+  updatedAt  DateTime @default(now()) @updatedAt
+} 
