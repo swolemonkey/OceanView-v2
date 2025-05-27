@@ -25,6 +25,7 @@ model HyperSettings {
   symbols       String   @default("bitcoin")
   riskPct       Float    @default(1)
   smcMinRetrace Float    @default(0.5)
+  strategyToggle String?  @default("{}")  // JSON column for strategy toggles
   updatedAt     DateTime @updatedAt
 }
 
