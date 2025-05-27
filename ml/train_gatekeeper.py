@@ -92,17 +92,17 @@ def main():
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         # Convert the model to ONNX
-        n_features = X.shape[1]
-        initial_types = [('float_input', FloatTensorType([None, n_features]))]
-        
-        # Use a simple conversion approach
-        onx = convert_sklearn(lr_model, initial_types=initial_types)
+        n_features = X_train.shape[1]
+        onnx_model = convert_sklearn(
+            lr_model,
+            initial_types=[('float_input', FloatTensorType([None, n_features]))]
+        )
         
         # Save the model
         with open(output_path, 'wb') as f:
-            f.write(onx.SerializeToString())
+            f.write(onnx_model.SerializeToString())
             
-        print(f"Model exported to {output_path}")
+        print(f"✅  Saved ONNX model → {output_path}")
     except Exception as e:
         print(f"Error exporting model to ONNX: {e}")
         

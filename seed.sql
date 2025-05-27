@@ -1,1 +1,1 @@
-insert into "AccountState"(equity) values (10000) on conflict do nothing; 
+insert into "AccountState"(id,equity) values (1,10000) on conflict (id) do nothing;

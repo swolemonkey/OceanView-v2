@@ -34,18 +34,8 @@ export class Gatekeeper {
       console.log(`[gatekeeper] initialized with model ${modelPath}, threshold ${this.threshold}`);
     } catch (error) {
       console.error(`Failed to load ONNX model ${modelPath}:`, error);
-      console.log(`[gatekeeper] using fallback model with threshold ${this.threshold}`);
-      // Create a dummy/mock session for development
-      this.sess = {
-        run: () => {
-          return {
-            output: {
-              data: [0.4, 0.6]  // Return a fixed probability
-            }
-          };
-        }
-      } as any;
-      this.modelId = modelId;
+      // Let it throw if model is missing
+      throw error;
     }
     
     // Set up model hot-reload interval (every 60 seconds)

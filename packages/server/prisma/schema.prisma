@@ -142,4 +142,10 @@ model RLDataset {
   action    String  // buy|sell|skip
   outcome   Float   // realised pnl
   strategyVersionId Int
+}
+
+model AccountState {
+  id      Int     @id @default(autoincrement())
+  equity  Float
+  updated DateTime @updatedAt
 } 

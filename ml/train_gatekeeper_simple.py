@@ -9,6 +9,7 @@ import os
 import pickle
 import numpy as np  # type: ignore
 import argparse
+import random
 
 def main():
     # Parse command line arguments
@@ -23,21 +24,24 @@ def main():
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Create a simple placeholder model
-    # This is just a binary file with some data to represent a model
-    # In a real scenario, this would be an actual trained model
+    # Create a larger placeholder model with random data
+    # Generate a large array to make the file size > 100kB
+    large_array = np.random.random((10000, 100))
+    
     placeholder_data = {
         "weights": np.array([0.1, 0.2, -0.3, 0.4]),
         "bias": np.array([0.05]),
         "feature_names": ["rsi14", "fastMA", "slowMA", "smcPattern"],
-        "description": "Placeholder gatekeeper model for Sprint 4.1"
+        "description": "Placeholder gatekeeper model for Sprint 4.1",
+        "large_data": large_array  # This makes the file larger
     }
     
     # Save as pickle (not ONNX but sufficient for development)
     with open(output_path, "wb") as f:
         pickle.dump(placeholder_data, f)
     
-    print(f"Placeholder model created at {output_path}")
+    file_size_kb = os.path.getsize(output_path) / 1024
+    print(f"Placeholder model created at {output_path} (Size: {file_size_kb:.2f} kB)")
     print("This is a development placeholder - replace with actual model in production.")
 
 if __name__ == "__main__":
