@@ -10,16 +10,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1️⃣ Setup Node + cache
+      # 1️⃣ Install pnpm (corepack)
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      # 2️⃣ Setup Node + cache
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
-
-      # 2️⃣ Install pnpm (corepack)
-      - name: Enable pnpm via corepack
-        run: corepack enable
 
       # 3️⃣ Install deps & type-check
       - run: pnpm install --frozen-lockfile --prod
