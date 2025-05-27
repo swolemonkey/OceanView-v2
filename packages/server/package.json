@@ -3,13 +3,13 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "pnpm run db:generate && pnpm run clean && tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "dev:no-prisma": "tsx watch src/index.ts",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "build": "rm -rf .build && tsc",
+    "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
-    "start": "node .build/src/index.js",
+    "start": "node dist/index.js",
     "prepare": "concurrently \"pnpm run clean\" \"tsc\"",
     "test-multi-asset": "tsx test-multi-asset.ts"
   },

@@ -1,22 +1,22 @@
 FROM node:20
 
 WORKDIR /app
+
+# copy prisma schema once for generate & runtime
+COPY prisma ./prisma
 COPY . .
 RUN corepack enable && pnpm install
 
-# Create minimal Prisma directory structure
-RUN mkdir -p /app/packages/server/prisma
+# Install onnxruntime-node & system libs
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libstdc++6 && \
+    pnpm --filter server add onnxruntime-node@1.17.3
 
-# Create a minimal schema.prisma file
-RUN echo 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\ngenerator client {\n  provider = "prisma-client-js"\n}' > /app/packages/server/prisma/schema.prisma
-
-# Add runtime dependencies for ONNX
-RUN apt-get update && apt-get install -y libstdc++6
-# ensure onnxruntime-node native binaries installed
-RUN pnpm i --filter @oceanview/server onnxruntime-node
+# Generate Prisma client during build (not at runtime)
+RUN pnpm --filter server prisma generate --schema=./prisma/schema.prisma
 
 # Set environment variables
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
 
-# Start the backend service with no-prisma to skip the Prisma generation
-CMD ["bash", "-c", "pnpm --filter server run dev:no-prisma"] 
+# Switch CMD to production start
+CMD ["pnpm", "--filter", "server", "run", "start"] 
