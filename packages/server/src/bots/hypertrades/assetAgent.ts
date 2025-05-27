@@ -5,6 +5,8 @@ import type { Config } from './config.js';
 import * as Indicators from './indicators/index.js';
 import { BaseStrategy } from './strategies/baseStrategy.js';
 import { SMCReversal } from './strategies/smcReversal.js';
+import { TrendFollowMA } from './strategies/trendFollow.js';
+import { RangeBounce } from './strategies/rangeBounce.js';
 import { passRR } from './utils/riskReward.js';
 
 // Define TradeIdea type to match what executeIdea expects
@@ -41,8 +43,23 @@ export class AssetAgent {
     // store versionId inside risk for trade logging
     (this.risk as any).versionId = versionId;
     
-    // Initialize strategies
-    this.strategies.push(new SMCReversal(symbol));
+    // Get strategy toggle for this symbol
+    const symbolToggle = cfg.strategyToggle[symbol] || {};
+    
+    // Initialize strategies based on configuration
+    if (symbolToggle.smcReversal !== false) { // Default to true if not specified
+      this.strategies.push(new SMCReversal(symbol));
+    }
+    
+    if (symbolToggle.trendFollowMA === true) {
+      this.strategies.push(new TrendFollowMA(symbol));
+    }
+    
+    if (symbolToggle.rangeBounce === true) {
+      this.strategies.push(new RangeBounce(symbol));
+    }
+    
+    console.log(`[${new Date().toISOString()}] Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`);
   }
 
   async onTick(price: number, ts: number) {

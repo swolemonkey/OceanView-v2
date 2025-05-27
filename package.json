@@ -12,7 +12,8 @@
     "start": "node server.js",
     "gatekeeper": "tsx scripts/gatekeeper.ts",
     "gatekeeper:retrain": "tsx scripts/gatekeeper.ts retrain",
-    "gatekeeper:register": "tsx scripts/gatekeeper.ts register"
+    "gatekeeper:register": "tsx scripts/gatekeeper.ts register",
+    "gatekeeper:train": "tsx scripts/gatekeeper.ts"
   },
   "keywords": [],
   "author": "",

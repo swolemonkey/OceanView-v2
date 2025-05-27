@@ -13,6 +13,7 @@ export type Config = {
   };
   riskPct: number;
   symbol: string;
+  strategyToggle: Record<string, Record<string, boolean>>;
   execution?: {
     slippageLimit: number;
     valueSplit: number;
@@ -29,6 +30,7 @@ type ExtendedHyperSettings = {
   symbols: string;
   riskPct?: number;
   smcMinRetrace?: number;
+  strategyToggle?: string;
   updatedAt: Date;
 };
 
@@ -39,6 +41,15 @@ export async function loadConfig(){
   
   const symbols = (extendedRow?.symbols ?? 'bitcoin')
                   .split(',').map((s: string)=>s.trim().toLowerCase());
+  
+  // Parse strategyToggle JSON, default to empty object
+  let strategyToggle: Record<string, Record<string, boolean>> = {};
+  try {
+    strategyToggle = extendedRow?.strategyToggle ? JSON.parse(extendedRow.strategyToggle) : {};
+  } catch (e) {
+    console.error('Error parsing strategyToggle JSON:', e);
+  }
+  
   return {
     symbols,
     smc: { 
@@ -51,7 +62,8 @@ export async function loadConfig(){
       overBought: extendedRow?.rsiOB ?? 65 
     },
     riskPct: extendedRow?.riskPct ?? 1,
-    symbol: 'bitcoin'
+    symbol: 'bitcoin',
+    strategyToggle
   } as const;
 }
 
@@ -68,6 +80,7 @@ export const defaultConfig = {
     overSold: 35, 
     overBought: 65 
   },
+  strategyToggle: {},      // Default empty strategy toggle configuration
   execution: {
     slippageLimit: 0.003,   // 0.3% max slippage tolerance
     valueSplit: 2000,       // USD threshold for splitting orders
