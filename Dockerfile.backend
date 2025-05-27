@@ -18,6 +18,11 @@ RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
 # Build the server
 RUN pnpm --filter server run build
 
+# Debug: List compiled files
+RUN ls -la /app/packages/server/dist
+RUN ls -la /app/packages/server/dist/src || echo "src directory not found in dist"
+RUN cat /app/packages/server/package.json | grep start
+
 # Set environment variables
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
 
