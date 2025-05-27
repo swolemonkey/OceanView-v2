@@ -12,6 +12,9 @@ primary_region = 'syd'
 [env]
   PORT = '3334'
 
+[processes]
+  app = "pnpm --filter server run start"
+
 [[mounts]]
   source = 'ovbackend_data'
   destination = '/app/packages/server/prisma'
