@@ -1,9 +1,10 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
-// Mock Prisma client
+// Mock Prisma client - using a more direct approach with @ts-ignore
 jest.mock('../src/db.js', () => ({
   prisma: {
     accountState: {
+      // @ts-ignore - suppressing the TypeScript error about the mock return type
       upsert: jest.fn().mockResolvedValue({ equity: 15000 })
     }
   }
@@ -14,19 +15,19 @@ import { FastifyInstance } from 'fastify';
 import { registerControlsRoute } from '../src/routes/controls.js';
 
 describe('Controls Controller', () => {
-  let app: FastifyInstance;
-  let mockReply;
+  let app: any; // Using any type to avoid TypeScript errors
+  let mockReply: any;
   
   beforeEach(() => {
     // Mock Fastify instance
     app = {
       post: jest.fn((path, handler) => {
         // Store the handler for testing
-        app.routes = app.routes || {};
-        app.routes[path] = handler;
+        app.handlers = app.handlers || {};
+        app.handlers[path] = handler;
       }),
-      routes: {}
-    } as unknown as FastifyInstance;
+      handlers: {}
+    };
     
     // Mock reply
     mockReply = {
@@ -42,7 +43,7 @@ describe('Controls Controller', () => {
   it('should update equity when valid value is provided', async () => {
     await registerControlsRoute(app);
     
-    const handler = app.routes['/controls'];
+    const handler = app.handlers['/controls'];
     const mockRequest = {
       body: { equity: 15000 }
     };
@@ -55,7 +56,7 @@ describe('Controls Controller', () => {
   it('should return error when no valid parameters are provided', async () => {
     await registerControlsRoute(app);
     
-    const handler = app.routes['/controls'];
+    const handler = app.handlers['/controls'];
     const mockRequest = {
       body: {}
     };

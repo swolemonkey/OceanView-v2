@@ -1,9 +1,20 @@
 import fetch from 'node-fetch';
 
-async function fetchMetrics() {
+// Define the metrics response type
+interface MetricsResponse {
+  equity: number;
+  pnl: number;
+  drawdown: number;
+  tradeCount24h: number;
+  gatekeeperVetoRatio: number;
+  latestSentiment: number;
+  latestOrderBookImbalance: number;
+}
+
+async function fetchMetrics(): Promise<MetricsResponse> {
   try {
     const response = await fetch('http://localhost:3334/metrics');
-    const metrics = await response.json();
+    const metrics = await response.json() as MetricsResponse;
     
     // Format and display metrics in a readable way
     console.log('\n=== Bot Metrics ===\n');

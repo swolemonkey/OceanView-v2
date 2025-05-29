@@ -81,8 +81,8 @@ model StrategyTrade {
   ts        DateTime @default(now())
   botName   String
   strategyVersionId Int
-  symbol    String
-  side      String    // buy | sell
+  symbol    String    // buy | sell
+  side      String
   price     Float
   size      Float
   entryReason String
@@ -148,4 +148,31 @@ model AccountState {
   id      Int     @id @default(autoincrement())
   equity  Float
   updated DateTime @updatedAt
+}
+
+// New models for Sprint 9
+
+model BotHeartbeat {
+  id      Int      @id @default(autoincrement())
+  ts      DateTime @default(now())
+  status  String   // 'ok', 'alert', 'critical'
+  details String?
+}
+
+model NewsSentiment {
+  id      Int      @id @default(autoincrement())
+  ts      DateTime @default(now())
+  source  String
+  score   Float    // -1 to 1, where 1 is positive
+  articles Int
+  @@index([ts])
+}
+
+model OrderBookMetric {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  symbol    String
+  imbalance Float    // -1 to 1, where 1 is buy pressure
+  depth     Int      // number of levels used
+  @@index([symbol, ts])
 } 

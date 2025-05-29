@@ -1,6 +1,17 @@
 import fetch from 'node-fetch';
 
-async function setEquity(equity: number) {
+// Define response types
+interface EquityResponse {
+  equity: number;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+type ControlsResponse = EquityResponse | ErrorResponse;
+
+async function setEquity(equity: number): Promise<EquityResponse> {
   try {
     if (isNaN(equity) || equity <= 0) {
       console.error('Error: Equity must be a positive number');
@@ -15,16 +26,17 @@ async function setEquity(equity: number) {
       body: JSON.stringify({ equity }),
     });
     
-    const result = await response.json();
+    const result = await response.json() as ControlsResponse;
     
     if (response.ok) {
-      console.log(`Equity successfully updated to $${result.equity.toFixed(2)}`);
+      const equityResult = result as EquityResponse;
+      console.log(`Equity successfully updated to $${equityResult.equity.toFixed(2)}`);
+      return equityResult;
     } else {
-      console.error('Error:', result.error || 'Failed to update equity');
+      const errorResult = result as ErrorResponse;
+      console.error('Error:', errorResult.error || 'Failed to update equity');
       process.exit(1);
     }
-    
-    return result;
   } catch (error) {
     console.error('Failed to set equity:', error);
     process.exit(1);

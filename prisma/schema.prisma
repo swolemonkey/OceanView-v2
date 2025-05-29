@@ -26,7 +26,7 @@ model HyperSettings {
   riskPct       Float    @default(1)
   smcMinRetrace Float    @default(0.5)
   updatedAt     DateTime @updatedAt
-  strategyParams Json     @default("{}")
+  strategyParams String   @default("{}")
 }
 
 model StrategyVersion {
@@ -137,7 +137,7 @@ model EvolutionMetric {
   sharpe      Float
   drawdown    Float
   promoted    Boolean  @default(false)
-  childParams Json
+  childParams String
   ts          DateTime @default(now())
 }
 
@@ -156,4 +156,11 @@ model OrderBookMetric {
   askVol   Float
   imbalance Float    // (bid-ask)/(bid+ask)
   ts       DateTime @default(now())
+}
+
+model BotHeartbeat {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  status    String   // "ok" or "alert"
+  details   String?
 } 

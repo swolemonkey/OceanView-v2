@@ -14,7 +14,9 @@
     "gatekeeper:retrain": "tsx scripts/gatekeeper.ts retrain",
     "gatekeeper:register": "tsx scripts/gatekeeper.ts register",
     "gatekeeper:train": "tsx scripts/gatekeeper.ts",
-    "evolution:run": "tsx scripts/evolution.ts"
+    "evolution:run": "tsx scripts/evolution.ts",
+    "bot:metrics": "pnpm --filter @oceanview/server run tsx scripts/bot-metrics.ts",
+    "bot:set-equity": "pnpm --filter @oceanview/server run tsx scripts/bot-set-equity.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +24,7 @@
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",
+    "@jest/globals": "30.0.0-beta.3",
     "@types/express": "^5.0.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.21",

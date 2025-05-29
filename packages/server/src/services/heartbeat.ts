@@ -1,21 +1,29 @@
 import { prisma } from '../db.js';
 
+interface HeartbeatData {
+  status: string;
+  details: string;
+}
+
 /**
  * Records a heartbeat in the database and simulates a statsd increment
  */
 export async function recordHeartbeat() {
   try {
-    await prisma.botHeartbeat.create({
-      data: {
-        status: 'ok',
-        details: 'Normal operation'
-      }
+    const heartbeatData: HeartbeatData = {
+      status: 'ok',
+      details: 'Normal operation'
+    };
+    
+    await (prisma as any).botHeartbeat.create({
+      data: heartbeatData
     });
     
     // Simulate statsd increment - in a real environment, this would use a statsd client
     console.log('[statsd] increment: bot.heartbeat');
   } catch (error) {
-    console.error('Failed to record heartbeat:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Failed to record heartbeat:', errorMessage);
   }
 }
 

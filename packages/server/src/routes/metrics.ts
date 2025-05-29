@@ -1,31 +1,41 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../db.js';
 
+interface MetricsResponse {
+  equity: number;
+  pnl: number;
+  drawdown: number;
+  tradeCount24h: number;
+  gatekeeperVetoRatio: number;
+  latestSentiment: number;
+  latestOrderBookImbalance: number;
+}
+
 export async function registerMetricsRoute(fastify: FastifyInstance) {
-  fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply): Promise<MetricsResponse | { error: string }> => {
     try {
       // Get account state for equity
-      const accountState = await prisma.accountState.findFirst();
+      const accountState = await (prisma as any).accountState.findFirst();
       
       // Get latest portfolio metric for drawdown
-      const latestMetric = await prisma.portfolioMetric.findFirst({
+      const latestMetric = await (prisma as any).portfolioMetric.findFirst({
         orderBy: { date: 'desc' }
       });
       
       // Count trades in the last 24 hours
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentTrades = await prisma.strategyTrade.count({
+      const recentTrades = await (prisma as any).strategyTrade.count({
         where: {
           ts: { gte: oneDayAgo }
         }
       });
       
       // Get gatekeeper veto ratio (skipped trades vs total)
-      const allDatasets = await prisma.rLDataset.count({
+      const allDatasets = await (prisma as any).rLDataset.count({
         where: { ts: { gte: oneDayAgo } }
       });
       
-      const skippedTrades = await prisma.rLDataset.count({
+      const skippedTrades = await (prisma as any).rLDataset.count({
         where: { 
           ts: { gte: oneDayAgo },
           action: 'skip'
@@ -35,12 +45,12 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
       const vetoRatio = allDatasets > 0 ? skippedTrades / allDatasets : 0;
       
       // Get latest sentiment
-      const latestSentiment = await prisma.newsSentiment.findFirst({
+      const latestSentiment = await (prisma as any).newsSentiment.findFirst({
         orderBy: { ts: 'desc' }
       });
       
       // Get latest order book imbalance
-      const latestOrderBook = await prisma.orderBookMetric.findFirst({
+      const latestOrderBook = await (prisma as any).orderBookMetric.findFirst({
         orderBy: { ts: 'desc' }
       });
       
@@ -59,7 +69,8 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
         latestOrderBookImbalance: latestOrderBook?.imbalance || 0
       };
     } catch (error) {
-      console.error('Error fetching metrics:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error fetching metrics:', errorMessage);
       reply.code(500);
       return { error: 'Failed to fetch metrics' };
     }

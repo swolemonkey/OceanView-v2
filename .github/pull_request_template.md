@@ -25,4 +25,25 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 - [ ] I have made corresponding changes to the documentation
 - [ ] My changes generate no new warnings
 - [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes 
+- [ ] New and existing unit tests pass locally with my changes
+
+## Deployment Information:
+
+- [ ] **Environment Variables**: No new environment variables needed
+  - If yes, list them here:
+  ```
+  VAR_NAME=default_value # Description
+  ```
+
+- [ ] **Database Migrations**: No migrations included
+  - If yes, list the migrations:
+  ```
+  migration_name: Brief description of what changed
+  ```
+
+- [ ] **Cron Jobs**: No new or modified cron jobs
+  - If yes, describe the schedule and purpose:
+  ```
+  Schedule: 0 7 * * * (7:00 UTC daily)
+  Purpose: Description of what the cron job does
+  ``` 

@@ -2,6 +2,17 @@ import * as cron from 'node-cron';
 import fetch from 'node-fetch';
 import { prisma } from '../db.js';
 
+// Define the metrics response type
+interface MetricsResponse {
+  equity: number;
+  pnl: number;
+  drawdown: number;
+  tradeCount24h: number;
+  gatekeeperVetoRatio: number;
+  latestSentiment: number;
+  latestOrderBookImbalance: number;
+}
+
 /**
  * Daily health check function
  * - Pulls metrics from /metrics endpoint
@@ -12,14 +23,14 @@ export async function dailyHealthCheck() {
   try {
     // Get metrics from endpoint
     const response = await fetch('http://localhost:3334/metrics');
-    const metrics = await response.json();
+    const metrics = await response.json() as MetricsResponse;
     
     // Get yesterday's portfolio metric
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
     
-    const yesterdayMetric = await prisma.portfolioMetric.findFirst({
+    const yesterdayMetric = await (prisma as any).portfolioMetric.findFirst({
       where: {
         date: {
           gte: yesterday
@@ -31,7 +42,7 @@ export async function dailyHealthCheck() {
     });
     
     // Determine if there are any alerts
-    const alerts = [];
+    const alerts: string[] = [];
     
     // Alert if drawdown > 5%
     if (metrics.drawdown > 5) {
@@ -49,7 +60,7 @@ export async function dailyHealthCheck() {
       console.log(`[ALERT] Health check issues detected: ${alertMessage}`);
       
       // Record heartbeat with alert status
-      await prisma.botHeartbeat.create({
+      await (prisma as any).botHeartbeat.create({
         data: {
           status: 'alert',
           details: alertMessage
@@ -59,7 +70,7 @@ export async function dailyHealthCheck() {
       console.log('[health] Daily health check passed');
       
       // Record normal heartbeat
-      await prisma.botHeartbeat.create({
+      await (prisma as any).botHeartbeat.create({
         data: {
           status: 'ok',
           details: 'Daily health check passed'
@@ -69,13 +80,14 @@ export async function dailyHealthCheck() {
     
     return { alerts };
   } catch (error) {
-    console.error('Health check failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Health check failed:', errorMessage);
     
     // Record error heartbeat
-    await prisma.botHeartbeat.create({
+    await (prisma as any).botHeartbeat.create({
       data: {
         status: 'alert',
-        details: `Health check error: ${error.message || 'Unknown error'}`
+        details: `Health check error: ${errorMessage}`
       }
     });
     
