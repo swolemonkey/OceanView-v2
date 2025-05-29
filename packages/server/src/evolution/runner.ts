@@ -10,6 +10,7 @@ import path from 'path';
 import { prisma } from '../db.js';
 import { mutate, score } from './parameterManager.js';
 import { getStrategyVersion } from '../lib/getVersion.js';
+import type { EvolutionResult, EvolutionEvaluation } from './types.js';
 
 // Number of children to spawn for each generation
 const NUM_CHILDREN = 5;
@@ -24,7 +25,7 @@ const RUN_DURATION = 24 * 60 * 60 * 1000;
  * @param params The mutated parameters for the child
  * @returns A promise that resolves when the child bot completes
  */
-async function spawnChildBot(parentId: number, childId: number, params: any): Promise<{ trades: any[], childParams: any }> {
+async function spawnChildBot(parentId: number, childId: number, params: any): Promise<EvolutionResult> {
   return new Promise((resolve) => {
     const botName = `evolution_child_${childId}`;
     const strategyVersion = getStrategyVersion();
@@ -83,8 +84,8 @@ export async function runEvolution(): Promise<void> {
     const parentId = 1; // Main strategy ID
     
     // Spawn child bots with mutated parameters
-    const childPromises = [];
-    const childParams = [];
+    const childPromises: Promise<EvolutionResult>[] = [];
+    const childParams: any[] = [];
     
     for (let i = 0; i < NUM_CHILDREN; i++) {
       // Create unique child ID
@@ -102,7 +103,7 @@ export async function runEvolution(): Promise<void> {
     const results = await Promise.all(childPromises);
     
     // Evaluate results
-    const evaluations = results.map((result, index) => {
+    const evaluations: EvolutionEvaluation[] = results.map((result: EvolutionResult, index: number) => {
       const { trades, childParams } = result;
       const metrics = score(trades);
       
@@ -126,8 +127,7 @@ export async function runEvolution(): Promise<void> {
     
     // Save all results to the database
     for (const evaluation of evaluations) {
-      
-      // @ts-ignore - New schema model not yet recognized by TypeScript
+      // @ts-ignore - Mock Prisma client type issues
       await prisma.evolutionMetric.create({
         data: {
           parentId: evaluation.parentId,
@@ -144,16 +144,14 @@ export async function runEvolution(): Promise<void> {
     if (bestChild.sharpe > 0) {
       console.log(`[evolution] Promoting child with Sharpe ${bestChild.sharpe.toFixed(2)}`);
       
-      
-      // @ts-ignore - strategyParams field not yet recognized by TypeScript
+      // @ts-ignore - Mock Prisma client type issues
       await prisma.hyperSettings.update({
         where: { id: 1 },
         data: { strategyParams: bestChild.childParams }
       });
       
       // Update promotion status
-      
-      // @ts-ignore - New schema model not yet recognized by TypeScript
+      // @ts-ignore - Mock Prisma client type issues
       await prisma.evolutionMetric.update({
         where: { id: bestChild.childId },
         data: { promoted: true }
