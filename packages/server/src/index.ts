@@ -10,11 +10,15 @@ import { registerOrderRoute } from './routes/order.js';
 import { registerHealthzRoute } from './routes/healthz.js';
 import { registerPortfolioRoute } from './routes/portfolio.js';
 import registerApiRoutes from './routes/index.js';
+import { registerMetricsRoute } from './routes/metrics.js';
+import { registerControlsRoute } from './routes/controls.js';
 import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 import { run_bot } from './agent.js'; // HyperTrades bot implementation
 import './cron/index.js'; // Initialize cron jobs
 import '../cron/evolution.js'; // Initialize evolution cron job
+import { initHeartbeat } from './services/heartbeat.js';
+import { initHealthCheck } from './cron/health-check.js';
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
@@ -91,6 +95,8 @@ await registerOrderRoute(app);
 await registerHealthzRoute(app);
 await registerPortfolioRoute(app);
 await registerApiRoutes(app);
+await registerMetricsRoute(app);
+await registerControlsRoute(app);
 
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {
@@ -98,6 +104,12 @@ app.addHook('onReady', async () => {
   
   // Initialize RLModel before starting the bot
   await initializeRLModel();
+  
+  // Initialize heartbeat service
+  initHeartbeat();
+  
+  // Initialize daily health check
+  initHealthCheck();
   
   // Start the HyperTrades bot in a background task using Promise to not block the main server
   Promise.resolve().then(() => {
