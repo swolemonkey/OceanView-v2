@@ -32,7 +32,7 @@ async function spawnChildBot(parentId: number, childId: number, params: any): Pr
     console.log(`[evolution] Spawning child bot ${botName} with ID ${childId}`);
     
     // Create a temporary bot to run with the mutated parameters
-    const worker = new Worker(path.resolve('src/botRunner/workers/hypertrades.ts'), {
+    const worker = new Worker(path.resolve('packages/server/src/botRunner/workers/hypertrades.ts'), {
       workerData: { 
         botId: childId, 
         name: botName, 
