@@ -26,6 +26,7 @@ model HyperSettings {
   riskPct       Float    @default(1)
   smcMinRetrace Float    @default(0.5)
   updatedAt     DateTime @updatedAt
+  strategyParams Json     @default("{}")
 }
 
 model StrategyVersion {
