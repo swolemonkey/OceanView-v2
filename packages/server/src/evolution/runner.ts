@@ -126,6 +126,7 @@ export async function runEvolution(): Promise<void> {
     
     // Save all results to the database
     for (const evaluation of evaluations) {
+      
       // @ts-ignore - New schema model not yet recognized by TypeScript
       await prisma.evolutionMetric.create({
         data: {
@@ -143,6 +144,7 @@ export async function runEvolution(): Promise<void> {
     if (bestChild.sharpe > 0) {
       console.log(`[evolution] Promoting child with Sharpe ${bestChild.sharpe.toFixed(2)}`);
       
+      
       // @ts-ignore - strategyParams field not yet recognized by TypeScript
       await prisma.hyperSettings.update({
         where: { id: 1 },
@@ -150,6 +152,7 @@ export async function runEvolution(): Promise<void> {
       });
       
       // Update promotion status
+      
       // @ts-ignore - New schema model not yet recognized by TypeScript
       await prisma.evolutionMetric.update({
         where: { id: bestChild.childId },

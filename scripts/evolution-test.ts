@@ -91,6 +91,7 @@ async function testEvolution() {
   // Save results to database
   for (const child of children) {
     // Use type assertion for Prisma client
+    
     // @ts-ignore - New schema model not yet recognized by TypeScript
     await prisma.evolutionMetric.create({
       data: {
@@ -105,6 +106,7 @@ async function testEvolution() {
   }
   
   // Update best child params
+  
   // @ts-ignore - strategyParams field not yet recognized by TypeScript
   await prisma.hyperSettings.update({
     where: { id: 1 },
