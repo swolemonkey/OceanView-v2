@@ -24,4 +24,20 @@ jest.mock('ioredis', () => {
       return redis;
     }
   };
-}); 
+});
+
+// Mock the database to avoid actual DB interactions in tests
+jest.mock('../src/db.js', () => ({
+  prisma: {
+    evolutionMetric: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn()
+    },
+    hyperSettings: {
+      findUnique: jest.fn(),
+      update: jest.fn()
+    }
+  }
+})); 

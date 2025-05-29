@@ -126,4 +126,16 @@ model Metric {
   equity Float
   pnl    Float
   date   DateTime @default(now())
+}
+
+// Evolution metric for strategy parameter optimization
+model EvolutionMetric {
+  id          Int      @id @default(autoincrement())
+  parentId    Int
+  childId     Int
+  sharpe      Float
+  drawdown    Float
+  promoted    Boolean  @default(false)
+  childParams Json
+  ts          DateTime @default(now())
 } 
