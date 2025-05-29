@@ -7,10 +7,10 @@
 import { Worker } from 'worker_threads';
 import { spawn } from 'child_process';
 import path from 'path';
-import { prisma } from '../db.js';
-import { mutate, score } from './parameterManager.js';
-import { getStrategyVersion } from '../lib/getVersion.js';
-import type { EvolutionResult, EvolutionEvaluation } from './types.js';
+import { prisma } from '../db';
+import { mutate, score } from './parameterManager';
+import { getStrategyVersion } from '../lib/getVersion';
+import type { EvolutionResult, EvolutionEvaluation } from './types';
 
 // Number of children to spawn for each generation
 const NUM_CHILDREN = 5;
@@ -127,7 +127,7 @@ export async function runEvolution(): Promise<void> {
     
     // Save all results to the database
     for (const evaluation of evaluations) {
-      // @ts-ignore - Mock Prisma client type issues
+      // @ts-ignore - Using mock Prisma client in development
       await prisma.evolutionMetric.create({
         data: {
           parentId: evaluation.parentId,
@@ -144,14 +144,14 @@ export async function runEvolution(): Promise<void> {
     if (bestChild.sharpe > 0) {
       console.log(`[evolution] Promoting child with Sharpe ${bestChild.sharpe.toFixed(2)}`);
       
-      // @ts-ignore - Mock Prisma client type issues
+      // @ts-ignore - Using mock Prisma client in development
       await prisma.hyperSettings.update({
         where: { id: 1 },
         data: { strategyParams: bestChild.childParams }
       });
       
       // Update promotion status
-      // @ts-ignore - Mock Prisma client type issues
+      // @ts-ignore - Using mock Prisma client in development
       await prisma.evolutionMetric.update({
         where: { id: bestChild.childId },
         data: { promoted: true }
