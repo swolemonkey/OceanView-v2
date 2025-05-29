@@ -7,10 +7,10 @@
 import { Worker } from 'worker_threads';
 import { spawn } from 'child_process';
 import path from 'path';
-import { prisma } from '../db';
-import { mutate, score } from './parameterManager';
-import { getStrategyVersion } from '../lib/getVersion';
-import type { EvolutionResult, EvolutionEvaluation } from './types';
+import { prisma } from '../db.js';
+import { mutate, score } from './parameterManager.js';
+import { getStrategyVersion } from '../lib/getVersion.js';
+import type { EvolutionResult, EvolutionEvaluation } from './types.js';
 
 // Number of children to spawn for each generation
 const NUM_CHILDREN = 5;
