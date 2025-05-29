@@ -139,4 +139,21 @@ model EvolutionMetric {
   promoted    Boolean  @default(false)
   childParams Json
   ts          DateTime @default(now())
+}
+
+model NewsSentiment {
+  id       Int      @id @default(autoincrement())
+  symbol   String
+  score    Float    // -1 … +1
+  source   String
+  ts       DateTime @default(now())
+}
+
+model OrderBookMetric {
+  id       Int      @id @default(autoincrement())
+  symbol   String
+  bidVol   Float
+  askVol   Float
+  imbalance Float    // (bid-ask)/(bid+ask)
+  ts       DateTime @default(now())
 } 
