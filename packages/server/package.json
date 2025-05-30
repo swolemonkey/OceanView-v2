@@ -11,13 +11,15 @@
     "db:generate": "prisma generate --schema=../../prisma/schema.prisma",
     "db:seed": "prisma db seed",
     "db:migrate": "prisma migrate deploy --schema=../../prisma/schema.prisma",
+    "db:apply-migration": "node scripts/apply-migration.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
     "start:docker": "prisma migrate deploy --schema=../../prisma/schema.prisma && node dist/src/index.js",
     "prepare": "concurrently \"pnpm run clean\" \"tsc\"",
-    "test-multi-asset": "tsx test-multi-asset.ts"
+    "test-multi-asset": "tsx test-multi-asset.ts",
+    "run:multi-asset": "node scripts/run-multi-asset.js"
   },
   "dependencies": {
     "@fastify/websocket": "^8.2.0",
@@ -29,7 +31,8 @@
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
     "@babel/core": "^7.22.5",
