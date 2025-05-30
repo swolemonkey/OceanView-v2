@@ -2,16 +2,82 @@
 
 This system replays historical market data through the AssetAgent pipeline to generate training data for the Gatekeeper model.
 
-## Data Collection
+## Automated Data Collection and Replay
 
-### BTC/USD (5-minute bars)
+The easiest way to collect data and run the replay is to use the provided script:
+
+```bash
+# Make the script executable
+chmod +x scripts/download_and_replay.sh
+
+# Run the data collection and replay
+./scripts/download_and_replay.sh
+```
+
+This script will:
+1. Try to use Polygon.io for both BTC and AAPL data (recommended)
+2. Fall back to other APIs if Polygon.io is unavailable (CoinGecko, Alpha Vantage, Yahoo Finance)
+3. Generate sample data as a last resort if all APIs fail
+4. Run the historical replay process
+5. Export the training dataset to ml/data_export.csv
+
+### Setting up API keys
+
+For best results with real market data, set up Polygon.io API key before running:
+
+```bash
+# Create a .env file
+touch .env
+
+# Add your Polygon.io API key to the .env file
+echo "POLYGON_API_KEY=your_polygon_api_key_here" >> .env
+
+# Load the environment variables
+source .env
+
+# Run the script
+./scripts/download_and_replay.sh
+```
+
+Alternatively, you can set the environment variable directly:
+
+```bash
+# For Polygon.io (recommended, provides both stocks and crypto data)
+export POLYGON_API_KEY=your_polygon_api_key_here
+
+# For Alpha Vantage (stocks data, alternative)
+export ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
+
+# For CoinGecko Pro (crypto data, alternative)
+export COINGECKO_API_KEY=your_coingecko_api_key_here
+```
+
+## Manual Data Collection
+
+If you prefer to collect data manually, you can use the following methods:
+
+### BTC/USD (5-minute bars via Polygon.io)
+```bash
+# Replace YOUR_API_KEY with your Polygon.io API key
+curl -s "https://api.polygon.io/v2/aggs/ticker/X:BTCUSD/range/5/minute/2023-01-01/2023-01-31?apiKey=YOUR_API_KEY" | jq -r '.results[] | [.t, .c] | @csv' > data/btc_5m.csv
+```
+
+### AAPL (5-minute bars via Polygon.io)
+```bash
+# Replace YOUR_API_KEY with your Polygon.io API key
+curl -s "https://api.polygon.io/v2/aggs/ticker/AAPL/range/5/minute/2023-01-01/2023-01-31?apiKey=YOUR_API_KEY" | jq -r '.results[] | [.t, .o, .h, .l, .c] | @csv' > data/aapl_5m.csv
+```
+
+### Alternative APIs
+
+#### BTC/USD (5-minute bars via CoinGecko)
 ```
 curl -s \
   "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=5m" \
   | jq -r '.prices[] | @csv' > data/btc_5m.csv
 ```
 
-### AAPL (5-minute bars via Alpaca Data v2)
+#### AAPL (5-minute bars via Alpaca Data v2)
 ```
 curl -H "APCA-API-KEY-ID:$KEY" \
      -H "APCA-API-SECRET-KEY:$SECRET" \
