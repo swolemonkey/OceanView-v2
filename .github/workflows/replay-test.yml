@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       
+      - name: Install ts-node globally
+        run: npm install -g ts-node typescript @types/node
+      
       - name: Create test data directory
         run: mkdir -p data
       
@@ -52,7 +55,7 @@ jobs:
           done
       
       - name: Run replay script
-        run: pnpm ts-node scripts/replay_historical.ts
+        run: npx ts-node --transpile-only scripts/replay_historical.ts
       
       - name: Verify data export exists
         run: |
