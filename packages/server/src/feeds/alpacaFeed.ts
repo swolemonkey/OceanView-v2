@@ -32,6 +32,7 @@ export class AlpacaFeed implements DataFeed {
   private apiKey: string;
   private apiSecret: string;
   private baseUrl: string;
+  private dataUrl: string; // Add separate data URL
   private websocket: WebSocket | null;
   private subscribers: Map<string, ((tick: Tick) => void)[]>;
   private connected: boolean;
@@ -43,6 +44,7 @@ export class AlpacaFeed implements DataFeed {
     this.apiKey = apiKey || process.env.ALPACA_API_KEY || '';
     this.apiSecret = apiSecret || process.env.ALPACA_API_SECRET || '';
     this.baseUrl = isPaper ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
+    this.dataUrl = 'https://data.alpaca.markets'; // Data API has its own URL
     this.websocket = null;
     this.subscribers = new Map();
     this.connected = false;
@@ -229,11 +231,11 @@ export class AlpacaFeed implements DataFeed {
       const symbols = Array.from(this.subscribers.keys());
       if (symbols.length === 0) return;
       
-      // Get latest quotes
-      const quotesUrl = `${this.baseUrl}/v2/stocks/quotes?symbols=${symbols.join(',')}`;
+      // Get latest trades using the data API URL
+      const tradesUrl = `${this.dataUrl}/v2/stocks/trades/latest?symbols=${symbols.join(',')}`;
       
-      logger.info(`Fetching from Alpaca REST API: ${quotesUrl}`);
-      const res = await fetch(quotesUrl, {
+      logger.info(`Fetching from Alpaca REST API: ${tradesUrl}`);
+      const res = await fetch(tradesUrl, {
         headers: {
           'APCA-API-KEY-ID': this.apiKey,
           'APCA-API-SECRET-KEY': this.apiSecret
@@ -245,43 +247,49 @@ export class AlpacaFeed implements DataFeed {
         return;
       }
       
-      const data = await res.json() as Record<string, { bp: number; ap: number }>;
-      logger.info(`Alpaca quotes response: ${JSON.stringify(data)}`);
-      
-      // Process each quote and notify subscribers
-      const now = Date.now();
-      
-      for (const symbol of symbols) {
-        const quote = data[symbol];
-        if (!quote) continue;
-        
-        // Create tick from quote data
-        const tick: Tick = {
-          symbol,
-          // Use midpoint as the price
-          price: (quote.bp + quote.ap) / 2,
-          timestamp: now,
-          bid: quote.bp,
-          ask: quote.ap
-        };
-        
-        // Update cache (only if we don't have newer data from websocket)
-        if (!this.cache[symbol] || this.cache[symbol].timestamp < now) {
-          this.cache[symbol] = tick;
-        }
-        
-        // Notify subscribers
-        const callbacks = this.subscribers.get(symbol) || [];
-        for (const cb of callbacks) {
-          try {
-            cb(tick);
-          } catch (err) {
-            logger.error(`Error in subscriber callback for ${symbol}: ${String(err)}`);
+      // Define the type for Alpaca trade response
+      interface AlpacaTradeResponse {
+        trades: {
+          [symbol: string]: {
+            p: number; // price
+            t: string; // timestamp
+            s?: number; // size/volume
           }
         }
       }
-    } catch (err) {
-      logger.error(`Error fetching from Alpaca REST API: ${String(err)}`);
+      
+      const data = await res.json() as AlpacaTradeResponse;
+      logger.info(`Alpaca trades response: ${JSON.stringify(data)}`);
+      
+      // Process the data - note the response has a 'trades' object containing symbols
+      if (data.trades) {
+        for (const symbol in data.trades) {
+          const trade = data.trades[symbol];
+          if (trade && trade.p) {
+            const tick: Tick = {
+              symbol,
+              price: trade.p,
+              timestamp: new Date(trade.t).getTime(),
+              volume: trade.s || 0
+            };
+            
+            // Update cache
+            this.cache[symbol] = tick;
+            
+            // Notify subscribers
+            const callbacks = this.subscribers.get(symbol) || [];
+            for (const cb of callbacks) {
+              try {
+                cb(tick);
+              } catch (err) {
+                logger.error(`Error in subscriber callback for ${symbol}: ${String(err)}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error(`Error fetching Alpaca REST data: ${String(error)}`);
     }
   }
   

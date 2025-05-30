@@ -1,0 +1,1 @@
+import { config } from 'dotenv'; config({path: '../../.env'}); console.log('Environment Variables:'); console.log('BINANCE_TESTNET_API_KEY:', process.env.BINANCE_TESTNET_API_KEY ? '✅ Found' : '❌ Missing');
