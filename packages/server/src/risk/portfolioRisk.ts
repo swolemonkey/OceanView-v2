@@ -1,12 +1,28 @@
 import { AssetAgent } from '../bots/hypertrades/assetAgent.js';
 import { prisma } from '../db.js';
 
+// Define type for HyperSettings to include our new fields
+type HyperSettings = {
+  id: number;
+  smcThresh: number;
+  rsiOS: number;
+  rsiOB?: number;
+  symbols: string;
+  riskPct?: number;
+  smcMinRetrace?: number;
+  maxDailyLoss: number;
+  maxOpenRisk: number;
+  updatedAt: Date;
+  strategyParams: string;
+};
+
 export class PortfolioRiskManager {
   equity = 10000; // Default value if DB lookup fails
   dayPnl = 0;
   openRiskPct = 0;
-  maxDailyLoss = 0.03;   // 3%
-  maxOpenRisk = 0.05;    // 5% combined
+  maxDailyLoss = 0.03;   // 3% default
+  maxOpenRisk = 0.05;    // 5% combined default
+  private refreshTimer: NodeJS.Timeout | null = null;
   
   /**
    * Initialize portfolio risk manager
@@ -14,6 +30,7 @@ export class PortfolioRiskManager {
    */
   async init() {
     try {
+      // Load account state
       const accountState = await prisma.accountState.findFirst();
       if (accountState && accountState.equity) {
         this.equity = accountState.equity;
@@ -21,9 +38,32 @@ export class PortfolioRiskManager {
       } else {
         console.log(`Using default starting equity: ${this.equity}`);
       }
+      
+      // Load risk limits from HyperSettings
+      await this.loadRiskLimits();
+      
+      // Set up hourly refresh of risk limits
+      this.refreshTimer = setInterval(() => this.loadRiskLimits(), 60 * 60 * 1000);
     } catch (error) {
-      console.error('Failed to load equity from DB:', error);
-      console.log(`Using default starting equity: ${this.equity}`);
+      console.error('Failed to initialize PortfolioRiskManager:', error);
+    }
+  }
+  
+  /**
+   * Loads risk limits from HyperSettings table
+   */
+  private async loadRiskLimits() {
+    try {
+      const settings = await prisma.hyperSettings.findUnique({ where: { id: 1 } });
+      if (settings) {
+        // Cast to our extended type
+        const typedSettings = settings as unknown as HyperSettings;
+        this.maxDailyLoss = typedSettings.maxDailyLoss;
+        this.maxOpenRisk = typedSettings.maxOpenRisk;
+        console.log(`Loaded risk limits from DB: maxDailyLoss=${this.maxDailyLoss}, maxOpenRisk=${this.maxOpenRisk}`);
+      }
+    } catch (error) {
+      console.error('Failed to load risk limits from DB:', error);
     }
   }
   
@@ -78,5 +118,15 @@ export class PortfolioRiskManager {
       update: { equity: this.equity },
       create: { id: 1, equity: this.equity }
     });
+  }
+  
+  /**
+   * Cleans up resources when shutting down
+   */
+  destroy() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 } 

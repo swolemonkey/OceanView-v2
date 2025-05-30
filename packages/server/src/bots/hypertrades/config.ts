@@ -32,15 +32,29 @@ type ExtendedHyperSettings = {
   smcMinRetrace?: number;
   strategyToggle?: string;
   updatedAt: Date;
+  maxDailyLoss: number;
+  maxOpenRisk: number;
 };
 
 export async function loadConfig(){
+  // Get the config from the database
   const row = await prisma.hyperSettings.findUnique({ where:{ id:1 }});
+  if (!row) {
+    throw new Error('HyperSettings not found in database. Please ensure ID 1 exists.');
+  }
+  
   // Cast row to the extended type
   const extendedRow = row as unknown as ExtendedHyperSettings;
   
-  const symbols = (extendedRow?.symbols ?? 'bitcoin')
-                  .split(',').map((s: string)=>s.trim().toLowerCase());
+  // Get symbols from database, split and normalize
+  const symbols = extendedRow.symbols
+                  .split(',')
+                  .map((s: string) => s.trim().toLowerCase())
+                  .filter((s: string) => s.length > 0);
+  
+  if (symbols.length === 0) {
+    throw new Error('No trading symbols configured in HyperSettings.symbols');
+  }
   
   // Parse strategyToggle JSON, default to empty object
   let strategyToggle: Record<string, Record<string, boolean>> = {};
@@ -62,7 +76,7 @@ export async function loadConfig(){
       overBought: extendedRow?.rsiOB ?? 65 
     },
     riskPct: extendedRow?.riskPct ?? 1,
-    symbol: 'bitcoin',
+    symbol: symbols[0],  // Default to first symbol
     strategyToggle
   } as const;
 }
