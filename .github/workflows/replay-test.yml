@@ -1,0 +1,72 @@
+name: Replay Test
+
+on:
+  pull_request:
+    branches: 
+      - staging
+    paths:
+      - 'scripts/replay_historical.js'
+      - 'scripts/replay_historical.ts'
+  workflow_dispatch:
+
+jobs:
+  replay-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      
+      - name: Create test data directory
+        run: mkdir -p data
+      
+      - name: Create 1-day sample data
+        run: |
+          # Create sample BTC data (1 day = 288 5-min bars)
+          echo "Creating 1-day sample BTC data..."
+          CURRENT_TIME=$(date +%s000)
+          for i in {0..287}; do
+            TIMESTAMP=$((CURRENT_TIME - i * 300000))
+            PRICE=$((20000 + RANDOM % 2000))
+            echo "$TIMESTAMP,$PRICE" >> data/btc_5m.csv
+          done
+          
+          # Create sample AAPL data (1 day = 78 5-min bars during market hours)
+          echo "Creating 1-day sample AAPL data..."
+          for i in {0..77}; do
+            TIMESTAMP=$((CURRENT_TIME - i * 300000))
+            OPEN=$((150 + RANDOM % 5))
+            HIGH=$((OPEN + RANDOM % 3))
+            LOW=$((OPEN - RANDOM % 3))
+            CLOSE=$((OPEN + RANDOM % 5 - 2))
+            echo "$TIMESTAMP,$OPEN,$HIGH,$LOW,$CLOSE" >> data/aapl_5m.csv
+          done
+      
+      - name: Run replay script
+        run: node scripts/replay_historical.js
+      
+      - name: Verify data export exists
+        run: |
+          if [ ! -f "ml/data_export.csv" ]; then
+            echo "Error: Expected ml/data_export.csv to be created, but file not found"
+            exit 1
+          fi
+          
+          # Check if the file has at least 10 rows
+          LINE_COUNT=$(wc -l < ml/data_export.csv)
+          if [ "$LINE_COUNT" -lt 10 ]; then
+            echo "Error: Expected at least 10 rows in ml/data_export.csv, but found $LINE_COUNT"
+            exit 1
+          fi
+          
+          echo "Replay test passed successfully! Generated $LINE_COUNT training examples." 
