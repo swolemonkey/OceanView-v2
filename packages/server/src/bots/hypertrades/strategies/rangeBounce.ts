@@ -1,42 +1,20 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import { Candle } from '../perception.js';
+import type { Candle } from '../perception.js';
 
 export class RangeBounce extends BaseStrategy {
-  onCandle(c: Candle, ctx: StrategyCtx): TradeIdea|null {
-    const { perception: p, ind, cfg } = ctx;
+  onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {
+    const { perception: p, ind } = ctx;
     
-    // Get the last 10 candles to determine range
-    const candles = p.last(10);
+    const hi = Math.max(...p.last(50).map(x => x.h));
+    const lo = Math.min(...p.last(50).map(x => x.l));
     
-    if (candles.length < 10) {
-      console.log(`[DEBUG Range] Not enough candles for ${this.symbol}, need at least 10`);
-      return null;
-    }
+    if (ind.avgOB > 0.6 || ind.avgOB < -0.6) return null; // order‑book pressure filter
     
-    // Calculate the high and low of the range
-    const high = Math.max(...candles.map(candle => candle.h));
-    const low = Math.min(...candles.map(candle => candle.l));
-    
-    // Calculate volatility as percentage of range size to average price
-    const rangeSize = high - low;
-    const avgPrice = candles.reduce((sum, candle) => sum + candle.c, 0) / candles.length;
-    const volatility = rangeSize / avgPrice;
-    
-    // Check if we're in a low volatility range (less than 5% range)
-    const isLowVol = volatility < 0.05;
-    
-    console.log(`[DEBUG Range] ${this.symbol} - Range high: ${high.toFixed(2)}, low: ${low.toFixed(2)}, volatility: ${(volatility * 100).toFixed(2)}%`);
-    console.log(`[DEBUG Range] RSI: ${ind.rsi14.toFixed(2)}, isLowVol: ${isLowVol}`);
-    
-    // Core strategy logic for buying at support in low vol range
-    if (isLowVol && ind.rsi14 < 30 && c.c < low * 1.02) {
-      console.log(`[DEBUG Range] LONG signal triggered! Price near support with oversold RSI`);
+    if (ind.rsi14 < 30 && c.c < lo * 1.02) {
       return { side: 'buy', price: c.c, reason: 'Range bounce long' };
     }
     
-    // Core strategy logic for selling at resistance in low vol range
-    if (isLowVol && ind.rsi14 > 70 && c.c > high * 0.98) {
-      console.log(`[DEBUG Range] SHORT signal triggered! Price near resistance with overbought RSI`);
+    if (ind.rsi14 > 70 && c.c > hi * 0.98) {
       return { side: 'sell', price: c.c, reason: 'Range bounce short' };
     }
     

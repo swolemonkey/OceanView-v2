@@ -4,6 +4,7 @@ export class IndicatorCache {
   private lows:number[]=[];
   rsi14=50; fastMA=0; slowMA=0;
   adx14=25; bbWidth=0; atr14=0;
+  avgSent=0; avgOB=0; // sentiment and order book pressure
   
   updateOnClose(close:number, high?:number, low?:number){
     this.closes.push(close);

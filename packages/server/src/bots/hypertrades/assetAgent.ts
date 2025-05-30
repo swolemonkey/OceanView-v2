@@ -5,7 +5,9 @@ import type { Config } from './config.js';
 import * as Indicators from './indicators/index.js';
 import { BaseStrategy } from './strategies/baseStrategy.js';
 import { SMCReversal } from './strategies/smcReversal.js';
-import { TrendFollowMA } from './strategies/trendFollow.js';
+import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow.js';
+import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce.js';
+import { TrendFollowMA } from './strategies/trendFollowMA.js';
 import { RangeBounce } from './strategies/rangeBounce.js';
 import { passRR } from './utils/riskReward.js';
 import type { DataFeed, Tick } from '../../feeds/interface.js';
@@ -159,16 +161,28 @@ export class AssetAgent {
       symbol: this.symbol,
       price: candle.c,
       rsi: this.indCache.rsi14 || 50,
-      adx: 25, // Default value since we don't have ADX implemented yet
+      adx: this.indCache.adx14 || 25,
       volatility: Math.abs(candle.h - candle.l) / candle.c,
       recentTrend: (candle.c - candle.o) / candle.o,
+      rsi14: this.indCache.rsi14 || 50,
+      adx14: this.indCache.adx14 || 25,
+      fastMASlowDelta: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
+      bbWidth: this.indCache.bbWidth || 0,
+      avgSent: 0, // We'll need to implement sentiment tracking
+      avgOB: 0,   // We'll need to implement order book tracking
       dayOfWeek: new Date().getDay(),
       hourOfDay: new Date().getHours()
     };
     
-    // Score the trade idea with the RL gatekeeper (shadow mode)
-    const score = gatekeeper.scoreIdea(features, tradeIdea.side);
+    // Score the trade idea with the RL gatekeeper (active mode)
+    const score = await gatekeeper.scoreIdea(features, tradeIdea.side);
     console.log(`[${new Date().toISOString()}] RL Score: ${score.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
+    
+    // Veto trade if score is below threshold
+    if (score < 0.55) {
+      console.log(`[${new Date().toISOString()}] BLOCKED: Trade vetoed by gatekeeper with score ${score.toFixed(4)}`);
+      return;
+    }
     
     // Process the trade idea
     if (this.risk.canTrade()) {
