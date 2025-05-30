@@ -20,7 +20,7 @@ export async function computeYesterdayMetrics() {
   
   if (!trades.length) return;
   
-  // Group trades by symbol and strategyVersionId
+  // Group trades by symbol AND strategyVersionId
   const groupedTrades = new Map<string, TradeData[]>();
   
   trades.forEach(trade => {
