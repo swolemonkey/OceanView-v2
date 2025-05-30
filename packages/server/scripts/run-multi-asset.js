@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { run_bot } = require('../dist/agent.js');
+import { runBot } from '../dist/src/agent.js';
 
 console.log('Starting Multi-Asset Trading Bot...');
 
@@ -21,7 +21,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Run the bot
-run_bot().catch(err => {
+runBot().catch(err => {
   console.error('Fatal error in bot:', err);
   process.exit(1);
 }); 

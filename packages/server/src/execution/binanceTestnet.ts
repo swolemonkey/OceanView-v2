@@ -47,10 +47,16 @@ export class BinanceTestnetEngine implements ExecutionEngine {
         }
       });
       
+      // Format the symbol for Binance API (remove slash if present, ensure USDT suffix)
+      let formattedSymbol = order.symbol.replace('/', '');
+      if (!formattedSymbol.endsWith('USDT') && !formattedSymbol.includes('USDT')) {
+        formattedSymbol = `${formattedSymbol}USDT`;
+      }
+      
       // Prepare parameters for Binance API
       const timestamp = Date.now();
       const queryParams = new URLSearchParams({
-        symbol: order.symbol.replace('/', ''), // Remove slash if present (BTC/USDT -> BTCUSDT)
+        symbol: formattedSymbol,
         side: order.side.toUpperCase(),
         type: (order.type || 'MARKET').toUpperCase(),
         quantity: order.qty.toString(),

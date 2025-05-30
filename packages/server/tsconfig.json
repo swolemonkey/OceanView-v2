@@ -7,6 +7,6 @@
     "typeRoots": ["./node_modules/@types", "./types"],
     "rootDir": "."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test-multi-asset.ts"],
   "exclude": ["__tests__/**/*", "node_modules"]
 } 

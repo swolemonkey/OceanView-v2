@@ -29,6 +29,7 @@ model HyperSettings {
   maxOpenRisk   Float    @default(0.05)
   updatedAt     DateTime @updatedAt
   strategyParams String   @default("{}")
+  strategyToggle String   @default("{\"TrendFollowMA\":true,\"RangeBounce\":true}")
 }
 
 model StrategyVersion {
@@ -108,6 +109,17 @@ model AccountState {
   id         Int      @id @default(autoincrement())
   equity     Float
   updatedAt  DateTime @default(now()) @updatedAt
+}
+
+// Symbol registry to track asset types
+model SymbolRegistry {
+  id         Int      @id @default(autoincrement())
+  symbol     String   @unique
+  assetClass String   // 'crypto', 'equity', 'forex', etc.
+  exchange   String?  // Optional exchange identifier
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // Bot model for forkManager

@@ -1,15 +1,18 @@
-export default {
+module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts'],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov'],
+  testTimeout: 30000,
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true,
-    }]
+      tsconfig: 'tsconfig.json',
+    }],
   },
-  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
-  },
-  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js']
+    '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js'
+  }
 }; 
