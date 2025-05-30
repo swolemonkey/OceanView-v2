@@ -24,28 +24,18 @@ curl -H "APCA-API-KEY-ID:$KEY" \
 To run the historical replay:
 
 ```
-pnpm ts-node scripts/replay_historical.ts
+node scripts/replay_historical.js
 ```
 
 This will process the CSV files in the `data/` directory and replay them through the AssetAgent pipeline, generating labeled trade data for the Gatekeeper model.
 
 ## Verification
 
-After running the replay, verify that sufficient data was generated:
+After running the replay, verify that data was generated:
 
 ```
-pnpm prisma studio   # Verify RLDataset has > 500 rows
+cat ml/data_export.csv  # Verify file has >500 rows
 ```
-
-## Exporting the Dataset
-
-To export the generated dataset for model training:
-
-```
-pnpm ts-node scripts/export_rl_dataset.ts
-```
-
-This will create `ml/data_export.csv` which can be used to train the Gatekeeper model.
 
 ## Training the Gatekeeper Model
 

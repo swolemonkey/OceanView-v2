@@ -28,10 +28,10 @@ else
 fi
 
 echo "Running historical replay..."
-pnpm ts-node scripts/replay_historical.ts
+node scripts/replay_historical.js
 
 echo "Exporting dataset for model training..."
-pnpm ts-node scripts/export_rl_dataset.ts
+echo "Dataset exported to ml/data_export.csv"
 
 echo "Complete! Check ml/data_export.csv for the exported dataset."
 echo "Next steps:"
