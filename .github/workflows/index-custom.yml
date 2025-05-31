@@ -46,8 +46,12 @@ jobs:
           find packages -name "*.js" -type f -not -path "*/node_modules/*" -not -path "*/dist/*" -delete
           find tests -name "*.js" -type f -not -path "*/node_modules/*" -not -path "*/dist/*" -delete
 
-      # Check if tests pass in the workspace
+      # Check if tests pass in the workspace - fixed command
       - name: Run workspace tests
         run: |
-          # Only run tests that don't require TypeScript compilation
-          pnpm test --if-present --filter="./tests" -- --passWithNoTests --testTimeout=60000 
+          # Only run tests if the script exists, without trying to compile TypeScript
+          if grep -q '"test":' package.json; then
+            pnpm test --filter="./tests" -- --passWithNoTests --testTimeout=60000
+          else
+            echo "No test script found in package.json, skipping tests"
+          fi 
