@@ -149,8 +149,8 @@ parentPort?.on('message', async (m) => {
       order.entryTs = Date.now() - 1000; // Assume 1 second ago if not provided
     }
     
-    // Close the position using agent's closePosition method which updates portfolio risk
-    const tradePnL = await agent.closePosition(order.qty, order.price, order.fee);
+    // Close the position using agent's closePositions method which updates portfolio risk
+    await agent.closePositions(order.price);
     
     // Get the RL entry ID for this order
     const entryId = rlEntryIds.get(`${order.symbol}-${order.entryTs}`);
@@ -158,7 +158,7 @@ parentPort?.on('message', async (m) => {
     // Update RL Dataset with outcome (individual trade PnL)
     if (entryId) {
       try {
-        await rlGatekeeper.updateOutcome(entryId, tradePnL);
+        await rlGatekeeper.updateOutcome(entryId, order.pnl);
         // Remove the entry from our tracking map after updating
         rlEntryIds.delete(`${order.symbol}-${order.entryTs}`);
       } catch (error) {
@@ -197,7 +197,7 @@ parentPort?.on('message', async (m) => {
     await logCompletedTrade(
       {
         ...order,
-        pnl: tradePnL, // Use the individual trade PnL
+        pnl: order.pnl, // Use the individual trade PnL
       },
       workerData.name,
       versionId

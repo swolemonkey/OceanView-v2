@@ -222,7 +222,7 @@ export class AssetAgent {
       rlEntryId = scoreResult.id;
       
       // Store the RL entry ID for later update
-      storeRLEntryId(this.symbol, rlEntryId);
+      storeRLEntryId(this.symbol, Date.now(), rlEntryId);
       
       logger.info(`RL Score: ${tradeScore.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
       
