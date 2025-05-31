@@ -9,6 +9,9 @@ import { getStrategyVersion } from '../lib/getVersion.js';
 // Get API port from environment
 const API_PORT = process.env.PORT || '3334';
 
+// Determine if we're in production or development
+const isProduction = process.env.NODE_ENV === 'production' || !process.env.NODE_ENV;
+
 // Mock Redis clients for development/testing
 // @ts-ignore - Working around type issues with ioredis-mock
 const redis = new IoRedisMock();
@@ -20,7 +23,11 @@ async function spawnBot(botId:number, name:string, type:string){
   // Keep respawning the worker as long as the bot should be running
   while (running) {
     try {
-      const workerPath = path.resolve(`src/botRunner/workers/${type}.ts`);
+      // Use .js extension in production, .ts in development
+      const fileExt = isProduction ? '.js' : '.ts';
+      // In production, use the dist path
+      const basePath = isProduction ? 'dist/src/botRunner/workers' : 'src/botRunner/workers';
+      const workerPath = path.resolve(`${basePath}/${type}${fileExt}`);
       console.log(`Attempting to spawn bot ${name} with worker path: ${workerPath}`);
       
       const worker = new Worker(workerPath, {
