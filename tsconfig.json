@@ -11,8 +11,9 @@
     "resolveJsonModule": true,
     "declaration": true,
     "allowJs": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "noEmit": true
   },
-  "include": ["packages/**/*.ts", "tests/**/*.ts"],
+  "include": ["packages/**/*.ts", "tests/**/*.ts", "tests/**/*.d.ts"],
   "exclude": ["node_modules"]
 } 

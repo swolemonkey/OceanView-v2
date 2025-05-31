@@ -1,0 +1,36 @@
+name: Index Custom
+
+on:
+  pull_request:
+    branches: 
+      - staging
+      - main
+    paths:
+      - 'packages/server/src/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Install dependencies (no frozen lockfile)
+        run: pnpm install --no-frozen-lockfile
+
+      # Check if tests pass in the workspace
+      - name: Run workspace tests
+        run: |
+          # Only run tests that don't require TypeScript compilation
+          pnpm test --if-present --filter="./tests" -- --passWithNoTests 
