@@ -222,7 +222,7 @@ export class AssetAgent {
       rlEntryId = scoreResult.id;
       
       // Store the RL entry ID for later update
-      storeRLEntryId(this.symbol, rlEntryId);
+      storeRLEntryId(this.symbol, Date.now(), rlEntryId);
       
       logger.info(`RL Score: ${tradeScore.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
       
@@ -236,7 +236,8 @@ export class AssetAgent {
     }
     
     // Calculate position size
-    const qty = this.risk.sizeTrade(candle.c);
+    const stopPrice = candle.c * 0.98; // Calculate a stop price 2% below current price
+    const qty = this.risk.sizeTrade(stopPrice, candle.c);
     
     // Prepare full trade idea
     const fullIdea: TradeIdea = {
@@ -247,7 +248,7 @@ export class AssetAgent {
     };
     
     // Check risk-reward ratio
-    if (!passRR(fullIdea.side, candle.c, this.risk.getStopPrice(), candle.c * 1.02, 2.0)) {
+    if (!passRR(fullIdea.side, candle.c, candle.c * 0.98, candle.c * 1.02, 2.0)) {
       logger.info(`BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
       return;
     }
@@ -274,11 +275,11 @@ export class AssetAgent {
         const fill = orderResult.trades[0];
         
         // Update risk manager with new position
-        const tradePnL = await this.risk.registerTrade(fill.side, fill.qty, fill.price, this.risk.getStopPrice(), fill.fee || 0);
+        this.risk.registerOrder(fill.side, fill.qty, fill.price, fill.price * 0.98);
         
         // Update the RL dataset with the PnL outcome
         if (rlEntryId) {
-          await rlGatekeeper.updateOutcome(rlEntryId, tradePnL);
+          await rlGatekeeper.updateOutcome(rlEntryId, 0); // Placeholder PnL, will be updated later
         }
         
         logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);
@@ -334,7 +335,7 @@ export class AssetAgent {
       
       const order: Order = {
         symbol: this.symbol,
-        side: closeSide,
+        side: closeSide as 'buy' | 'sell',
         type: 'market',
         qty: Math.abs(positionQty),
         price: currentPrice
@@ -342,7 +343,7 @@ export class AssetAgent {
       
       try {
         const result = await this.executionEngine.place(order);
-        if (result && result.status === 'filled') {
+        if (result && typeof result === 'object' && 'status' in result && result.status === 'filled' && 'trades' in result && Array.isArray(result.trades)) {
           const fill = result.trades[0];
           const tradePnL = await this.risk.closePosition(fill.qty, fill.price, fill.fee || 0);
           logger.info(`Closed position: ${tradePnL.toFixed(2)} PnL`);
