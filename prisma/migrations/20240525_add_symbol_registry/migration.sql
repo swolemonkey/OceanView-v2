@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "SymbolRegistry" (
+CREATE TABLE IF NOT EXISTS "SymbolRegistry" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "symbol" TEXT NOT NULL,
     "assetClass" TEXT NOT NULL,
@@ -10,10 +10,10 @@ CREATE TABLE "SymbolRegistry" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SymbolRegistry_symbol_key" ON "SymbolRegistry"("symbol");
+CREATE UNIQUE INDEX IF NOT EXISTS "SymbolRegistry_symbol_key" ON "SymbolRegistry"("symbol");
 
--- Add default symbols
-INSERT INTO "SymbolRegistry" ("symbol", "assetClass", "exchange", "active", "updatedAt") 
+-- Add default symbols - only if table is empty
+INSERT OR IGNORE INTO "SymbolRegistry" ("symbol", "assetClass", "exchange", "active", "updatedAt") 
 VALUES 
   ('BTC', 'crypto', 'binance', true, CURRENT_TIMESTAMP),
   ('ETH', 'crypto', 'binance', true, CURRENT_TIMESTAMP),

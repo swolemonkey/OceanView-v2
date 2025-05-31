@@ -5,8 +5,8 @@
  */
 
 import cron from 'node-cron';
-import { runEvolution } from '../packages/server/src/evolution/runner.js';
-import { createLogger } from '../packages/server/src/utils/logger.js';
+import { runEvolution } from '../evolution/runner.js';
+import { createLogger } from '../utils/logger.js';
 
 // Initialize logger
 const logger = createLogger('evolution-cron');

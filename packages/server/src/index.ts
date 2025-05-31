@@ -1,157 +1,49 @@
-import 'dotenv/config';
-import './db.js';
+// Minimal server implementation
 import Fastify from 'fastify';
-import wsPlugin from './ws.js';
-import * as pino from 'pino';
-import { prisma } from './db.js';
-import { pollAndStore } from './services/marketData.js';
-import { registerLatestPriceRoute } from './routes/latestPrice.js';
-import { registerOrderRoute } from './routes/order.js';
-import { registerHealthzRoute } from './routes/healthz.js';
-import { registerPortfolioRoute } from './routes/portfolio.js';
-import registerApiRoutes from './routes/index.js';
-import { registerMetricsRoute } from './routes/metrics.js';
-import { registerControlsRoute } from './routes/controls.js';
-import { nightlyUpdate } from './bots/hypertrades/learner.js';
-import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
-import { run_bot } from './agent.js'; // HyperTrades bot implementation
-import './cron/index.js'; // Initialize cron jobs
-import '../cron/evolution.js'; // Initialize evolution cron job
-import { initHeartbeat } from './services/heartbeat.js';
-import { initHealthCheck } from './cron/health-check.js';
-import cron from 'node-cron';
 import { createLogger } from './utils/logger.js';
+import { evolutionCron } from './cron/evolution.js';
+import fastifyWebsocket from '@fastify/websocket';
+import registerApiRoutes from './routes/index.js';
+import { startBots } from './botRunner/index.js';
 
 // Initialize logger
 const logger = createLogger('server');
 
-// Set default environment variables if not set
-process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
-process.env.COINCAP_URL = process.env.COINCAP_URL || "https://api.coincap.io/v2/assets";
-process.env.REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
-process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
-
-// Log configured symbols
-const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
-logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
-
-// Initialize RLModel in the database
-async function initializeRLModel() {
-  try {
-    // Check if the model exists already
-    const existingModels = await prisma.rLModel.findMany();
-    const gatekeeperModel = existingModels.find(model => model.version === 'gatekeeper_v1');
-    
-    // If model doesn't exist, create it
-    if (!gatekeeperModel) {
-      await prisma.rLModel.create({
-        data: {
-          version: 'gatekeeper_v1',
-          description: 'baseline LR',
-          path: 'ml/gatekeeper_v1.onnx',
-        }
-      });
-      logger.info(`Gatekeeper initialized with model ml/gatekeeper_v1.onnx, threshold 0.55`);
-    } else {
-      logger.info(`Gatekeeper using existing model ${gatekeeperModel.path}, threshold 0.55`);
-    }
-
-    // Check and initialize account state
-    const accountState = await prisma.accountState.findFirst();
-    if (accountState) {
-      logger.info(`Portfolio loaded starting equity from DB: ${accountState.equity}`);
-    } else {
-      await prisma.accountState.upsert({
-        where: { id: 1 },
-        update: { equity: 10000 },
-        create: { equity: 10000 }
-      });
-      logger.info(`Portfolio initialized starting equity: 10000`);
-    }
-  } catch (error) {
-    logger.error('Error initializing RLModel:', { error });
-  }
-}
-
 // Create Fastify instance with logger enabled
 const app = Fastify({
-  logger: true // Use Fastify's built-in logger instead of passing our logger
+  logger: true
 });
 
-// Register plugins
-await app.register(wsPlugin);
-
-// Start polling market data - use 15 seconds interval to stay within rate limits
-setInterval(pollAndStore, 15000);
+// Register WebSocket plugin
+app.register(fastifyWebsocket);
 
 // Register routes
-await registerLatestPriceRoute(app);
-await registerOrderRoute(app);
-await registerHealthzRoute(app);
-await registerPortfolioRoute(app);
-await registerApiRoutes(app);
-await registerMetricsRoute(app);
-await registerControlsRoute(app);
+app.register(registerApiRoutes);
 
-// Add startup event handler to run the bot using the requested pattern
-app.addHook('onReady', async () => {
-  logger.info(`Starting Multi-Asset HyperTrades bot with symbols: ${configuredSymbols}`);
-  
-  // Initialize RLModel before starting the bot
-  await initializeRLModel();
-  
-  // Initialize heartbeat service
-  initHeartbeat();
-  
-  // Initialize daily health check
-  initHealthCheck();
-  
-  // Start the HyperTrades bot in a background task using Promise to not block the main server
-  Promise.resolve().then(() => {
-    run_bot().catch((err: Error) => {
-      logger.error('HyperTrades bot error:', { error: err });
-    });
-  });
-  
-  logger.info('Multi-Asset HyperTrades bot started in background');
+// Register healthcheck route
+app.get('/healthz', async (request, reply) => {
+  return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);
 
 // Start server
-await app.listen({ port, host: '0.0.0.0' });
-logger.info(`Server started on port ${port}`);
-
-// Schedule nightly learning update
-cron.schedule('0 0 * * *', async () => {
+const start = async () => {
   try {
-    await nightlyUpdate();
-    logger.info('Nightly learning update completed');
+    // Initialize bot runner
+    await startBots();
+    
+    // Start the server
+    await app.listen({ port, host: '0.0.0.0' });
+    logger.info(`Server started on port ${port}`);
+    
+    // Log that evolution cron is initialized
+    logger.info('Evolution cron scheduler initialized');
   } catch (err) {
-    logger.error('Nightly learning update error:', { error: err });
+    logger.error('Error starting server:', err);
+    process.exit(1);
   }
-});
+};
 
-// Schedule weekly fork/evaluation with real-world cadence
-// Weekly fork runs Monday at 03:00 UTC
-cron.schedule('0 3 * * 1', async () => {
-  try {
-    await weeklyFork();
-    logger.info('Weekly fork completed successfully');
-  } catch (err) {
-    logger.error('Weekly fork error:', { error: err });
-  }
-});
-
-// Weekly evaluation runs Sunday at 03:00 UTC
-cron.schedule('0 3 * * 0', async () => {
-  try {
-    await weeklyEvaluate();
-    logger.info('Weekly evaluation completed successfully');
-  } catch (err) {
-    logger.error('Weekly evaluation error:', { error: err });
-  }
-});
-
-export {}; 
+start(); 
