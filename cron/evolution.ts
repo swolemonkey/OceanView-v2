@@ -6,13 +6,21 @@
 
 import cron from 'node-cron';
 import { runEvolution } from '../packages/server/src/evolution/runner.js';
+import { createLogger } from '../packages/server/src/utils/logger.js';
+
+// Initialize logger
+const logger = createLogger('evolution-cron');
 
 // Schedule evolution run at 3:00 AM UTC every day
 // The pattern is: minute hour day-of-month month day-of-week
 cron.schedule('0 3 * * *', async () => {
-  console.log('[evolution] Starting scheduled evolution run');
-  await runEvolution();
-  console.log('[evolution] Completed scheduled evolution run');
+  logger.info('Starting scheduled evolution run');
+  try {
+    await runEvolution();
+    logger.info('Completed scheduled evolution run');
+  } catch (error) {
+    logger.error('Error during evolution run:', { error });
+  }
 });
 
 // Export for use in other modules
