@@ -3,7 +3,7 @@ import path from 'path';
 import { AssetAgent } from '../../packages/server/src/bots/hypertrades/assetAgent';
 import { loadConfig } from '../../packages/server/src/bots/hypertrades/config';
 import { PortfolioRiskManager } from '../../packages/server/src/risk/portfolioRisk';
-import { RLGatekeeper } from '../../packages/server/src/rl/gatekeeper';
+import { RLGatekeeper, FeatureVector } from '../../packages/server/src/rl/gatekeeper';
 import { InferenceSession } from 'onnxruntime-node';
 import { DataFeed, Tick } from '../../packages/server/src/feeds/interface';
 import { Candle } from '../../packages/server/src/bots/hypertrades/perception';
@@ -42,15 +42,26 @@ jest.mock('../../packages/server/src/db', () => ({
   },
 }));
 
+// Mock loadConfig function to avoid the parameter error
+jest.mock('../../packages/server/src/bots/hypertrades/config', () => ({
+  loadConfig: jest.fn().mockResolvedValue({
+    strategyToggle: {
+      'BTC-USD': { smcReversal: true, trendFollowMA: true },
+      'AAPL': { smcReversal: true, rangeBounce: true }
+    },
+    riskPct: 0.01
+  })
+}));
+
 // Create a mock for the ONNX InferenceSession with a trade scoring mechanism
 // that will veto one trade and allow another
 jest.mock('../../packages/server/src/rl/gatekeeper', () => {
   // Keep track of call count to alternate between scores
   let callCount = 0;
   
-  // Create a spy to track calls
-  const vetoedTrades = [];
-  const executedTrades = [];
+  // Create spy arrays with proper types
+  const vetoedTrades: Array<{features: FeatureVector, action: string, score: number}> = [];
+  const executedTrades: Array<{features: FeatureVector, action: string, score: number}> = [];
   
   // Export the mock
   const originalModule = jest.requireActual('../../packages/server/src/rl/gatekeeper');
@@ -60,7 +71,7 @@ jest.mock('../../packages/server/src/rl/gatekeeper', () => {
     RLGatekeeper: class MockGatekeeper {
       constructor() {}
       
-      async scoreIdea(features, action) {
+      async scoreIdea(features: FeatureVector, action: string): Promise<{score: number, id: number}> {
         // Increment call count
         callCount++;
         
@@ -77,7 +88,7 @@ jest.mock('../../packages/server/src/rl/gatekeeper', () => {
         return { score, id: callCount };
       }
       
-      static getTradeStats() {
+      static getTradeStats(): {vetoed: number, executed: number} {
         return {
           vetoed: vetoedTrades.length,
           executed: executedTrades.length
@@ -198,7 +209,7 @@ describe('Live Trading Smoke Test', () => {
     process.env.ONNX_PATH = 'ml/gatekeeper_v2.onnx';
     
     // Load config
-    const config = await loadConfig(1);
+    const config = await loadConfig();
     
     // Initialize risk manager
     riskManager = new PortfolioRiskManager();
