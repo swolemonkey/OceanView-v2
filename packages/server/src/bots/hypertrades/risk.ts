@@ -61,7 +61,7 @@ export class RiskManager {
   // simplistic close handling (fills always at price)
   async closePosition(qty:number, price:number, fee:number = 0){
     const pos = this.positions.shift();
-    if(!pos) return;
+    if(!pos) return 0; // Return 0 if no position found
     let pnl = pos.side==='buy'
       ? (price-pos.entry)*qty
       : (pos.entry-price)*qty;
@@ -96,5 +96,8 @@ export class RiskManager {
         console.error('Failed to update equity:', err);
       }
     }
+
+    // Return the individual trade PnL
+    return pnl;
   }
 } 

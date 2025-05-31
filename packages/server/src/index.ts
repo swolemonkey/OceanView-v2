@@ -19,6 +19,11 @@ import './cron/index.js'; // Initialize cron jobs
 import '../cron/evolution.js'; // Initialize evolution cron job
 import { initHeartbeat } from './services/heartbeat.js';
 import { initHealthCheck } from './cron/health-check.js';
+import cron from 'node-cron';
+import { createLogger } from './utils/logger.js';
+
+// Initialize logger
+const logger = createLogger('server');
 
 // Set default environment variables if not set
 process.env.COINGECKO_URL = process.env.COINGECKO_URL || "https://api.coingecko.com/api/v3/simple/price";
@@ -28,17 +33,7 @@ process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
 
 // Log configured symbols
 const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
-console.log(`[INIT] HyperTrades configured with symbols: ${configuredSymbols}`);
-
-// Initialize logger
-const logger = pino.pino({
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true
-    }
-  }
-});
+logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
 
 // Initialize RLModel in the database
 async function initializeRLModel() {
@@ -56,25 +51,25 @@ async function initializeRLModel() {
           path: 'ml/gatekeeper_v1.onnx',
         }
       });
-      console.log(`[gatekeeper] initialized with model ml/gatekeeper_v1.onnx, threshold 0.55`);
+      logger.info(`Gatekeeper initialized with model ml/gatekeeper_v1.onnx, threshold 0.55`);
     } else {
-      console.log(`[gatekeeper] using existing model ${gatekeeperModel.path}, threshold 0.55`);
+      logger.info(`Gatekeeper using existing model ${gatekeeperModel.path}, threshold 0.55`);
     }
 
     // Check and initialize account state
     const accountState = await prisma.accountState.findFirst();
     if (accountState) {
-      console.log(`[portfolio] Loaded starting equity from DB: ${accountState.equity}`);
+      logger.info(`Portfolio loaded starting equity from DB: ${accountState.equity}`);
     } else {
       await prisma.accountState.upsert({
         where: { id: 1 },
         update: { equity: 10000 },
         create: { equity: 10000 }
       });
-      console.log(`[portfolio] Initialized starting equity: 10000`);
+      logger.info(`Portfolio initialized starting equity: 10000`);
     }
   } catch (error) {
-    console.error('Error initializing RLModel:', error);
+    logger.error('Error initializing RLModel:', { error });
   }
 }
 
@@ -100,7 +95,7 @@ await registerControlsRoute(app);
 
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {
-  console.log('[INIT] Starting Multi-Asset HyperTrades bot with symbols:', configuredSymbols);
+  logger.info(`Starting Multi-Asset HyperTrades bot with symbols: ${configuredSymbols}`);
   
   // Initialize RLModel before starting the bot
   await initializeRLModel();
@@ -114,7 +109,7 @@ app.addHook('onReady', async () => {
   // Start the HyperTrades bot in a background task using Promise to not block the main server
   Promise.resolve().then(() => {
     run_bot().catch((err: Error) => {
-      console.error('HyperTrades bot error:', err);
+      logger.error('HyperTrades bot error:', { error: err });
     });
   });
   
@@ -128,42 +123,35 @@ const port = parseInt(process.env.PORT || '3334', 10);
 await app.listen({ port, host: '0.0.0.0' });
 logger.info(`Server started on port ${port}`);
 
-// We don't need to start the bot workers anymore as we've integrated HyperTrades directly
-// Keeping these schedules for learning and evaluation
-
-// Schedule nightly learning update - for demo, run every minute instead of midnight
-const scheduleUpdate = () => {
-  const now = new Date();
-  console.log(`[learner] Scheduling next update in 60 seconds`);
-  setTimeout(async () => {
-    try {
-      await nightlyUpdate();
-    } catch (err) {
-      console.error('[learner] Update error:', err);
-    }
-    scheduleUpdate();
-  }, 60 * 1000); // Run every minute for demo
-};
-
-scheduleUpdate();
-
-// Schedule fork operations - replace cron with setInterval
-// Run weeklyEvaluate every minute
-setInterval(async () => {
+// Schedule nightly learning update
+cron.schedule('0 0 * * *', async () => {
   try {
-    await weeklyEvaluate();
+    await nightlyUpdate();
+    logger.info('Nightly learning update completed');
   } catch (err) {
-    console.error('[weeklyEvaluate] Error:', err);
+    logger.error('Nightly learning update error:', { error: err });
   }
-}, 60 * 1000); // every minute for demo
+});
 
-// Run weeklyFork every 5 minutes
-setInterval(async () => {
+// Schedule weekly fork/evaluation with real-world cadence
+// Weekly fork runs Monday at 03:00 UTC
+cron.schedule('0 3 * * 1', async () => {
   try {
     await weeklyFork();
+    logger.info('Weekly fork completed successfully');
   } catch (err) {
-    console.error('[weeklyFork] Error:', err);
+    logger.error('Weekly fork error:', { error: err });
   }
-}, 5 * 60 * 1000); // every 5 min for demo
+});
+
+// Weekly evaluation runs Sunday at 03:00 UTC
+cron.schedule('0 3 * * 0', async () => {
+  try {
+    await weeklyEvaluate();
+    logger.info('Weekly evaluation completed successfully');
+  } catch (err) {
+    logger.error('Weekly evaluation error:', { error: err });
+  }
+});
 
 export {}; 
