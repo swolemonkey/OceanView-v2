@@ -102,6 +102,8 @@ model RLDataset {
   strategyVersionId Int?
   modelId      Int?
   model        RLModel? @relation(fields: [modelId], references: [id])
+  
+  @@index([symbol, ts]) // Index for faster lookups when updating outcome
 }
 
 // Account state for equity bootstrapping
@@ -177,4 +179,38 @@ model BotHeartbeat {
   ts        DateTime @default(now())
   status    String   // "ok" or "alert"
   details   String?
+}
+
+// Order model for execution tracking
+model Order {
+  id              Int      @id @default(autoincrement())
+  symbol          String
+  side            String   // buy or sell
+  type            String   // market, limit, etc.
+  qty             Float
+  price           Float?   // Null for market orders until filled
+  status          String   // pending, filled, cancelled, rejected
+  exchange        String?  // Exchange where order was placed
+  exchangeOrderId String?  // ID from exchange
+  clientOrderId   String?  // Client-generated order ID
+  botId           Int      // Bot that placed the order
+  fee             Float?
+  ts              DateTime @default(now())
+  fillTs          DateTime? // When the order was filled
+  trades          Trade[]  // Related trade executions
+}
+
+// Trade model for partial fills and executions
+model Trade {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id])
+  symbol      String
+  side        String   // buy or sell
+  qty         Float    // Partial fill quantity
+  price       Float    // Execution price
+  fee         Float?   // Fee for this execution
+  ts          DateTime @default(now())
+  exchangeTradeId String?
+  strategy    String?  // Strategy that generated the trade
 } 

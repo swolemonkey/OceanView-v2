@@ -1,6 +1,62 @@
 import { prisma } from '../db.js';
 import { InferenceSession, Tensor } from 'onnxruntime-node';
 import path from 'path';
+import { createLogger } from '../utils/logger.js';
+
+// Create logger
+const logger = createLogger('gatekeeper');
+
+// Global session for standalone score function
+let globalSession: InferenceSession | null = null;
+
+/**
+ * Initialize the global session
+ */
+async function initGlobalSession(): Promise<void> {
+  if (!globalSession) {
+    try {
+      globalSession = await InferenceSession.create('ml/gatekeeper_v2.onnx');
+      logger.info(`Loaded global RL model: gatekeeper_v2.onnx`);
+    } catch (error) {
+      logger.error('Error loading global RL model:', { error });
+    }
+  }
+}
+
+/**
+ * Score a feature vector using the ONNX model
+ * @param vec Feature vector for the model
+ * @returns Probability score between 0-1
+ */
+export async function score(vec: number[]): Promise<number> {
+  // Initialize global session if not already done
+  if (!globalSession) {
+    await initGlobalSession();
+  }
+  
+  // If still no session, return default score
+  if (!globalSession) return 0.5;
+  
+  try {
+    const result = await globalSession.run({ 
+      input: new Tensor('float32', Float32Array.from(vec), [1, vec.length])
+    });
+    
+    // The output tensor name may vary based on your model
+    // Look for a property that contains the probability data
+    const outputKeys = Object.keys(result);
+    if (outputKeys.length > 0) {
+      const outputTensor = result[outputKeys[0]];
+      if (outputTensor && outputTensor.data && outputTensor.data.length > 0) {
+        return Number(outputTensor.data[0]);
+      }
+    }
+    return 0.5; // Default if we can't extract the probability
+  } catch (error) {
+    logger.error('Error scoring with global RL model:', { error });
+    return 0.5;
+  }
+}
 
 /**
  * Feature vector for RL model input
@@ -43,25 +99,40 @@ export class RLGatekeeper {
    */
   private async loadModel(): Promise<void> {
     try {
-      // Get the latest model from the database
-      const model = await prisma.rLModel.findFirst({
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-
-      if (model) {
-        this.modelPath = model.path;
-        // Use absolute path to the model file
-        const modelPath = path.resolve(process.cwd(), model.path);
-        this.session = await InferenceSession.create(modelPath);
-        this.modelLoaded = true;
-        console.log(`[${new Date().toISOString()}] Loaded RL model: ${model.version}`);
-      } else {
-        console.log(`[${new Date().toISOString()}] No RL model found in database.`);
-      }
+      this.session = await InferenceSession.create('ml/gatekeeper_v2.onnx');
+      this.modelLoaded = true;
+      logger.info(`Loaded RL model: gatekeeper_v2.onnx`);
     } catch (error) {
-      console.error('Error loading RL model:', error);
+      logger.error('Error loading RL model:', { error });
+    }
+  }
+
+  /**
+   * Score a feature vector using the loaded model
+   * @param vec Feature vector for the model
+   * @returns Probability score (0-1)
+   */
+  private async score(vec: number[]): Promise<number> {
+    if (!this.session) return 0.5;
+    
+    try {
+      const result = await this.session.run({ 
+        input: new Tensor('float32', Float32Array.from(vec), [1, vec.length])
+      });
+      
+      // The output tensor name may vary based on your model
+      // Look for a property that contains the probability data
+      const outputKeys = Object.keys(result);
+      if (outputKeys.length > 0) {
+        const outputTensor = result[outputKeys[0]];
+        if (outputTensor && outputTensor.data && outputTensor.data.length > 0) {
+          return Number(outputTensor.data[0]);
+        }
+      }
+      return 0.5; // Default if we can't extract the probability
+    } catch (error) {
+      logger.error('Error scoring with RL model:', { error });
+      return 0.5;
     }
   }
 
@@ -70,9 +141,9 @@ export class RLGatekeeper {
    * Uses the ONNX model if available, otherwise falls back to random
    * @param {FeatureVector} features Feature vector for the model
    * @param {string} action Proposed action (buy|sell|skip)
-   * @returns {number} Confidence score between 0-1
+   * @returns {Promise<{score: number, id: number}>} Confidence score between 0-1 and database entry ID
    */
-  public async scoreIdea(features: FeatureVector, action: string): Promise<number> {
+  public async scoreIdea(features: FeatureVector, action: string): Promise<{score: number, id: number}> {
     let score = 0.5; // Default middle score
     
     // If model is loaded, use it to score the idea
@@ -89,33 +160,24 @@ export class RLGatekeeper {
           action === 'buy' ? 1 : 0
         ];
         
-        // Create tensor for inference
-        const input = new Tensor('float32', Float32Array.from(featureVec), [1, featureVec.length]);
+        score = await this.score(featureVec);
         
-        // Run inference
-        const output = await this.session.run({ input });
-        
-        // Extract score from output (probability)
-        score = output.probabilities ? 
-          Number(output.probabilities.data[0]) : 
-          Number(output.probability.data[0]);
-        
-        console.log(`[${new Date().toISOString()}] Gatekeeper score=${score.toFixed(4)} for ${action} ${features.symbol}`);
+        logger.debug(`Gatekeeper score=${score.toFixed(4)} for ${action} ${features.symbol}`);
       } catch (error) {
-        console.error('Error scoring with RL model:', error);
+        logger.error('Error scoring with RL model:', { error });
         // Fall back to random score
         score = Math.random();
       }
     } else {
       // If model not loaded, use random score (shadow mode)
       score = Math.random();
-      console.log(`[${new Date().toISOString()}] Shadow mode: score=${score.toFixed(4)}`);
+      logger.debug(`Shadow mode: score=${score.toFixed(4)}`);
     }
     
     // Log feature vector and score to database
-    this.logFeatures(features, action, score);
+    const id = await this.logFeatures(features, action, score);
     
-    return score;
+    return { score, id };
   }
 
   /**
@@ -123,10 +185,11 @@ export class RLGatekeeper {
    * @param {FeatureVector} features Feature vector
    * @param {string} action Proposed action
    * @param {number} score Confidence score
+   * @returns {Promise<number>} ID of the created database entry
    */
-  private async logFeatures(features: FeatureVector, action: string, score: number): Promise<void> {
+  private async logFeatures(features: FeatureVector, action: string, score: number): Promise<number> {
     try {
-      await prisma.rLDataset.create({
+      const entry = await prisma.rLDataset.create({
         data: {
           symbol: features.symbol,
           featureVec: JSON.stringify(features),
@@ -136,48 +199,27 @@ export class RLGatekeeper {
           strategyVersionId: this.strategyVersionId
         }
       });
+      return entry.id;
     } catch (error) {
-      console.error('Error logging RL feature vector:', error);
+      logger.error('Error logging RL feature vector:', { error });
+      return 0;
     }
   }
 
   /**
-   * Update outcome for a previous trade
-   * @param {string} symbol Symbol
-   * @param {number} timestamp Timestamp of the original trade
-   * @param {number} pnl Realized PnL from the trade
+   * Update outcome for a previous trade decision
+   * @param {number} id ID of the dataset entry to update
+   * @param {number} pnl P&L outcome value
    */
-  public async updateOutcome(symbol: string, timestamp: number, pnl: number): Promise<void> {
+  public async updateOutcome(id: number, pnl: number): Promise<void> {
     try {
-      // Find the most recent feature vector for this symbol near the timestamp
-      const datasets = await prisma.rLDataset.findMany({
-        where: {
-          symbol: symbol,
-          ts: {
-            // Find entries within 5 minutes of the timestamp
-            gte: new Date(timestamp - 5 * 60 * 1000),
-            lte: new Date(timestamp + 5 * 60 * 1000)
-          }
-        },
-        orderBy: {
-          ts: 'desc'
-        },
-        take: 1
+      await prisma.rLDataset.update({
+        where: { id },
+        data: { outcome: pnl }
       });
-
-      if (datasets.length > 0) {
-        // Update the outcome with the realized PnL
-        await prisma.rLDataset.update({
-          where: {
-            id: datasets[0].id
-          },
-          data: {
-            outcome: pnl
-          }
-        });
-      }
+      logger.debug(`Updated outcome for entry ${id}: ${pnl}`);
     } catch (error) {
-      console.error('Error updating RL outcome:', error);
+      logger.error(`Error updating outcome for entry ${id}:`, { error });
     }
   }
 } 

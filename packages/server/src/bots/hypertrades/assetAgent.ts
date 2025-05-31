@@ -13,6 +13,18 @@ import { passRR } from './utils/riskReward.js';
 import type { DataFeed, Tick } from '../../feeds/interface.js';
 import type { ExecutionEngine, Order } from '../../execution/interface.js';
 import { SimEngine } from '../../execution/sim.js';
+import { score } from '../../rl/gatekeeper.js';
+import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
+import { createLogger } from '../../utils/logger.js';
+
+// Create logger
+const logger = createLogger('assetAgent');
+
+// Global portfolio risk manager instance
+let portfolioRisk: PortfolioRiskManager | null = null;
+// Global collection of all agent instances
+const allAgents = new Map<string, AssetAgent>();
 
 // Define TradeIdea type to match what executeIdea expects
 type TradeIdea = { 
@@ -90,7 +102,18 @@ export class AssetAgent {
       this.strategies.push(new RangeBounce(symbol));
     }
     
-    console.log(`[${new Date().toISOString()}] Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`);
+    logger.info(`Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`);
+    
+    // Register this agent in the global collection
+    allAgents.set(symbol, this);
+    
+    // Initialize portfolio risk manager if not already done
+    if (!portfolioRisk) {
+      portfolioRisk = new PortfolioRiskManager();
+      portfolioRisk.init().catch(err => 
+        logger.error(`Failed to initialize portfolio risk manager:`, { error: err })
+      );
+    }
   }
 
   // Method to set data feed after construction
@@ -117,7 +140,7 @@ export class AssetAgent {
     // Get the last 2 candles for stop calculation
     const lastCandles = this.perception.last(2);
     if (lastCandles.length < 2) {
-      console.log(`[${new Date().toISOString()}] ${this.symbol.toUpperCase()}: Not enough data yet, need at least 2 candles`);
+      logger.debug(`${this.symbol.toUpperCase()}: Not enough data yet, need at least 2 candles`);
       return; // Need at least 2 candles
     }
   }
@@ -128,6 +151,18 @@ export class AssetAgent {
     
     // Update indicator cache
     this.indCache.updateOnClose(candle.c);
+    
+    // Update portfolio risk metrics
+    if (portfolioRisk) {
+      portfolioRisk.recalc(allAgents);
+      
+      // Check portfolio-wide risk limits
+      if (!portfolioRisk.canTrade()) {
+        logger.info(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`);
+        logger.info(`Open risk: ${portfolioRisk.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolioRisk.dayPnl.toFixed(2)}`);
+        return;
+      }
+    }
     
     // Prepare strategy context
     const ctx = {
@@ -145,116 +180,186 @@ export class AssetAgent {
     
     // If no trade idea, return
     if (!tradeIdea) {
-      console.log(`[${new Date().toISOString()}] DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals`);
+      logger.debug(`DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals`);
       return;
     }
     
-    console.log(`[${new Date().toISOString()}] DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
+    logger.info(`DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
     
-    // Import the RLGatekeeper dynamically to avoid circular dependencies
-    const gatekeeper = await import('../../rl/gatekeeper.js').then(
+    // Prepare feature vector for RL model
+    const featureVec = [
+      this.indCache.rsi14 || 50,
+      this.indCache.adx14 || 25,
+      (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
+      this.indCache.bbWidth || 0,
+      0, // avgSent
+      0, // avgOB
+      tradeIdea.side === 'buy' ? 1 : 0
+    ];
+    
+    // Import the RLGatekeeper dynamically to score the idea
+    const rlGatekeeper = await import('../../rl/gatekeeper.js').then(
       module => new module.RLGatekeeper((this.risk as any).versionId || 1)
     );
     
-    // Prepare feature vector for RL model
-    const features = {
+    // Score the trade idea with the gatekeeper
+    let tradeScore = 0.5; // Default score
+    let rlEntryId = 0;
+    try {
+      // Score the trade idea
+      const scoreResult = await rlGatekeeper.scoreIdea({
+        symbol: this.symbol,
+        price: candle.c,
+        rsi: this.indCache.rsi14,
+        adx: this.indCache.adx14,
+        volatility: this.indCache.bbWidth,
+        recentTrend: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
+        dayOfWeek: new Date().getDay(),
+        hourOfDay: new Date().getHours(),
+      }, tradeIdea.side);
+      
+      tradeScore = scoreResult.score;
+      rlEntryId = scoreResult.id;
+      
+      // Store the RL entry ID for later update
+      storeRLEntryId(this.symbol, rlEntryId);
+      
+      logger.info(`RL Score: ${tradeScore.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
+      
+      // Veto the trade if score is below threshold
+      if (tradeScore < 0.55) {
+        logger.info(`VETO: Trade vetoed by gatekeeper with score ${tradeScore.toFixed(4)}`);
+        return;
+      }
+    } catch (error) {
+      logger.error('Error scoring trade idea with gatekeeper:', { error });
+    }
+    
+    // Calculate position size
+    const qty = this.risk.sizeTrade(candle.c);
+    
+    // Prepare full trade idea
+    const fullIdea: TradeIdea = {
       symbol: this.symbol,
+      side: tradeIdea.side,
       price: candle.c,
-      rsi: this.indCache.rsi14 || 50,
-      adx: this.indCache.adx14 || 25,
-      volatility: Math.abs(candle.h - candle.l) / candle.c,
-      recentTrend: (candle.c - candle.o) / candle.o,
-      rsi14: this.indCache.rsi14 || 50,
-      adx14: this.indCache.adx14 || 25,
-      fastMASlowDelta: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
-      bbWidth: this.indCache.bbWidth || 0,
-      avgSent: 0, // We'll need to implement sentiment tracking
-      avgOB: 0,   // We'll need to implement order book tracking
-      dayOfWeek: new Date().getDay(),
-      hourOfDay: new Date().getHours()
+      qty
     };
     
-    // Score the trade idea with the RL gatekeeper (active mode)
-    const score = await gatekeeper.scoreIdea(features, tradeIdea.side);
-    console.log(`[${new Date().toISOString()}] RL Score: ${score.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
-    
-    // Veto trade if score is below threshold
-    if (score < 0.55) {
-      console.log(`[${new Date().toISOString()}] BLOCKED: Trade vetoed by gatekeeper with score ${score.toFixed(4)}`);
+    // Check risk-reward ratio
+    if (!passRR(fullIdea.side, candle.c, this.risk.getStopPrice(), candle.c * 1.02, 2.0)) {
+      logger.info(`BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
       return;
     }
     
-    // Process the trade idea
-    if (this.risk.canTrade()) {
-      const lastCandles = this.perception.last(2);
-      const stop = tradeIdea.side === 'buy' 
-        ? lastCandles[0].l * 0.99  // 1% below recent low for long
-        : lastCandles[0].h * 1.01; // 1% above recent high for short
-      
-      // Check risk-reward ratio using our helper
-      const target = tradeIdea.side === 'buy'
-        ? candle.c + (candle.c - stop) * 2  // 1:2 risk-reward for now
-        : candle.c - (stop - candle.c) * 2;
-      
-      if (!passRR(tradeIdea.side, candle.c, stop, target, 2)) {
-        console.log(`[${new Date().toISOString()}] BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
-        return;
-      }
-      
-      const qty = this.risk.sizeTrade(stop, candle.c);
-      
-      // Log trade execution
-      console.log(`[${new Date().toISOString()}] EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)}`);
-      
-      // Create order for execution
+    // Execute trade idea
+    logger.info(`EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)}`);
+    
+    try {
+      // Create execution order
       const order: Order = {
         symbol: this.symbol,
         side: tradeIdea.side,
-        qty,
-        price: candle.c,
-        type: 'market'
+        type: 'market',
+        qty: qty,
+        price: candle.c
       };
       
-      try {
-        // Execute the trade using the execution engine with retry logic
-        const fill = await this.executeWithRetry(order);
+      // Execute order with retry
+      const orderResult = await this.executeWithRetry(order);
+      
+      // Process the order result
+      if (orderResult && orderResult.status === 'filled') {
+        // Get the fill price from the order result
+        const fill = orderResult.trades[0];
         
-        // Register the order with risk manager
-        this.risk.registerOrder(order.side, fill.qty, fill.price, stop);
+        // Update risk manager with new position
+        const tradePnL = await this.risk.registerTrade(fill.side, fill.qty, fill.price, this.risk.getStopPrice(), fill.fee || 0);
         
-        // Log trade completion
-        console.log(`[${new Date().toISOString()}] COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] ERROR: Failed to execute ${order.side} for ${this.symbol}: ${String(error)}`);
+        // Update the RL dataset with the PnL outcome
+        if (rlEntryId) {
+          await rlGatekeeper.updateOutcome(rlEntryId, tradePnL);
+        }
+        
+        logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);
       }
-    } else {
-      console.log(`[${new Date().toISOString()}] BLOCKED: Risk limits exceeded for ${this.symbol.toUpperCase()}. Open risk: ${this.risk.openRisk.toFixed(2)}%`);
+    } catch (error) {
+      logger.error(`Error executing trade:`, { error, symbol: this.symbol, side: tradeIdea.side });
+      if (this.risk.openRisk > this.cfg.riskPct) {
+        logger.warn(`BLOCKED: Risk limits exceeded for ${this.symbol.toUpperCase()}. Open risk: ${this.risk.openRisk.toFixed(2)}%`);
+      }
     }
   }
   
-  // Execute an order with exponential backoff retry (3 attempts)
+  /**
+   * Execute an order with retry logic
+   * @param order Order to execute
+   * @param maxRetries Maximum number of retry attempts
+   * @returns Promise resolving to order result
+   */
   private async executeWithRetry(order: Order, maxRetries = 3): Promise<any> {
     let lastError;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        // Exponential backoff delay
-        if (attempt > 0) {
-          const delay = Math.pow(2, attempt) * 1000; // 2^attempt seconds
-          console.log(`[${new Date().toISOString()}] Retry attempt ${attempt + 1} for ${order.side} ${order.symbol} after ${delay/1000}s delay`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        
-        // Execute the order
         return await this.executionEngine.place(order);
       } catch (error) {
-        console.error(`[${new Date().toISOString()}] Execution attempt ${attempt + 1} failed: ${String(error)}`);
         lastError = error;
+        
+        // Check if portfolio risk still allows trading
+        if (portfolioRisk && !portfolioRisk.canTrade()) {
+          throw new Error('Portfolio risk limits exceeded, aborting execution');
+        }
+        
+        // Delay before retry
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+        logger.debug(`Retry attempt ${attempt + 1} for ${order.side} ${order.symbol} after ${delay/1000}s delay`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
     
-    // If we get here, all attempts failed
-    console.error(`[${new Date().toISOString()}] All ${maxRetries} execution attempts failed for ${order.side} ${order.symbol}`);
     throw lastError;
+  }
+  
+  /**
+   * Close all open positions at current price
+   * @param currentPrice Current market price
+   * @returns Promise resolving to position close result
+   */
+  async closePositions(currentPrice: number): Promise<void> {
+    if (this.risk.positions.length > 0) {
+      const positionQty = this.risk.positions[0].qty;
+      const positionSide = this.risk.positions[0].side;
+      const closeSide = positionSide === 'buy' ? 'sell' : 'buy';
+      
+      const order: Order = {
+        symbol: this.symbol,
+        side: closeSide,
+        type: 'market',
+        qty: Math.abs(positionQty),
+        price: currentPrice
+      };
+      
+      try {
+        const result = await this.executionEngine.place(order);
+        if (result && result.status === 'filled') {
+          const fill = result.trades[0];
+          const tradePnL = await this.risk.closePosition(fill.qty, fill.price, fill.fee || 0);
+          logger.info(`Closed position: ${tradePnL.toFixed(2)} PnL`);
+        }
+      } catch (error) {
+        logger.error(`Error closing position:`, { error, symbol: this.symbol });
+      }
+    }
+  }
+  
+  /**
+   * Check if portfolio risk allows trading again after being halted
+   */
+  async checkRiskResumption(): Promise<void> {
+    if (portfolioRisk && portfolioRisk.canTrade()) {
+      logger.info(`Trading can resume - Portfolio risk metrics within limits`);
+      logger.info(`Open risk: ${portfolioRisk.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolioRisk.dayPnl.toFixed(2)}`);
+    }
   }
 } 

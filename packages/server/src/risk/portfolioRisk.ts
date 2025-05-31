@@ -71,8 +71,12 @@ export class PortfolioRiskManager {
    * Checks if trading should be allowed based on current risk limits
    * @returns {boolean} true if trading is allowed, false if risk limits are exceeded
    */
-  canTrade() { 
-    return this.dayPnl > -this.maxDailyLoss * this.equity && this.openRiskPct < this.maxOpenRisk; 
+  canTrade(): boolean { 
+    // Convert dayPnl to percentage of equity
+    const dayLossPct = this.dayPnl < 0 ? Math.abs(this.dayPnl) / this.equity : 0;
+    
+    // Check if either risk limit is exceeded
+    return dayLossPct < this.maxDailyLoss && this.openRiskPct < this.maxOpenRisk * 100; 
   }
   
   /**
