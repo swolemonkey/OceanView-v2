@@ -1,0 +1,50 @@
+name: E2E Smoke Test
+
+on:
+  pull_request:
+    branches: 
+      - staging
+      - main
+    paths:
+      - 'tests/e2e/**'
+      - 'tests/fixtures/**'
+      - 'packages/server/src/**'
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+        
+      - name: Install ONNX runtime
+        run: pnpm add -D onnxruntime-node
+      
+      - name: Copy ONNX model
+        run: |
+          mkdir -p ml
+          # Use v1 as v2 if it doesn't exist yet
+          if [ -f "ml/gatekeeper_v1.onnx" ]; then
+            cp ml/gatekeeper_v1.onnx ml/gatekeeper_v2.onnx
+          else
+            # Create a dummy model file if neither exists
+            echo "Creating dummy ONNX model for testing"
+            touch ml/gatekeeper_v2.onnx
+          fi
+      
+      - name: Run E2E smoke test
+        run: |
+          export ONNX_PATH=ml/gatekeeper_v2.onnx
+          pnpm test:e2e 

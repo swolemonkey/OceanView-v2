@@ -15,5 +15,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testMatch: ['**/tests/**/*.test.ts'],
-  testTimeout: 30000
+  testTimeout: 30000,
+  // Add these settings for CI compatibility
+  testPathIgnorePatterns: ['/node_modules/'],
+  transformIgnorePatterns: ['/node_modules/']
 }; 
