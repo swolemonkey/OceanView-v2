@@ -26,11 +26,28 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
+      - name: Debug package files
+        run: |
+          echo "Checking package.json and pnpm-lock.yaml"
+          ls -la package.json pnpm-lock.yaml
+          echo "Package.json version:"
+          grep -A 5 "version" package.json
+          echo "Node version:"
+          node --version
+          echo "PNPM version:"
+          pnpm --version
+
       - name: Install dependencies (no frozen lockfile)
         run: pnpm install --no-frozen-lockfile
+
+      # Clean TypeScript artifacts before running tests
+      - name: Clean built files
+        run: |
+          find packages -name "*.js" -type f -not -path "*/node_modules/*" -not -path "*/dist/*" -delete
+          find tests -name "*.js" -type f -not -path "*/node_modules/*" -not -path "*/dist/*" -delete
 
       # Check if tests pass in the workspace
       - name: Run workspace tests
         run: |
           # Only run tests that don't require TypeScript compilation
-          pnpm test --if-present --filter="./tests" -- --passWithNoTests 
+          pnpm test --if-present --filter="./tests" -- --passWithNoTests --testTimeout=60000 

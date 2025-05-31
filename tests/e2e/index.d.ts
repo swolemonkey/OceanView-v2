@@ -46,9 +46,25 @@ declare module '../../packages/server/src/rl/gatekeeper' {
 }
 
 declare module '../../packages/server/src/execution/sim' {
+  export interface OrderResult {
+    id: string;
+    symbol: string;
+    side: string;
+    qty: number;
+    price: number;
+    status: string;
+    trades: Array<{
+      id: string;
+      side: string;
+      qty: number;
+      price: number;
+      fee: number;
+    }>;
+  }
+
   export class SimEngine {
     constructor(botId?: number);
-    place(order: any): Promise<any>;
+    place(order: any): Promise<OrderResult>;
   }
 }
 
@@ -76,4 +92,20 @@ declare module '../../packages/server/src/bots/hypertrades/perception' {
     l: number;
     c: number;
   }
+}
+
+declare module '../../packages/server/src/bots/hypertrades/risk' {
+  export class RiskManager {
+    equity: number;
+    openRisk: number;
+    dayPnL: number;
+    positions: Array<{qty: number, entry: number, side: string, stop?: number}>;
+    
+    registerOrder(side: string, qty: number, price: number, stop?: number): void;
+    closePosition(qty: number, price: number, fee?: number): Promise<number>;
+  }
+}
+
+declare module '../../packages/server/src/botRunner/workers/hypertrades' {
+  export function storeRLEntryId(symbol: string, timestamp: number, id: number): void;
 } 
