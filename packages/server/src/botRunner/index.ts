@@ -101,6 +101,12 @@ async function spawnBot(botId:number, name:string, type:string){
 }
 
 export async function startBots(){
+  // Skip bot spawning in production for now as a temporary fix
+  if (isProduction) {
+    console.log('Running in production mode - skipping bot spawning to ensure server stability');
+    return;
+  }
+
   const bots = await prisma.bot.findMany({ where:{ enabled:true }});
   console.log(`Found ${bots.length} enabled bots:`, bots.map(b => b.name).join(', '));
   // @ts-ignore - type field added to schema but not yet recognized by TypeScript
