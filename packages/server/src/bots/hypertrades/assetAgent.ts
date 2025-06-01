@@ -156,8 +156,10 @@ export class AssetAgent {
       
       // Check portfolio-wide risk limits
       if (!portfolioRisk.canTrade()) {
-        logger.info(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`);
-        logger.info(`Open risk: ${portfolioRisk.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolioRisk.dayPnl.toFixed(2)}`);
+        logger.warn(
+          'VETO-PORTFOLIO limits exceeded',
+          { open: portfolioRisk.openRiskPct, loss: portfolioRisk.dayPnl < 0 ? Math.abs(portfolioRisk.dayPnl) / portfolioRisk.equity : 0 }
+        );
         return;
       }
     }
@@ -279,8 +281,9 @@ export class AssetAgent {
       }
     } catch (error) {
       logger.error(`Error executing trade:`, { error, symbol: this.symbol, side: tradeIdea.side });
-      if (this.risk.openRisk > this.cfg.riskPct) {
-        logger.warn(`BLOCKED: Risk limits exceeded for ${this.symbol.toUpperCase()}. Open risk: ${this.risk.openRisk.toFixed(2)}%`);
+      // Only check portfolio risk limits
+      if (portfolioRisk && !portfolioRisk.canTrade()) {
+        logger.warn(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`);
       }
     }
   }

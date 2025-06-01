@@ -1,0 +1,48 @@
+
+> @oceanview/server@0.0.1 dev /Users/ricky/Dropbox/Apps/OceanView-v2/packages/server
+> tsx watch src/index.ts
+
+[2025-06-01 20:18:55] [oceanview] [32minfo[39m: HyperTrades configured with symbols: bitcoin {
+  "context": "server"
+}
+[hypertrades] init error: TypeError: Cannot destructure property 'botId' of 'workerData' as it is null.
+    at init (/Users/ricky/Dropbox/Apps/OceanView-v2/packages/server/src/botRunner/workers/hypertrades.ts:29:11)
+[2025-06-01 20:18:55] [oceanview] [32minfo[39m: Starting Multi-Asset HyperTrades bot with symbols: bitcoin {
+  "context": "server"
+}
+[2025-06-01 20:18:55] [oceanview] [32minfo[39m: Gatekeeper using existing model ./ml/gatekeeper_v1.onnx, threshold 0.55 {
+  "context": "server"
+}
+[2025-06-01 20:18:55] [oceanview] [32minfo[39m: Portfolio loaded starting equity from DB: 10000 {
+  "context": "server"
+}
+Failed to record heartbeat: Cannot read properties of undefined (reading 'create')
+[heartbeat] Service initialized, recording every 5 minutes
+[cron] Daily health check scheduled for 07:00 UTC
+[2025-06-01 20:18:55] [oceanview] [32minfo[39m: Multi-Asset HyperTrades bot started in background {
+  "context": "server"
+}
+[2025-06-01T10:18:55.520Z] Multi-Asset HyperTrades bot starting up...
+[2025-06-01T10:18:55.521Z] HyperTrades loaded config for symbols: bitcoin
+[2025-06-01 20:18:55] [oceanview] [31merror[39m: HyperTrades bot error: {
+  "error": {},
+  "context": "server"
+}
+node:net:1939
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:3334
+    at Server.setupListenHandle [as _listen2] (node:net:1939:16)
+    at listenInCluster (node:net:1996:12)
+    at node:net:2205:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 3334
+}
+
+Node.js v23.11.0
+ ELIFECYCLE  Command failed.
