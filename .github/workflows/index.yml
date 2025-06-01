@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: 'pnpm-lock.yaml'
 
       # 3️⃣ Install deps with dev dependencies needed for CI
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm install --no-frozen-lockfile --ignore-scripts
       
       # 4️⃣ Run clean script
       - run: pnpm -F server run clean

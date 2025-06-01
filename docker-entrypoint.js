@@ -20,6 +20,10 @@ if (process.argv.slice(-3).join(' ') === 'pnpm run start') {
 
   // prepare database
   await exec('npx prisma migrate deploy')
+  
+  // Run the seedAll script to ensure all mandatory rows exist
+  await exec('pnpm ts-node scripts/seedAll.ts')
+  
   if (newDb) await exec('ts-node packages/server/prisma/seed.ts')
 }
 

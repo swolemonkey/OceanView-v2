@@ -21,6 +21,10 @@ interface HyperSettings {
   id: number;
   smcThresh: number;
   rsiOS: number;
+  rsiOB?: number;
+  fastMAPeriod?: number;
+  slowMAPeriod?: number;
+  riskPct?: number;
 }
 
 interface Bot {
@@ -76,12 +80,19 @@ export async function weeklyFork() {
       }
     });
     
+    // Define numeric keys to mutate
+    const numericKeys = ['smcThresh', 'rsiOS', 'rsiOB', 'fastMAPeriod', 'slowMAPeriod', 'riskPct'];
+    
     // @ts-ignore - New schema fields not yet recognized by TypeScript
     await prisma.hyperSettings.create({
       data: {
         id: child.id, // use botId as settings id
         smcThresh: mutate(set.smcThresh, forkCfg.mutatePct),
-        rsiOS: mutate(set.rsiOS, forkCfg.mutatePct)
+        rsiOS: mutate(set.rsiOS, forkCfg.mutatePct),
+        rsiOB: mutate(set.rsiOB || 65, forkCfg.mutatePct),
+        fastMAPeriod: Math.round(mutate(set.fastMAPeriod || 50, forkCfg.mutatePct)),
+        slowMAPeriod: Math.round(mutate(set.slowMAPeriod || 200, forkCfg.mutatePct)),
+        riskPct: mutate(set.riskPct || 1, forkCfg.mutatePct)
       }
     });
     
@@ -172,7 +183,11 @@ export async function weeklyEvaluate() {
               where: { id: 1 }, 
               data: {
                 smcThresh: childSettings.smcThresh,
-                rsiOS: childSettings.rsiOS
+                rsiOS: childSettings.rsiOS,
+                rsiOB: childSettings.rsiOB,
+                fastMAPeriod: childSettings.fastMAPeriod,
+                slowMAPeriod: childSettings.slowMAPeriod,
+                riskPct: childSettings.riskPct
               }
             });
           }

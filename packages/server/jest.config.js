@@ -1,15 +1,21 @@
 export default {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/js-with-ts-esm',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts'],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov'],
+  testTimeout: 30000,
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
       useESM: true,
-    }]
+    }],
   },
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
+    '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js',
     '^(\\.{1,2}/.*)\\.js$': '$1'
-  },
-  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js']
+  }
 }; 

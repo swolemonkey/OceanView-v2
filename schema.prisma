@@ -25,6 +25,7 @@ model HyperSettings {
   symbols       String   @default("bitcoin")
   riskPct       Float    @default(1)
   smcMinRetrace Float    @default(0.5)
+  strategyToggle String?  @default("{}")  // JSON column for strategy toggles
   updatedAt     DateTime @updatedAt
 }
 
@@ -105,4 +106,15 @@ model AccountState {
   id         Int      @id @default(autoincrement())
   equity     Float
   updatedAt  DateTime @default(now()) @updatedAt
+}
+
+// Symbol registry to track asset types
+model SymbolRegistry {
+  id         Int      @id @default(autoincrement())
+  symbol     String   @unique
+  assetClass String   // 'crypto', 'equity', 'forex', etc.
+  exchange   String?  // Optional exchange identifier
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 } 

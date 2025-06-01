@@ -20,6 +20,8 @@ let portfolio: PortfolioRiskManager;
 let rlGatekeeper: RLGatekeeper;
 // Trading halted flag
 let tradingHalted = false;
+// Track RL dataset entries by order ID
+const rlEntryIds = new Map<string, number>();
 
 async function init() {
   // Get config and bot info
@@ -42,8 +44,9 @@ async function init() {
     lastCandleTimes.set(symbol, 0);
   }
   
-  // Initialize portfolio risk manager
+  // Initialize portfolio risk manager with config
   portfolio = new PortfolioRiskManager();
+  await portfolio.init();
   
   // Initialize RL Gatekeeper
   rlGatekeeper = new RLGatekeeper(versionId);
@@ -65,7 +68,6 @@ async function init() {
     const canTrade = portfolio.canTrade();
     if (!canTrade && !tradingHalted) {
       log('TRADING HALTED - Risk limits exceeded');
-      log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
       tradingHalted = true;
     }
     
@@ -112,7 +114,6 @@ parentPort?.on('message', async (m) => {
           if (!portfolio.canTrade()) {
             tradingHalted = true;
             log(`Trading halted for ${symbol} - Portfolio risk limits exceeded`);
-            log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
             
             // Skip trade processing
             lastCandleTimes.set(symbol, currentMinute);
@@ -146,13 +147,21 @@ parentPort?.on('message', async (m) => {
       order.entryTs = Date.now() - 1000; // Assume 1 second ago if not provided
     }
     
-    await agent.risk.closePosition(order.qty, order.price, order.fee);
+    // Close the position using agent's closePositions method which updates portfolio risk
+    await agent.closePositions(order.price);
     
-    // Update RL Dataset with outcome (PnL)
-    try {
-      await rlGatekeeper.updateOutcome(order.symbol, order.entryTs, agent.risk.dayPnL);
-    } catch (error) {
-      console.error('Error updating RL outcome:', error);
+    // Get the RL entry ID for this order
+    const entryId = rlEntryIds.get(`${order.symbol}-${order.entryTs}`);
+    
+    // Update RL Dataset with outcome (individual trade PnL)
+    if (entryId) {
+      try {
+        await rlGatekeeper.updateOutcome(entryId, order.pnl);
+        // Remove the entry from our tracking map after updating
+        rlEntryIds.delete(`${order.symbol}-${order.entryTs}`);
+      } catch (error) {
+        console.error('Error updating RL outcome:', error);
+      }
     }
     
     // Send metrics update after position close - combined from all agents
@@ -167,6 +176,15 @@ parentPort?.on('message', async (m) => {
     // Update portfolio risk manager
     portfolio.recalc(agents);
     
+    // Check if trading can resume after this position close
+    if (!tradingHalted && portfolio.canTrade()) {
+      console.log(`[${workerData.name}] Trading enabled - Portfolio risk metrics within limits`);
+    } else if (tradingHalted && portfolio.canTrade()) {
+      tradingHalted = false;
+      console.log(`[${workerData.name}] Trading resumed - Portfolio risk metrics now within limits`);
+      console.log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
+    }
+    
     parentPort?.postMessage({ 
       type: 'metric', 
       equity: totalEquity, 
@@ -177,10 +195,15 @@ parentPort?.on('message', async (m) => {
     await logCompletedTrade(
       {
         ...order,
-        pnl: agent.risk.dayPnL, // Use the risk manager's calculation for consistency
+        pnl: order.pnl, // Use the individual trade PnL
       },
       workerData.name,
       versionId
     );
   }
-}); 
+});
+
+// Helper function to store RL entry ID when a trade is initiated
+export function storeRLEntryId(symbol: string, timestamp: number, id: number): void {
+  rlEntryIds.set(`${symbol}-${timestamp}`, id);
+} 

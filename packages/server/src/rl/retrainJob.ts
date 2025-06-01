@@ -1,78 +1,41 @@
-import { spawn } from 'child_process';
-import { randomUUID } from 'crypto';
-import path from 'path';
-import fs from 'fs';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
 import { prisma } from '../db.js';
+import { createLogger } from '../utils/logger.js';
+
+const exec = promisify(execCallback);
+const logger = createLogger('gatekeeper');
 
 /**
- * Executes a shell command and returns the output
- * @param command Command to execute
- * @returns Promise that resolves with stdout or rejects with error
- */
-async function executeCommand(command: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const process = spawn(command, args);
-    let stdout = '';
-    let stderr = '';
-
-    process.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    process.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    process.on('close', (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(`Command failed with code ${code}: ${stderr}`));
-      }
-    });
-  });
-}
-
-/**
- * Retrains the gatekeeper model using latest data
+ * Retrains the gatekeeper model using the latest RL dataset
  * @returns Promise that resolves when retraining is complete
  */
-export async function retrainGatekeeper(): Promise<void> {
-  try {
-    console.log('Starting gatekeeper retraining...');
-    
-    // Step 1: Export latest dataset
-    console.log('Exporting RL dataset...');
-    await executeCommand('pnpm', ['ts-node', 'scripts/export_rl_dataset.ts']);
-    
-    // Step 2: Train new model with unique temp filename
-    const tempFilename = `tmp_${randomUUID()}.onnx`;
-    const tempPath = path.join('ml', tempFilename);
-    console.log(`Training model to ${tempPath}...`);
-    
-    try {
-      await executeCommand('python3', ['ml/train_gatekeeper.py', '--output', tempPath]);
-    } catch (error) {
-      console.error('Error during model training, using simplified script:', error);
-      // Fallback to simplified script if main training fails
-      await executeCommand('python3', ['ml/train_gatekeeper_simple.py', '--output', tempPath]);
+export async function retrainGatekeeper() {
+  logger.info('Starting gatekeeper retraining...');
+  
+  // Export the dataset
+  logger.debug('Exporting RL dataset...');
+  await exec('pnpm ts-node scripts/export_rl_dataset.ts');
+  
+  // Train the model
+  const tempPath = 'ml/tmp.onnx';
+  logger.debug(`Training model to ${tempPath}...`);
+  await exec(`python ml/train_gatekeeper.py --output ${tempPath}`);
+  
+  // Generate a version hash
+  const { stdout } = await exec(`sha1sum ${tempPath}`);
+  const version = 'gatekeeper_' + stdout.split(' ')[0].slice(0, 8);
+  
+  // Register the model in the database
+  logger.debug('Registering new model...');
+  await prisma.rLModel.create({ 
+    data: { 
+      version: version, 
+      path: tempPath, 
+      description: 'auto-retrain' 
     }
-    
-    // Step 3: Register the new model
-    console.log('Registering new model...');
-    const modelVersion = `gatekeeper_v${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
-    await executeCommand('pnpm', [
-      'ts-node', 
-      'scripts/register_rl_model.ts', 
-      tempPath, 
-      modelVersion, 
-      `Auto-trained model ${new Date().toLocaleString()}`
-    ]);
-    
-    console.log('Gatekeeper retraining completed successfully');
-    return;
-  } catch (error) {
-    console.error('Error during gatekeeper retraining:', error);
-    throw error;
-  }
+  });
+  
+  logger.info('Gatekeeper retraining completed successfully');
+  return { version, path: tempPath };
 } 

@@ -13,6 +13,8 @@ export type Config = {
   };
   riskPct: number;
   symbol: string;
+  strategyToggle: Record<string, boolean>;
+  gatekeeperThresh: number;
   execution?: {
     slippageLimit: number;
     valueSplit: number;
@@ -29,16 +31,56 @@ type ExtendedHyperSettings = {
   symbols: string;
   riskPct?: number;
   smcMinRetrace?: number;
+  strategyToggle?: string;
+  gatekeeperThresh?: number;
   updatedAt: Date;
+  maxDailyLoss: number;
+  maxOpenRisk: number;
 };
 
 export async function loadConfig(){
+  // Get the config from the database
   const row = await prisma.hyperSettings.findUnique({ where:{ id:1 }});
+  if (!row) {
+    throw new Error('HyperSettings not found in database. Please ensure ID 1 exists.');
+  }
+  
   // Cast row to the extended type
   const extendedRow = row as unknown as ExtendedHyperSettings;
   
-  const symbols = (extendedRow?.symbols ?? 'bitcoin')
-                  .split(',').map((s: string)=>s.trim().toLowerCase());
+  // Get symbols from database, split and normalize
+  const symbols = extendedRow.symbols
+                  .split(',')
+                  .map((s: string) => s.trim().toLowerCase())
+                  .filter((s: string) => s.length > 0);
+  
+  if (symbols.length === 0) {
+    throw new Error('No trading symbols configured in HyperSettings.symbols');
+  }
+  
+  // Parse strategyToggle JSON with deterministic default
+  const raw = extendedRow?.strategyToggle ?? '{}';
+  let strategyToggle: Record<string, boolean> = {};
+  
+  try {
+    strategyToggle = JSON.parse(raw);
+    
+    // Ensure we have default values for all strategies
+    if (!('TrendFollowMA' in strategyToggle)) strategyToggle.TrendFollowMA = true;
+    if (!('RangeBounce' in strategyToggle)) strategyToggle.RangeBounce = true;
+    if (!('SMCReversal' in strategyToggle)) strategyToggle.SMCReversal = true;
+    
+    console.log('Loaded strategy toggles:', strategyToggle);
+  } catch (e) {
+    console.error('Error parsing strategyToggle JSON:', e);
+    // Provide deterministic defaults if parsing fails
+    strategyToggle = {
+      TrendFollowMA: true,
+      RangeBounce: true,
+      SMCReversal: true
+    };
+  }
+  
   return {
     symbols,
     smc: { 
@@ -51,7 +93,9 @@ export async function loadConfig(){
       overBought: extendedRow?.rsiOB ?? 65 
     },
     riskPct: extendedRow?.riskPct ?? 1,
-    symbol: 'bitcoin'
+    symbol: symbols[0],  // Default to first symbol
+    strategyToggle,
+    gatekeeperThresh: extendedRow?.gatekeeperThresh ?? 0.55
   } as const;
 }
 
@@ -68,6 +112,12 @@ export const defaultConfig = {
     overSold: 35, 
     overBought: 65 
   },
+  strategyToggle: {        // Default strategy toggle configuration
+    TrendFollowMA: true,
+    RangeBounce: true,
+    SMCReversal: true
+  },
+  gatekeeperThresh: 0.55,  // Default gatekeeper threshold
   execution: {
     slippageLimit: 0.003,   // 0.3% max slippage tolerance
     valueSplit: 2000,       // USD threshold for splitting orders

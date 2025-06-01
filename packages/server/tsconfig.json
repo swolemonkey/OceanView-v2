@@ -5,11 +5,8 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "typeRoots": ["./node_modules/@types", "./types"],
-    "rootDir": ".",
-    "paths": {
-      "*": ["./node_modules/*"]
-    }
+    "rootDir": "."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test-multi-asset.ts"],
   "exclude": ["__tests__/**/*", "node_modules"]
 } 
