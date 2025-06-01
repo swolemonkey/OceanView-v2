@@ -13,7 +13,7 @@ export type Config = {
   };
   riskPct: number;
   symbol: string;
-  strategyToggle: Record<string, Record<string, boolean>>;
+  strategyToggle: Record<string, boolean>;
   execution?: {
     slippageLimit: number;
     valueSplit: number;
@@ -56,12 +56,27 @@ export async function loadConfig(){
     throw new Error('No trading symbols configured in HyperSettings.symbols');
   }
   
-  // Parse strategyToggle JSON, default to empty object
-  let strategyToggle: Record<string, Record<string, boolean>> = {};
+  // Parse strategyToggle JSON with deterministic default
+  const raw = extendedRow?.strategyToggle ?? '{}';
+  let strategyToggle: Record<string, boolean> = {};
+  
   try {
-    strategyToggle = extendedRow?.strategyToggle ? JSON.parse(extendedRow.strategyToggle) : {};
+    strategyToggle = JSON.parse(raw);
+    
+    // Ensure we have default values for all strategies
+    if (!('TrendFollowMA' in strategyToggle)) strategyToggle.TrendFollowMA = true;
+    if (!('RangeBounce' in strategyToggle)) strategyToggle.RangeBounce = true;
+    if (!('SMCReversal' in strategyToggle)) strategyToggle.SMCReversal = true;
+    
+    console.log('Loaded strategy toggles:', strategyToggle);
   } catch (e) {
     console.error('Error parsing strategyToggle JSON:', e);
+    // Provide deterministic defaults if parsing fails
+    strategyToggle = {
+      TrendFollowMA: true,
+      RangeBounce: true,
+      SMCReversal: true
+    };
   }
   
   return {
@@ -94,7 +109,11 @@ export const defaultConfig = {
     overSold: 35, 
     overBought: 65 
   },
-  strategyToggle: {},      // Default empty strategy toggle configuration
+  strategyToggle: {        // Default strategy toggle configuration
+    TrendFollowMA: true,
+    RangeBounce: true,
+    SMCReversal: true
+  },
   execution: {
     slippageLimit: 0.003,   // 0.3% max slippage tolerance
     valueSplit: 2000,       // USD threshold for splitting orders

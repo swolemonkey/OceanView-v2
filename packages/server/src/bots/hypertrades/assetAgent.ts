@@ -86,19 +86,17 @@ export class AssetAgent {
       dataFeed.subscribe(symbol, this.tickHandler);
     }
     
-    // Get strategy toggle for this symbol
-    const symbolToggle = cfg.strategyToggle[symbol] || {};
-    
+    // Use global strategy toggles directly instead of per-symbol toggles
     // Initialize strategies based on configuration
-    if (symbolToggle.smcReversal !== false) { // Default to true if not specified
+    if (cfg.strategyToggle.SMCReversal !== false) { // Default to true if not specified
       this.strategies.push(new SMCReversal(symbol));
     }
     
-    if (symbolToggle.trendFollowMA === true) {
+    if (cfg.strategyToggle.TrendFollowMA === true) {
       this.strategies.push(new TrendFollowMA(symbol));
     }
     
-    if (symbolToggle.rangeBounce === true) {
+    if (cfg.strategyToggle.RangeBounce === true) {
       this.strategies.push(new RangeBounce(symbol));
     }
     
