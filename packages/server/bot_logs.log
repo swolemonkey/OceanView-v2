@@ -1,0 +1,85 @@
+
+> @oceanview/server@0.0.1 dev /Users/ricky/Dropbox/Apps/OceanView-v2/packages/server
+> tsx watch src/index.ts
+
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: HyperTrades configured with symbols: bitcoin {
+  "context": "server"
+}
+[hypertrades] init error: TypeError: Cannot read properties of undefined (reading 'split')
+    at loadConfig (/Users/ricky/Dropbox/Apps/OceanView-v2/packages/server/src/bots/hypertrades/config.ts:51:20)
+    at async init (/Users/ricky/Dropbox/Apps/OceanView-v2/packages/server/src/botRunner/workers/hypertrades.ts:28:15)
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: Starting Multi-Asset HyperTrades bot with symbols: bitcoin {
+  "context": "server"
+}
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: Gatekeeper using existing model ./ml/gatekeeper_v1.onnx, threshold 0.55 {
+  "context": "server"
+}
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: Portfolio loaded starting equity from DB: 10000 {
+  "context": "server"
+}
+Failed to record heartbeat: Cannot read properties of undefined (reading 'create')
+[heartbeat] Service initialized, recording every 5 minutes
+[cron] Daily health check scheduled for 07:00 UTC
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: Multi-Asset HyperTrades bot started in background {
+  "context": "server"
+}
+[2025-06-01T10:18:04.430Z] Multi-Asset HyperTrades bot starting up...
+[2025-06-01 20:18:04] [oceanview] [31merror[39m: HyperTrades bot error: {
+  "error": {},
+  "context": "server"
+}
+{"level":30,"time":1748773084433,"pid":59462,"hostname":"The-Dream-Machine.local","msg":"Server listening at http://0.0.0.0:3334"}
+[2025-06-01 20:18:04] [oceanview] [32minfo[39m: Server started on port 3334 {
+  "context": "server"
+}
+[20:18:19.429] [32mINFO[39m (59462): [36mAttempting to fetch from CoinGecko...[39m
+[20:18:19.429] [32mINFO[39m (59462): [36mFetching from coingecko: https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,avalanche-2&vs_currencies=usd[39m
+[20:18:19.851] [32mINFO[39m (59462): [36mCoinGecko raw response data: {"avalanche-2":{"usd":20.39},"bitcoin":{"usd":104007},"ethereum":{"usd":2492.46},"solana":{"usd":151.57}}[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mCoinGecko data: {"avalanche-2":{"usd":20.39},"bitcoin":{"usd":104007},"ethereum":{"usd":2492.46},"solana":{"usd":151.57}}[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mProcessing price for bitcoin: 104007[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mProcessing price for ethereum: 2492.46[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mProcessing price for solana: 151.57[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mProcessing price for avalanche-2: 20.39[39m
+[20:18:19.852] [32mINFO[39m (59462): [36mRedis pipeline commands prepared for execution[39m
+[20:18:19.854] [32mINFO[39m (59462): [36mPublishing to WebSocket channel: {"ts":"2025-06-01T10:18:00.000Z","prices":{"avalanche-2":{"usd":20.39},"bitcoin":{"usd":104007},"ethereum":{"usd":2492.46},"solana":{"usd":151.57}}}[39m
+[20:18:34.428] [32mINFO[39m (59462): [36mUsing cached data from 15s ago[39m
+[20:18:34.428] [32mINFO[39m (59462): [36mProcessing price for bitcoin: 104007[39m
+[20:18:34.429] [32mINFO[39m (59462): [36mProcessing price for ethereum: 2492.46[39m
+[20:18:34.429] [32mINFO[39m (59462): [36mProcessing price for solana: 151.57[39m
+[20:18:34.429] [32mINFO[39m (59462): [36mProcessing price for avalanche-2: 20.39[39m
+[20:18:34.429] [32mINFO[39m (59462): [36mRedis pipeline commands prepared for execution[39m
+[20:18:34.430] [32mINFO[39m (59462): [36mPublishing to WebSocket channel: {"ts":"2025-06-01T10:18:00.000Z","prices":{"avalanche-2":{"usd":20.39},"bitcoin":{"usd":104007},"ethereum":{"usd":2492.46},"solana":{"usd":151.57}}}[39m
+8:18:43 PM [tsx] change in ./src/bots/hypertrades/config.ts Restarting...
+[20:18:43.311] [32mINFO[39m (59462): [36mSIGTERM received, shutting down gracefully[39m
+[20:18:43.311] [32mINFO[39m (59462): [36mGraceful shutdown completed[39m
+c[2025-06-01 20:18:47] [oceanview] [32minfo[39m: HyperTrades configured with symbols: bitcoin {
+  "context": "server"
+}
+[hypertrades] init error: TypeError: Cannot destructure property 'botId' of 'workerData' as it is null.
+    at init (/Users/ricky/Dropbox/Apps/OceanView-v2/packages/server/src/botRunner/workers/hypertrades.ts:29:11)
+[2025-06-01 20:18:47] [oceanview] [32minfo[39m: Starting Multi-Asset HyperTrades bot with symbols: bitcoin {
+  "context": "server"
+}
+[2025-06-01 20:18:47] [oceanview] [32minfo[39m: Gatekeeper using existing model ./ml/gatekeeper_v1.onnx, threshold 0.55 {
+  "context": "server"
+}
+[2025-06-01 20:18:47] [oceanview] [32minfo[39m: Portfolio loaded starting equity from DB: 10000 {
+  "context": "server"
+}
+Failed to record heartbeat: Cannot read properties of undefined (reading 'create')
+[heartbeat] Service initialized, recording every 5 minutes
+[cron] Daily health check scheduled for 07:00 UTC
+[2025-06-01 20:18:47] [oceanview] [32minfo[39m: Multi-Asset HyperTrades bot started in background {
+  "context": "server"
+}
+[2025-06-01T10:18:47.667Z] Multi-Asset HyperTrades bot starting up...
+[2025-06-01T10:18:47.668Z] HyperTrades loaded config for symbols: bitcoin
+[2025-06-01 20:18:47] [oceanview] [31merror[39m: HyperTrades bot error: {
+  "error": {},
+  "context": "server"
+}
+{"level":30,"time":1748773127688,"pid":59502,"hostname":"The-Dream-Machine.local","msg":"Server listening at http://0.0.0.0:3334"}
+[2025-06-01 20:18:47] [oceanview] [32minfo[39m: Server started on port 3334 {
+  "context": "server"
+}
+ ELIFECYCLE  Command failed.

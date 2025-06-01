@@ -46,9 +46,9 @@ export class RiskManager {
   }
 
   canTrade(){
-    if(this.openRisk > 2)   return false;
-    if(this.dayPnL  < -0.03*this.equity) return false;
-    return true;
+    // DEPRECATED: Use PortfolioRiskManager.canTrade() instead
+    // This method will be removed in a future release
+    return true;  // Always return true, portfolio risk manager will handle risk checks
   }
 
   registerOrder(side:'buy'|'sell', qty:number, price:number, stop?: number) {

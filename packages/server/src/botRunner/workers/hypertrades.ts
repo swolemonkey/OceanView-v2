@@ -68,7 +68,6 @@ async function init() {
     const canTrade = portfolio.canTrade();
     if (!canTrade && !tradingHalted) {
       log('TRADING HALTED - Risk limits exceeded');
-      log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
       tradingHalted = true;
     }
     
@@ -115,7 +114,6 @@ parentPort?.on('message', async (m) => {
           if (!portfolio.canTrade()) {
             tradingHalted = true;
             log(`Trading halted for ${symbol} - Portfolio risk limits exceeded`);
-            log(`Open risk: ${portfolio.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolio.dayPnl.toFixed(2)}`);
             
             // Skip trade processing
             lastCandleTimes.set(symbol, currentMinute);

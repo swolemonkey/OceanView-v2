@@ -1,5 +1,9 @@
 import { AssetAgent } from '../bots/hypertrades/assetAgent.js';
 import { prisma } from '../db.js';
+import { createLogger } from '../utils/logger.js';
+
+// Create logger
+const logger = createLogger('portfolioRisk');
 
 // Define type for HyperSettings to include our new fields
 type HyperSettings = {
@@ -75,8 +79,19 @@ export class PortfolioRiskManager {
     // Convert dayPnl to percentage of equity
     const dayLossPct = this.dayPnl < 0 ? Math.abs(this.dayPnl) / this.equity : 0;
     
-    // Check if either risk limit is exceeded
-    return dayLossPct < this.maxDailyLoss && this.openRiskPct < this.maxOpenRisk * 100; 
+    // Check day loss limit
+    if (dayLossPct >= this.maxDailyLoss) {
+      logger.warn('VETO-PORTFOLIO day loss limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      return false;
+    }
+    
+    // Check open risk limit
+    if (this.openRiskPct >= this.maxOpenRisk * 100) {
+      logger.warn('VETO-PORTFOLIO open risk limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      return false;
+    }
+    
+    return true;
   }
   
   /**
