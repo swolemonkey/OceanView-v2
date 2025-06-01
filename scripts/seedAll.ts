@@ -46,7 +46,8 @@ async function main() {
         update: {
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
-            "RangeBounce": true
+            "RangeBounce": true,
+            "SMCReversal": true
           })
         },
         create: {
@@ -59,7 +60,8 @@ async function main() {
           smcMinRetrace: 0.5,
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
-            "RangeBounce": true
+            "RangeBounce": true,
+            "SMCReversal": true
           })
         }
       }),

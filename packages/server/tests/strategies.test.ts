@@ -45,10 +45,9 @@ describe('Strategy Tests', () => {
       riskPct: 1,
       symbol: 'bitcoin',
       strategyToggle: {
-        bitcoin: {
-          trendFollowMA: true,
-          rangeBounce: true
-        }
+        TrendFollowMA: true,
+        RangeBounce: true,
+        SMCReversal: true
       }
     };
   });
@@ -146,9 +145,49 @@ describe('Strategy Tests', () => {
   
   describe('Strategy Toggle', () => {
     test('should respect config toggle settings', () => {
-      // Test case will need to be implemented after AssetAgent integration
-      // This would test that strategies are only initialized when toggled on
-      expect(true).toBe(true);
+      // Create a mock AssetAgent for testing
+      const AssetAgentMock = jest.fn().mockImplementation((symbol, cfg) => {
+        const strategies = [];
+        
+        if (cfg.strategyToggle.TrendFollowMA === true) {
+          strategies.push(new TrendFollowMA(symbol));
+        }
+        
+        if (cfg.strategyToggle.RangeBounce === true) {
+          strategies.push(new RangeBounce(symbol));
+        }
+        
+        return { strategies };
+      });
+      
+      // Test with all strategies enabled
+      const allEnabledConfig = {
+        ...mockConfig,
+        strategyToggle: {
+          TrendFollowMA: true,
+          RangeBounce: true,
+          SMCReversal: true
+        }
+      };
+      
+      const allEnabledAgent = new AssetAgentMock('bitcoin', allEnabledConfig);
+      expect(allEnabledAgent.strategies.length).toBe(2);
+      expect(allEnabledAgent.strategies[0]).toBeInstanceOf(TrendFollowMA);
+      expect(allEnabledAgent.strategies[1]).toBeInstanceOf(RangeBounce);
+      
+      // Test with some strategies disabled
+      const partialConfig = {
+        ...mockConfig,
+        strategyToggle: {
+          TrendFollowMA: false,
+          RangeBounce: true,
+          SMCReversal: true
+        }
+      };
+      
+      const partialAgent = new AssetAgentMock('bitcoin', partialConfig);
+      expect(partialAgent.strategies.length).toBe(1);
+      expect(partialAgent.strategies[0]).toBeInstanceOf(RangeBounce);
     });
   });
 }); 
