@@ -17,6 +17,7 @@ import { gate } from '../../rl/gatekeeper.js';
 import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
 import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
 import { createLogger } from '../../utils/logger.js';
+import { prisma } from '../../db.js';
 
 // Create logger
 const logger = createLogger('assetAgent');
@@ -224,6 +225,19 @@ export class AssetAgent {
       // Veto the trade if score is below threshold
       if (tradeScore < this.cfg.gatekeeperThresh) {
         logger.info(`VETO: Trade vetoed by gatekeeper with score ${tradeScore.toFixed(4)} (threshold: ${this.cfg.gatekeeperThresh.toFixed(2)})`);
+        
+        // Persist the skipped trade to the database
+        await prisma.rLDataset.create({
+          data: {
+            symbol: this.symbol,
+            featureVec: JSON.stringify(featureVec),
+            action: 'skip',
+            outcome: 0,
+            gateScore: tradeScore,
+            strategyVersionId: (this.risk as any).versionId
+          }
+        });
+        
         return;
       }
     } catch (error) {
@@ -245,6 +259,27 @@ export class AssetAgent {
     // Check risk-reward ratio
     if (!passRR(fullIdea.side, candle.c, candle.c * 0.98, candle.c * 1.02, 2.0)) {
       logger.info(`BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
+      
+      // Persist the blocked trade to the database
+      await prisma.rLDataset.create({
+        data: {
+          symbol: this.symbol,
+          featureVec: JSON.stringify({
+            symbol: this.symbol,
+            price: candle.c,
+            rsi: this.indCache.rsi14,
+            adx: this.indCache.adx14,
+            volatility: this.indCache.bbWidth,
+            recentTrend: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
+            dayOfWeek: new Date().getDay(),
+            hourOfDay: new Date().getHours(),
+          }),
+          action: 'blocked_rr',
+          outcome: 0,
+          strategyVersionId: (this.risk as any).versionId
+        }
+      });
+      
       return;
     }
     

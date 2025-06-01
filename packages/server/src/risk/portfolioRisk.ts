@@ -82,16 +82,52 @@ export class PortfolioRiskManager {
     // Check day loss limit
     if (dayLossPct >= this.maxDailyLoss) {
       logger.warn('VETO-PORTFOLIO day loss limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      
+      // Persist risk veto
+      this.persistRiskVeto('day_loss', dayLossPct, this.openRiskPct);
+      
       return false;
     }
     
     // Check open risk limit
     if (this.openRiskPct >= this.maxOpenRisk * 100) {
       logger.warn('VETO-PORTFOLIO open risk limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      
+      // Persist risk veto
+      this.persistRiskVeto('open_risk', dayLossPct, this.openRiskPct);
+      
       return false;
     }
     
     return true;
+  }
+  
+  /**
+   * Persist risk veto to the database
+   * @param {string} reason The reason for the risk veto
+   * @param {number} dayLossPct Current day loss percentage
+   * @param {number} openRiskPct Current open risk percentage
+   */
+  private async persistRiskVeto(reason: string, dayLossPct: number, openRiskPct: number): Promise<void> {
+    try {
+      await prisma.rLDataset.create({
+        data: {
+          symbol: 'portfolio', // This is a portfolio-wide decision
+          featureVec: JSON.stringify({
+            reason,
+            dayLossPct,
+            openRiskPct,
+            maxDailyLoss: this.maxDailyLoss,
+            maxOpenRisk: this.maxOpenRisk * 100,
+            timestamp: new Date().toISOString()
+          }),
+          action: 'blocked_risk',
+          outcome: 0,
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to persist risk veto:', { error });
+    }
   }
   
   /**
