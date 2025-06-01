@@ -18,6 +18,12 @@ RUN pnpm prisma generate --schema=./prisma/schema.prisma
 # Copy the rest of the codebase
 COPY . .
 
+# Ensure the server's prisma folder survives .dockerignore
+RUN mkdir -p packages/server/prisma
+# Copy only the schema + migrations (tiny)
+COPY packages/server/prisma/schema.prisma packages/server/prisma/
+COPY packages/server/prisma/migrations packages/server/prisma/migrations
+
 # Install system libs only
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libstdc++6
@@ -26,7 +32,9 @@ RUN apt-get update && \
 RUN cd packages/server && pnpm install
 
 # Generate server-specific Prisma client
-RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
+WORKDIR /app/packages/server
+RUN pnpm prisma generate --schema=./prisma/schema.prisma
+WORKDIR /app
 
 # Install TypeScript globally
 RUN npm install -g typescript
