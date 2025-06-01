@@ -13,7 +13,7 @@ import { passRR } from './utils/riskReward.js';
 import type { DataFeed, Tick } from '../../feeds/interface.js';
 import type { ExecutionEngine, Order } from '../../execution/interface.js';
 import { SimEngine } from '../../execution/sim.js';
-import { score } from '../../rl/gatekeeper.js';
+import { gate } from '../../rl/gatekeeper.js';
 import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
 import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
 import { createLogger } from '../../utils/logger.js';
@@ -195,17 +195,12 @@ export class AssetAgent {
       tradeIdea.side === 'buy' ? 1 : 0
     ];
     
-    // Import the RLGatekeeper dynamically to score the idea
-    const rlGatekeeper = await import('../../rl/gatekeeper.js').then(
-      module => new module.RLGatekeeper((this.risk as any).versionId || 1)
-    );
-    
     // Score the trade idea with the gatekeeper
     let tradeScore = 0.5; // Default score
     let rlEntryId = 0;
     try {
       // Score the trade idea
-      const scoreResult = await rlGatekeeper.scoreIdea({
+      const scoreResult = await gate.scoreIdea({
         symbol: this.symbol,
         price: candle.c,
         rsi: this.indCache.rsi14,
@@ -225,8 +220,8 @@ export class AssetAgent {
       logger.info(`RL Score: ${tradeScore.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
       
       // Veto the trade if score is below threshold
-      if (tradeScore < 0.55) {
-        logger.info(`VETO: Trade vetoed by gatekeeper with score ${tradeScore.toFixed(4)}`);
+      if (tradeScore < this.cfg.gatekeeperThresh) {
+        logger.info(`VETO: Trade vetoed by gatekeeper with score ${tradeScore.toFixed(4)} (threshold: ${this.cfg.gatekeeperThresh.toFixed(2)})`);
         return;
       }
     } catch (error) {
@@ -277,7 +272,7 @@ export class AssetAgent {
         
         // Update the RL dataset with the PnL outcome
         if (rlEntryId) {
-          await rlGatekeeper.updateOutcome(rlEntryId, 0); // Placeholder PnL, will be updated later
+          await gate.updateOutcome(rlEntryId, 0); // Placeholder PnL, will be updated later
         }
         
         logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);

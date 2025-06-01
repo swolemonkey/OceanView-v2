@@ -27,6 +27,7 @@ model HyperSettings {
   smcMinRetrace Float    @default(0.5)
   maxDailyLoss  Float    @default(0.03)
   maxOpenRisk   Float    @default(0.05)
+  gatekeeperThresh Float  @default(0.55)
   updatedAt     DateTime @updatedAt
   strategyParams String   @default("{}")
   strategyToggle String   @default("{\"TrendFollowMA\":true,\"RangeBounce\":true}")

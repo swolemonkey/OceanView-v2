@@ -108,6 +108,9 @@ async function main() {
       })
     ]);
 
+    // Update gatekeeperThresh with direct query to avoid type issues
+    await prisma.$executeRaw`UPDATE "HyperSettings" SET "gatekeeperThresh" = 0.55 WHERE id = 1`;
+
     console.log("Database seeding completed successfully!");
   } catch (error) {
     console.error("Error during seeding:", error);

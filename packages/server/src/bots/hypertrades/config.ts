@@ -14,6 +14,7 @@ export type Config = {
   riskPct: number;
   symbol: string;
   strategyToggle: Record<string, boolean>;
+  gatekeeperThresh: number;
   execution?: {
     slippageLimit: number;
     valueSplit: number;
@@ -31,6 +32,7 @@ type ExtendedHyperSettings = {
   riskPct?: number;
   smcMinRetrace?: number;
   strategyToggle?: string;
+  gatekeeperThresh?: number;
   updatedAt: Date;
   maxDailyLoss: number;
   maxOpenRisk: number;
@@ -92,7 +94,8 @@ export async function loadConfig(){
     },
     riskPct: extendedRow?.riskPct ?? 1,
     symbol: symbols[0],  // Default to first symbol
-    strategyToggle
+    strategyToggle,
+    gatekeeperThresh: extendedRow?.gatekeeperThresh ?? 0.55
   } as const;
 }
 
@@ -114,6 +117,7 @@ export const defaultConfig = {
     RangeBounce: true,
     SMCReversal: true
   },
+  gatekeeperThresh: 0.55,  // Default gatekeeper threshold
   execution: {
     slippageLimit: 0.003,   // 0.3% max slippage tolerance
     valueSplit: 2000,       // USD threshold for splitting orders
