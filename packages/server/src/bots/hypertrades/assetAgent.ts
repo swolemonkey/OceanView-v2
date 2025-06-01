@@ -134,7 +134,7 @@ export class AssetAgent {
 
   async onTick(price: number, ts: number) {
     this.perception.addTick(price, ts);
-    this.risk.updateStops(price);
+    this.risk.updateAllStops();
     
     // Get the last 2 candles for stop calculation
     const lastCandles = this.perception.last(2);
