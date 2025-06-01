@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "HyperSettings" ADD COLUMN "atrMultiple" REAL NOT NULL DEFAULT 1.5;
+ALTER TABLE "HyperSettings" ADD COLUMN "atrPeriod" INTEGER NOT NULL DEFAULT 14; 

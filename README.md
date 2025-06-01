@@ -18,6 +18,7 @@ This software is proprietary. All rights reserved by the author. The code may no
 - **Risk Management**: Built-in risk/reward calculation and position sizing
 - **Real-Time Monitoring**: Monitor trading performance in real-time
 - **Backtesting**: Test strategies against historical data
+- **Trailing Stops**: Dynamic stop-loss management based on ATR ([docs](docs/TRAILING_STOPS.md))
 
 ## Project Structure
 
@@ -52,6 +53,23 @@ pnpm tsx scripts/seedBots.ts
 # Start development server
 pnpm dev
 ```
+
+### After Updating
+
+Run database migrations and seed scripts:
+
+```bash
+pnpm prisma migrate dev
+pnpm ts-node scripts/seedAll.ts
+```
+
+#### New Environment Variables
+
+- `TRAILING_STOP_ENABLED` - Enable/disable trailing stop functionality (default: true)
+- `TRAILING_STOP_THRESHOLD` - Minimum profit percentage before activating trailing stop (default: 0.01)
+- `TRAILING_STOP_DISTANCE` - How far the trailing stop follows price (default: uses atrMultiple from settings)
+
+For complete details on environment variables, see [Environment Variables Documentation](docs/ENV_VARIABLES.md).
 
 ### Available Scripts
 
