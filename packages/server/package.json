@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "prisma": {
+    "schema": "./prisma/schema.prisma",
     "seed": "tsx ../../prisma/seed.ts"
   },
   "scripts": {
@@ -16,7 +17,7 @@
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
-    "start:docker": "pnpm prisma migrate deploy && node dist/src/index.js"
+    "start:docker": "node dist/src/index.js"
   },
   "dependencies": {
     "@fastify/websocket": "^8.2.0",
