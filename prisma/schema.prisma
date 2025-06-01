@@ -28,6 +28,8 @@ model HyperSettings {
   maxDailyLoss  Float    @default(0.03)
   maxOpenRisk   Float    @default(0.05)
   gatekeeperThresh Float  @default(0.55)
+  atrMultiple   Float    @default(1.5)
+  atrPeriod     Int      @default(14)
   updatedAt     DateTime @updatedAt
   strategyParams String   @default("{}")
   strategyToggle String   @default("{\"TrendFollowMA\":true,\"RangeBounce\":true}")

@@ -113,6 +113,8 @@ model HyperSettings {
   rsiOS     Float    @default(35)
   riskPct   Float    @default(1)
   symbols   String   @default("bitcoin") // comma‑sep list e.g. "bitcoin,ethereum,solana"
+  atrMultiple Float  @default(1.5) // ATR multiple for trailing stops
+  atrPeriod Int      @default(14)  // ATR period for volatility calculation
   updatedAt DateTime @updatedAt
 }
 

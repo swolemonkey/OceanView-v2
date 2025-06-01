@@ -1,5 +1,5 @@
-module.exports = {
-  preset: 'ts-jest',
+export default {
+  preset: 'ts-jest/presets/js-with-ts-esm',
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverage: true,
@@ -10,9 +10,12 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
+      useESM: true,
     }],
   },
+  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js'
+    '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js',
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   }
 }; 

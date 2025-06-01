@@ -6,6 +6,36 @@ export class IndicatorCache {
   adx14=25; bbWidth=0; atr14=0;
   avgSent=0; avgOB=0; // sentiment and order book pressure
   
+  // Return the last n candles (high, low, close)
+  last(n: number = 1): Array<{h: number, l: number, c: number}> {
+    const result: Array<{h: number, l: number, c: number}> = [];
+    for (let i = 0; i < Math.min(n, this.closes.length); i++) {
+      const idx = this.closes.length - 1 - i;
+      result.push({
+        h: this.highs[idx],
+        l: this.lows[idx],
+        c: this.closes[idx]
+      });
+    }
+    return result;
+  }
+  
+  // Calculate ATR for a given period
+  atr(period: number = 14): number {
+    const candles = this.last(period + 1);
+    if (candles.length < period + 1) return 0;
+
+    let atrSum = 0;
+    for (let i = 1; i <= period; i++) {
+      const highLow = candles[i].h - candles[i].l;
+      const highClose = Math.abs(candles[i].h - candles[i - 1].c);
+      const lowClose = Math.abs(candles[i].l - candles[i - 1].c);
+      const trueRange = Math.max(highLow, highClose, lowClose);
+      atrSum += trueRange;
+    }
+    return atrSum / period;
+  }
+  
   updateOnClose(close:number, high?:number, low?:number){
     this.closes.push(close);
     

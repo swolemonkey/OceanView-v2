@@ -10,34 +10,21 @@ async function main() {
   console.log("Starting database seeding...");
 
   try {
-    // Bot - hypertrades
-    // First check if bot exists
-    // Note: Prisma client uses lowercase model names (prisma.bot) even though
-    // the model is defined with uppercase in the schema (model Bot)
-    const existingBot = await prisma.bot.findFirst({
-      where: { name: "hypertrades" }
-    });
+    // Bot operations using raw SQL (since Bot might not be accessible directly)
+    const existingBots = await prisma.$queryRaw`SELECT * FROM "Bot" WHERE name = 'hypertrades' LIMIT 1`;
+    const existingBot = Array.isArray(existingBots) && existingBots.length > 0 ? existingBots[0] : null;
 
     if (existingBot) {
-      await prisma.bot.update({
-        where: { id: existingBot.id },
-        data: { 
-          type: "hypertrades",
-          enabled: true,
-          equity: 10000,
-          pnlToday: 0
-        }
-      });
+      await prisma.$executeRaw`
+        UPDATE "Bot" 
+        SET "type" = 'hypertrades', "enabled" = true, "equity" = 10000, "pnlToday" = 0
+        WHERE "id" = ${existingBot.id}
+      `;
     } else {
-      await prisma.bot.create({
-        data: {
-          name: "hypertrades",
-          type: "hypertrades", 
-          enabled: true,
-          equity: 10000,
-          pnlToday: 0
-        }
-      });
+      await prisma.$executeRaw`
+        INSERT INTO "Bot" ("name", "type", "enabled", "equity", "pnlToday")
+        VALUES ('hypertrades', 'hypertrades', true, 10000, 0)
+      `;
     }
 
     // Run remaining operations in a transaction
@@ -48,21 +35,22 @@ async function main() {
         update: {
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
-            "RangeBounce": true,
+            "RangeBounce": false,
             "SMCReversal": true
-          })
+          }),
+          symbols: "bitcoin,ethereum"
         },
         create: {
           id: 1,
           smcThresh: 0.002,
           rsiOS: 35,
           rsiOB: 65,
-          symbols: "bitcoin",
+          symbols: "bitcoin,ethereum",
           riskPct: 1,
           smcMinRetrace: 0.5,
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
-            "RangeBounce": true,
+            "RangeBounce": false,
             "SMCReversal": true
           })
         }
@@ -110,8 +98,12 @@ async function main() {
       })
     ]);
 
-    // Update gatekeeperThresh with direct query to avoid type issues
-    await prisma.$executeRaw`UPDATE "HyperSettings" SET "gatekeeperThresh" = 0.55 WHERE id = 1`;
+    // Update ATR parameters and other fields with raw SQL
+    await prisma.$executeRaw`UPDATE "HyperSettings" SET 
+      "atrMultiple" = 1.5, 
+      "atrPeriod" = 14, 
+      "gatekeeperThresh" = 0.55
+      WHERE id = 1`;
 
     console.log("Database seeding completed successfully!");
   } catch (error) {
