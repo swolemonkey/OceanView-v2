@@ -12,6 +12,8 @@ async function main() {
   try {
     // Bot - hypertrades
     // First check if bot exists
+    // Note: Prisma client uses lowercase model names (prisma.bot) even though
+    // the model is defined with uppercase in the schema (model Bot)
     const existingBot = await prisma.bot.findFirst({
       where: { name: "hypertrades" }
     });
