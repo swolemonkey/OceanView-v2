@@ -24,10 +24,11 @@ export default function DirectPanel() {
     addLog("DirectPanel mounted");
     
     // Connect directly to the WebSocket server
-    // Direct connection without path since our server is configured that way
-    const ws = new WebSocket('ws://localhost:3334');
+    // Use dynamic WebSocket URL that works in both local and Fly.io environments
+    const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+    const ws = new WebSocket(wsUrl);
     
-    addLog(`Attempting connection to ws://localhost:3334`);
+    addLog(`Attempting connection to ${wsUrl}`);
     
     ws.onopen = () => {
       addLog("WebSocket connection established");

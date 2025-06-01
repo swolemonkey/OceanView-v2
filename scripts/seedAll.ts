@@ -47,23 +47,27 @@ async function main() {
         where: { id: 1 },
         update: {
           strategyToggle: JSON.stringify({
+            "SMCReversal": true,
             "TrendFollowMA": true,
-            "RangeBounce": true,
-            "SMCReversal": true
-          })
+            "RangeBounce": false
+          }),
+          atrMultiple: 1.5,
+          atrPeriod: 14
         },
         create: {
           id: 1,
           smcThresh: 0.002,
           rsiOS: 35,
           rsiOB: 65,
-          symbols: "bitcoin",
+          symbols: "bitcoin,ethereum",
           riskPct: 1,
           smcMinRetrace: 0.5,
+          atrMultiple: 1.5,
+          atrPeriod: 14,
           strategyToggle: JSON.stringify({
+            "SMCReversal": true,
             "TrendFollowMA": true,
-            "RangeBounce": true,
-            "SMCReversal": true
+            "RangeBounce": false
           })
         }
       }),
