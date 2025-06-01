@@ -9,6 +9,12 @@ interface MetricsResponse {
   gatekeeperVetoRatio: number;
   latestSentiment: number;
   latestOrderBookImbalance: number;
+  tradeActions: {
+    executed: number;
+    skip: number;
+    blocked_rr: number;
+    blocked_risk: number;
+  };
 }
 
 export async function registerMetricsRoute(fastify: FastifyInstance) {
@@ -42,6 +48,28 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
         }
       });
       
+      // Count different trade actions
+      const executedTrades = await (prisma as any).rLDataset.count({
+        where: { 
+          ts: { gte: oneDayAgo },
+          action: { in: ['buy', 'sell'] }
+        }
+      });
+      
+      const blockedRRTrades = await (prisma as any).rLDataset.count({
+        where: { 
+          ts: { gte: oneDayAgo },
+          action: 'blocked_rr'
+        }
+      });
+      
+      const blockedRiskTrades = await (prisma as any).rLDataset.count({
+        where: { 
+          ts: { gte: oneDayAgo },
+          action: 'blocked_risk'
+        }
+      });
+      
       const vetoRatio = allDatasets > 0 ? skippedTrades / allDatasets : 0;
       
       // Get latest sentiment
@@ -66,7 +94,13 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
         tradeCount24h: recentTrades,
         gatekeeperVetoRatio: vetoRatio,
         latestSentiment: latestSentiment?.score || 0,
-        latestOrderBookImbalance: latestOrderBook?.imbalance || 0
+        latestOrderBookImbalance: latestOrderBook?.imbalance || 0,
+        tradeActions: {
+          executed: executedTrades,
+          skip: skippedTrades,
+          blocked_rr: blockedRRTrades,
+          blocked_risk: blockedRiskTrades
+        }
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
