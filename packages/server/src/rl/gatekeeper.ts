@@ -6,58 +6,6 @@ import { createLogger } from '../utils/logger.js';
 // Create logger
 const logger = createLogger('gatekeeper');
 
-// Global session for standalone score function
-let globalSession: InferenceSession | null = null;
-
-/**
- * Initialize the global session
- */
-async function initGlobalSession(): Promise<void> {
-  if (!globalSession) {
-    try {
-      globalSession = await InferenceSession.create('ml/gatekeeper_v2.onnx');
-      logger.info(`Loaded global RL model: gatekeeper_v2.onnx`);
-    } catch (error) {
-      logger.error('Error loading global RL model:', { error });
-    }
-  }
-}
-
-/**
- * Score a feature vector using the ONNX model
- * @param vec Feature vector for the model
- * @returns Probability score between 0-1
- */
-export async function score(vec: number[]): Promise<number> {
-  // Initialize global session if not already done
-  if (!globalSession) {
-    await initGlobalSession();
-  }
-  
-  // If still no session, return default score
-  if (!globalSession) return 0.5;
-  
-  try {
-    const result = await globalSession.run({ 
-      input: new Tensor('float32', Float32Array.from(vec), [1, vec.length])
-    });
-    
-    // The output tensor name may vary based on your model
-    // Look for a property that contains the probability data
-    const outputKeys = Object.keys(result);
-    if (outputKeys.length > 0) {
-      const outputTensor = result[outputKeys[0]];
-      if (outputTensor && outputTensor.data && outputTensor.data.length > 0) {
-        return Number(outputTensor.data[0]);
-      }
-    }
-    return 0.5; // Default if we can't extract the probability
-  } catch (error) {
-    logger.error('Error scoring with global RL model:', { error });
-    return 0.5;
-  }
-}
-
 /**
  * Feature vector for RL model input
  */
@@ -91,19 +39,24 @@ export class RLGatekeeper {
 
   constructor(strategyVersionId: number) {
     this.strategyVersionId = strategyVersionId;
-    this.loadModel();
   }
 
   /**
-   * Load the ONNX model
+   * Initialize the ONNX model
+   * @param path Path to the ONNX model file
+   * @returns Promise that resolves when the model is loaded
    */
-  private async loadModel(): Promise<void> {
+  async init(path: string): Promise<void> {
     try {
-      this.session = await InferenceSession.create('ml/gatekeeper_v2.onnx');
+      this.modelPath = path;
+      logger.info(`Loading RL model from ${path}`);
+      this.session = await InferenceSession.create(path);
       this.modelLoaded = true;
-      logger.info(`Loaded RL model: gatekeeper_v2.onnx`);
+      logger.info(`Successfully loaded RL model: ${path}`);
     } catch (error) {
-      logger.error('Error loading RL model:', { error });
+      logger.error('Error loading RL model:', { error, path });
+      // Critical error - exit the process so Fly.io will restart it
+      process.exit(1);
     }
   }
 
@@ -112,8 +65,11 @@ export class RLGatekeeper {
    * @param vec Feature vector for the model
    * @returns Probability score (0-1)
    */
-  private async score(vec: number[]): Promise<number> {
-    if (!this.session) return 0.5;
+  public async score(vec: number[]): Promise<number> {
+    if (!this.session) {
+      logger.error('Attempting to score without initialized model');
+      return 0.5;
+    }
     
     try {
       const result = await this.session.run({ 
@@ -222,4 +178,7 @@ export class RLGatekeeper {
       logger.error(`Error updating outcome for entry ${id}:`, { error });
     }
   }
-} 
+}
+
+// Create a singleton instance of RLGatekeeper
+export const gate = new RLGatekeeper(1); 

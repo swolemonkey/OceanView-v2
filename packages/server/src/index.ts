@@ -21,6 +21,7 @@ import { initHeartbeat } from './services/heartbeat.js';
 import { initHealthCheck } from './cron/health-check.js';
 import cron from 'node-cron';
 import { createLogger } from './utils/logger.js';
+import { gate } from './rl/gatekeeper.js';
 
 // Initialize logger
 const logger = createLogger('server');
@@ -51,10 +52,21 @@ async function initializeRLModel() {
           path: 'ml/gatekeeper_v1.onnx',
         }
       });
-      logger.info(`Gatekeeper initialized with model ml/gatekeeper_v1.onnx, threshold 0.55`);
+      logger.info(`Gatekeeper initialized with model ml/gatekeeper_v1.onnx`);
+      
+      // Initialize the model
+      await gate.init('ml/gatekeeper_v1.onnx');
     } else {
-      logger.info(`Gatekeeper using existing model ${gatekeeperModel.path}, threshold 0.55`);
+      logger.info(`Gatekeeper using existing model ${gatekeeperModel.path}`);
+      
+      // Initialize the model with the path from the database
+      await gate.init(gatekeeperModel.path);
     }
+
+    // Load gatekeeper threshold from database
+    const hyperSettings = await prisma.hyperSettings.findUnique({ where: { id: 1 } });
+    const gatekeeperThresh = (hyperSettings as any)?.gatekeeperThresh || 0.55;
+    logger.info(`Gatekeeper threshold set to ${gatekeeperThresh}`);
 
     // Check and initialize account state
     const accountState = await prisma.accountState.findFirst();
@@ -70,6 +82,8 @@ async function initializeRLModel() {
     }
   } catch (error) {
     logger.error('Error initializing RLModel:', { error });
+    // Critical error - exit the process so Fly.io will restart it
+    process.exit(1);
   }
 }
 
