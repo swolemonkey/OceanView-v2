@@ -26,6 +26,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
+        env:
+          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
       
       - name: Create test data directory
         run: mkdir -p data

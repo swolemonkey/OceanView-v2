@@ -7,8 +7,8 @@ on:
       - main
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-  FLY_APP_NAME:  oceanview-staging     # deploy to staging environment
+  FLY_APP_NAME:  ocean-staging     # deploy to staging environment
+  npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
 
 jobs:
   deploy:

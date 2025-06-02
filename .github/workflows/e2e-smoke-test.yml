@@ -29,12 +29,16 @@ jobs:
       # Update the lockfile if needed
       - name: Update lockfile
         run: pnpm install --no-frozen-lockfile
+        env:
+          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
 
       # Install only minimal dependencies required for testing
       - name: Install minimal test dependencies
         run: |
           # Use pnpm instead of npm for consistency
           pnpm add -D jest ts-jest @types/jest onnxruntime-node
+        env:
+          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
       
       - name: Setup test directory structure
         run: |

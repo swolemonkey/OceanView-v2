@@ -39,6 +39,8 @@ jobs:
       - uses: pnpm/action-setup@v2
         with: { version: 9 }
       - run: pnpm install --frozen-lockfile
+        env:
+          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
       
       # 💡 2️⃣  Run database migrations
       - run: pnpm prisma migrate deploy
