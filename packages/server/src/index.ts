@@ -16,7 +16,7 @@ import { nightlyUpdate } from './bots/hypertrades/learner.js';
 import { weeklyFork, weeklyEvaluate } from './bots/hypertrades/forkManager.js';
 import { run_bot } from './agent.js'; // HyperTrades bot implementation
 import './cron/index.js'; // Initialize cron jobs
-import '../cron/evolution.js'; // Initialize evolution cron job
+// import '../cron/evolution.js'; // Initialize evolution cron job
 import { initHeartbeat } from './services/heartbeat.js';
 import { initHealthCheck } from './cron/health-check.js';
 import cron from 'node-cron';
@@ -132,6 +132,9 @@ app.addHook('onReady', async () => {
 
 // Get port from environment variable
 const port = parseInt(process.env.PORT || '3334', 10);
+
+// Connect to Prisma before starting the server
+await prisma.$connect();
 
 // Start server
 await app.listen({ port, host: '0.0.0.0' });

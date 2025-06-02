@@ -9,6 +9,11 @@ export interface Order {
   stopPrice?: number;
 }
 
+export interface OrderContext {
+  botId?: number;
+  strategyName?: string;
+}
+
 export interface Fill {
   id: string;
   symbol: string;
@@ -21,5 +26,5 @@ export interface Fill {
 }
 
 export interface ExecutionEngine {
-  place(order: Order): Promise<Fill>;
+  place(order: Order, ctx?: OrderContext): Promise<Fill>;
 } 

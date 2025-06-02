@@ -52,7 +52,7 @@
     "ws": "^8.18.2"
   },
   "prisma": {
-    "seed": "ts-node packages/server/prisma/seed.ts"
+    "seed": "tsx scripts/seedAll.ts"
   },
   "dockerfile": {
     "litestream": true

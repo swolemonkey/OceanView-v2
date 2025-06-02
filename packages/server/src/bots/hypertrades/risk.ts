@@ -189,12 +189,44 @@ export class RiskManager {
   updateAllStops(): (number | null)[] {
     if (!this.perception || this.positions.length === 0) return [];
     
-    return this.positions.map(position => {
-      const newStop = this.updateStops(position);
-      if (newStop !== null) {
+    // Get the current price and ATR value
+    const lastCandles = this.perception.last(1);
+    if (!lastCandles || lastCandles.length === 0) return [];
+    
+    const price = lastCandles[0].c;
+    
+    // Get ATR from indicator cache
+    const indicators = this.perception as unknown as { indicators: IndicatorCache };
+    const atr = indicators?.indicators?.atr?.(this.atrPeriod) || 0;
+    if (atr === 0) return []; // safety check if insufficient data
+    
+    // Iterate through all positions and update stops using ATR
+    this.positions.forEach(position => {
+      const newStop = position.side === 'buy' 
+        ? price - atr * this.atrMultiple 
+        : price + atr * this.atrMultiple;
+      
+      // Only move stops in favorable direction (up for longs, down for shorts)
+      if ((position.side === 'buy' && newStop > (position.stop || -Infinity)) || 
+          (position.side === 'sell' && newStop < (position.stop || Infinity))) {
         position.stop = newStop;
+        
+        // Log the adjustment
+        const symbol = position.symbol || 'unknown';
+        console.log(`ATR trailing stop adjusted for ${symbol}: to ${newStop} (ATR: ${atr.toFixed(2)}, Multiple: ${this.atrMultiple})`);
+        
+        if (typeof global.logger !== 'undefined') {
+          global.logger.info({ 
+            symbol, 
+            newStop, 
+            atr,
+            atrMultiple: this.atrMultiple 
+          }, "ATR trailing stop adjusted");
+        }
       }
-      return newStop;
     });
+    
+    // Return the updated stop values
+    return this.positions.map(p => p.stop || null);
   }
 } 

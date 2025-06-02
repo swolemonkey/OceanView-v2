@@ -24,7 +24,6 @@ export default {
   ],
   moduleNameMapper: {
     '^onnxruntime-node$': '<rootDir>/__mocks__/autofix.js',
-    '^@/db\\.ts$': '<rootDir>/__mocks__/autofix.js',
     '.+/(indicators|execution|risk)/.+\\.js$': '<rootDir>/__mocks__/autofix.js',
     '.+/forkManager/.+/config\\.js$': '<rootDir>/__mocks__/autofix.js',
     '.+/perception\\.js$': '<rootDir>/__mocks__/autofix.js',
