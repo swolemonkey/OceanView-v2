@@ -37,4 +37,10 @@ pnpm-debug.log*
 *.ntvs*
 *.njsproj
 *.sln
-*.sw? 
+*.sw?
+
+# Database files
+*.db
+packages/dev.db
+packages/server/ml/
+packages/server/server_output.log 

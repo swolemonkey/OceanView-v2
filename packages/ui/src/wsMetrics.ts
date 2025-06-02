@@ -1,11 +1,11 @@
 export function connectMetrics(on: (m: any) => void) {
   console.log("Connecting to WebSocket...");
   
-  // Always use explicit localhost:3334 connection for metrics
-  const serverUrl = 'ws://localhost:3334';
-  console.log(`Connecting to ${serverUrl}/ws/metrics`);
+  // Use dynamic WebSocket URL that works in both local and Fly.io environments
+  const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/metrics";
+  console.log(`Connecting to ${wsUrl}`);
   
-  const ws = new WebSocket(`${serverUrl}/ws/metrics`);
+  const ws = new WebSocket(wsUrl);
   
   ws.onopen = () => {
     console.log("WebSocket connection established");
