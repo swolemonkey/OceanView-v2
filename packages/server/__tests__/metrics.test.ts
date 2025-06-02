@@ -12,7 +12,9 @@ jest.mock('../src/db.js', () => ({
       findFirst: jest.fn().mockResolvedValue({ 
         equityStart: 15000, 
         equityEnd: 14250,
-        dailyPnl: -750
+        dailyPnl: -750,
+        equity: 15000,
+        pnl: -750
       })
     },
     strategyTrade: {

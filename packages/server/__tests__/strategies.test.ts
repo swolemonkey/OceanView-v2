@@ -143,6 +143,26 @@ describe('Strategy Tests', () => {
       
       expect(result).toBeNull();
     });
+
+    test('should not generate signal when price is below 50-bar low', () => {
+      const strategy = new RangeBounce('bitcoin');
+      
+      // Mock price below 50-bar low
+      mockCandle.c = 30000; // Below the lowest price in perception
+      
+      // Add RSI oversold stub
+      indCache.rsi14 = 25;
+      
+      const ctx = {
+        perception,
+        ind: indCache,
+        cfg: mockConfig
+      };
+      
+      const result = strategy.onCandle(mockCandle, ctx);
+      
+      expect(result).toBeNull();
+    });
   });
   
   describe('Strategy Toggle', () => {

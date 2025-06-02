@@ -197,4 +197,6 @@ export class RiskManager {
       return newStop;
     });
   }
-} 
+}
+
+export default RiskManager; 

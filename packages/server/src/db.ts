@@ -1,5 +1,11 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+export { prisma };        // named export for tests / ESM imports
+export default prisma;
+
 // Mock Prisma client
-export const prisma = {
+export const prismaMock = {
   price1m: {
     upsert: async () => {
       if (process.env.NODE_ENV === 'test') console.log('Mock upsert called');

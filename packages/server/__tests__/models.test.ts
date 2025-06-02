@@ -1,5 +1,14 @@
 import { prisma } from '../src/db.js';
 
+// Mock Prisma client
+jest.mock('../src/db.js', () => ({
+  prisma: {
+    bot: {},
+    metric: {},
+    hyperSettings: {}
+  }
+}));
+
 describe('Required Prisma Models', () => {
   test('weeklyEvaluate required models exist', async () => {
     // Check if 'bot' model exists

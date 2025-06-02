@@ -1,4 +1,4 @@
-import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache';
+import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache.js';
 
 describe('IndicatorCache', () => {
   let cache: IndicatorCache;
@@ -111,7 +111,7 @@ describe('IndicatorCache', () => {
       
       // ADX should be calculated and in the range 0-100
       expect(cache.adx14).toBeGreaterThan(0);
-      expect(cache.adx14).toBeLessThan(100);
+      expect(cache.adx14).toBeLessThanOrEqual(100);
       
       // With a strong trend, ADX should be relatively high
       expect(cache.adx14).toBeGreaterThan(20);

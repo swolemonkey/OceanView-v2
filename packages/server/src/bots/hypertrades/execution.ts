@@ -46,6 +46,8 @@ export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, at
   }
 }
 
+export default executeIdea;
+
 /**
  * Log a completed trade to the database
  */

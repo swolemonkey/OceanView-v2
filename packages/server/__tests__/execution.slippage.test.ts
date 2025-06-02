@@ -28,6 +28,7 @@ jest.mock('timers', () => ({
 describe('Execution with slippage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
   });
 
   it('should add slippage of approximately 0.15% for a trade', async () => {

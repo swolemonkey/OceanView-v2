@@ -46,6 +46,8 @@ const mockPrisma = prisma as unknown as MockClient;
 describe('Fork Manager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Ensure mockPrisma is defined
+    const mockPrisma = jest.requireMock('../src/db.js').prisma;
   });
 
   test('weeklyFork creates child bot with mutated parameters', async () => {

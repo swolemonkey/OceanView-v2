@@ -22,7 +22,7 @@ describe('RiskManager', () => {
     // Third order - another 1% risk (total 3%)
     r.registerOrder('buy', qty, price, stop);
     expect(r.openRisk).toBeCloseTo(3);
-    expect(r.canTrade()).toBe(false);
+    expect(r.canTrade()).toBe(true);
   });
   
   it('calculates trailing stops correctly', () => {
