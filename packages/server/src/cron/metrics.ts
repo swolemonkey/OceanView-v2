@@ -1,4 +1,5 @@
-import { prisma } from '../db.js';
+import * as cron from 'node-cron';
+import { prisma } from '@/db.js';
 import { addDays, startOfDay } from 'date-fns';
 
 interface TradeData {

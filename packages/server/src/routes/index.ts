@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { retrainGatekeeper } from '../rl/retrainJob.js';
+import { retrainGatekeeper } from '@/rl/retrainJob.js';
 
 export default async function registerApiRoutes(fastify: FastifyInstance) {
   // API endpoint for retraining the gatekeeper model

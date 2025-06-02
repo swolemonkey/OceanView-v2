@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import fetch from 'node-fetch';
-import { prisma } from '../db.js';
-import { notify } from '../ops/alertService.js';
+import { prisma } from '@/db.js';
+import { notify } from '@/ops/alertService.js';
 
 // Define the metrics response type
 interface MetricsResponse {
