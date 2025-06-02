@@ -44,11 +44,6 @@ async function main() {
       prisma.hyperSettings.upsert({
         where: { id: 1 },
         update: {
-          strategyToggle: JSON.stringify({
-            "TrendFollowMA": true,
-            "RangeBounce": false,
-            "SMCReversal": true
-          }),
           symbols: "bitcoin,ethereum",
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
@@ -60,20 +55,13 @@ async function main() {
           id: 1,
           smcThresh: 0.002,
           rsiOS: 35,
-          rsiOB: 65,
           symbols: "bitcoin,ethereum",
           riskPct: 1,
-          smcMinRetrace: 0.5,
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
           maxOpenRisk: 0.05,
           fastMAPeriod: 50,
-          slowMAPeriod: 200,
-          strategyToggle: JSON.stringify({
-            "TrendFollowMA": true,
-            "RangeBounce": false,
-            "SMCReversal": true
-          })
+          slowMAPeriod: 200
         }
       }),
       
