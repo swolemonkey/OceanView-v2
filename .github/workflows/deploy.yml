@@ -28,7 +28,7 @@ jobs:
       matrix:
         include:
           - envName: staging
-            flyApp: oceanview-staging
+            flyApp: ocean-staging
           # uncomment when ready for prod cut-over
           # - envName: prod
           #   flyApp: oceanview-prod
@@ -37,7 +37,7 @@ jobs:
 
       # 💡 1️⃣  Install deps & run lint/tests before we even call Fly
       - uses: pnpm/action-setup@v2
-        with: { version: 8 }
+        with: { version: 9 }
       - run: pnpm install --frozen-lockfile
       - run: pnpm test --filter server
       - run: pnpm run lint
