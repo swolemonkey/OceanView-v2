@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { defaultConfig, execCfg } from './config.js';
-import { prisma } from '../../db.js';
+import { prisma } from '@/db.js';
+import { randomUUID } from 'crypto';
 
 // Use values from config
 const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %

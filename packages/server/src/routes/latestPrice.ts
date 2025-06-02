@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 // Import only the default function from ioredis-mock
 import IoRedisMock from 'ioredis-mock';
-import { prisma } from '../db.js';
+import { prisma } from '@/db.js';
 import * as pino from 'pino';
 
 // Initialize logger

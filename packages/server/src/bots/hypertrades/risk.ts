@@ -1,5 +1,5 @@
 import { defaultConfig } from './config.js';
-import { prisma } from '../../db.js';
+import { prisma } from '@/db.js';
 import type { Config } from './config.js';
 import type { Perception } from './perception.js';
 import { IndicatorCache } from './indicators/cache.js';

@@ -10,14 +10,14 @@ import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce.js';
 import { TrendFollowMA } from './strategies/trendFollowMA.js';
 import { RangeBounce } from './strategies/rangeBounce.js';
 import { passRR } from './utils/riskReward.js';
-import type { DataFeed, Tick } from '../../feeds/interface.js';
-import type { ExecutionEngine, Order } from '../../execution/interface.js';
-import { SimEngine } from '../../execution/sim.js';
-import { gate } from '../../rl/gatekeeper.js';
-import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
-import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
-import { createLogger } from '../../utils/logger.js';
-import { prisma } from '../../db.js';
+import type { DataFeed, Tick } from '@/feeds/interface.js';
+import type { ExecutionEngine, Order } from '@/execution/interface.js';
+import { SimEngine } from '@/execution/sim.js';
+import { gate } from '@/rl/gatekeeper.js';
+import { storeRLEntryId } from '@/botRunner/workers/hypertrades.js';
+import { PortfolioRiskManager } from '@/risk/portfolioRisk.js';
+import { createLogger } from '@/utils/logger.js';
+import { prisma } from '@/db.js';
 
 // Create logger
 const logger = createLogger('assetAgent');

@@ -1,4 +1,4 @@
-import { prisma } from '../../db.js';
+import { prisma } from '@/db.js';
 import IoRedisMock from 'ioredis-mock';
 import { forkCfg } from './config.js';
 
@@ -6,7 +6,7 @@ import { forkCfg } from './config.js';
 // @ts-ignore - Working around type issues with ioredis-mock
 const redis = new IoRedisMock();
 
-function mutate(x: number, pct = 0.1) { 
+function mutateFactor(x: number, pct = 0.1) { 
   return x * (1 + (Math.random() * 2 - 1) * pct); 
 }
 
@@ -87,12 +87,12 @@ export async function weeklyFork() {
     await prisma.hyperSettings.create({
       data: {
         id: child.id, // use botId as settings id
-        smcThresh: mutate(set.smcThresh, forkCfg.mutatePct),
-        rsiOS: mutate(set.rsiOS, forkCfg.mutatePct),
-        rsiOB: mutate(set.rsiOB || 65, forkCfg.mutatePct),
-        fastMAPeriod: Math.round(mutate(set.fastMAPeriod || 50, forkCfg.mutatePct)),
-        slowMAPeriod: Math.round(mutate(set.slowMAPeriod || 200, forkCfg.mutatePct)),
-        riskPct: mutate(set.riskPct || 1, forkCfg.mutatePct)
+        smcThresh: mutateFactor(set.smcThresh, forkCfg.mutatePct),
+        rsiOS: mutateFactor(set.rsiOS, forkCfg.mutatePct),
+        rsiOB: mutateFactor(set.rsiOB || 65, forkCfg.mutatePct),
+        fastMAPeriod: Math.round(mutateFactor(set.fastMAPeriod || 50, forkCfg.mutatePct)),
+        slowMAPeriod: Math.round(mutateFactor(set.slowMAPeriod || 200, forkCfg.mutatePct)),
+        riskPct: mutateFactor(set.riskPct || 1, forkCfg.mutatePct)
       }
     });
     

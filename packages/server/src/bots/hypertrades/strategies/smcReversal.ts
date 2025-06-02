@@ -1,5 +1,5 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import { Candle } from '../perception.js';
+import { Candle } from '@/bots/hypertrades/perception.js';
 
 export class SMCReversal extends BaseStrategy {
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea|null {
