@@ -50,7 +50,12 @@ async function main() {
             "TrendFollowMA": true,
             "RangeBounce": true,
             "SMCReversal": true
-          })
+          }),
+          gatekeeperThresh: 0.55,
+          maxDailyLoss: 0.03,
+          maxOpenRisk: 0.05,
+          fastMAPeriod: 50,
+          slowMAPeriod: 200
         },
         create: {
           id: 1,
@@ -60,6 +65,11 @@ async function main() {
           symbols: "bitcoin",
           riskPct: 1,
           smcMinRetrace: 0.5,
+          gatekeeperThresh: 0.55,
+          maxDailyLoss: 0.03,
+          maxOpenRisk: 0.05,
+          fastMAPeriod: 50,
+          slowMAPeriod: 200,
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
             "RangeBounce": true,
@@ -72,12 +82,12 @@ async function main() {
       prisma.rLModel.upsert({
         where: { version: "gatekeeper_v1" },
         update: {
-          path: "./models/gatekeeper_v1.onnx",
+          path: "packages/server/models/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         },
         create: {
           version: "gatekeeper_v1",
-          path: "./models/gatekeeper_v1.onnx",
+          path: "packages/server/models/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         }
       }),
@@ -109,9 +119,6 @@ async function main() {
         }
       })
     ]);
-
-    // Update gatekeeperThresh with direct query to avoid type issues
-    await prisma.$executeRaw`UPDATE "HyperSettings" SET "gatekeeperThresh" = 0.55 WHERE id = 1`;
 
     console.log("Database seeding completed successfully!");
   } catch (error) {
