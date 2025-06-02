@@ -17,6 +17,29 @@ jobs:
     concurrency: deploy-group    # optional: ensure only one action runs at a time
     steps:
       - uses: actions/checkout@v4
+      
+      # Add steps to handle ONNX runtime installation if dependencies are needed
+      - name: Block onnxruntime postinstall
+        run: npm pkg set scripts.postinstall="echo skipped"
+        working-directory: packages/server/node_modules/onnxruntime-node || true
+      
+      # Add pnpm setup and install dependencies if needed
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies if needed
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            pnpm install --frozen-lockfile
+            
+            # Manually download and extract ONNX Runtime CPU binary
+            curl -L https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime/nuget/v3/flatcontainer/microsoft.ml.onnxruntime.linux-x64/1.22.0/microsoft.ml.onnxruntime.linux-x64.1.22.0.nupkg -o ort.nupkg
+            unzip -q ort.nupkg -d ort-extract
+            mkdir -p node_modules/onnxruntime-node/bin
+            cp ort-extract/runtimes/linux-x64/native/libonnxruntime.so node_modules/onnxruntime-node/bin/
+          fi
+      
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy app
         run: flyctl deploy --remote-only --app $FLY_APP_NAME

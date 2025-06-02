@@ -26,11 +26,24 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
+      # Block onnxruntime postinstall script
+      - name: Block onnxruntime postinstall
+        run: npm pkg set scripts.postinstall="echo skipped"
+        working-directory: packages/server/node_modules/onnxruntime-node || true
+
       # Update the lockfile if needed
       - name: Update lockfile
         run: pnpm install --no-frozen-lockfile
         env:
           npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
+
+      # Manually download and extract ONNX Runtime CPU binary
+      - name: Download onnxruntime CPU binary
+        run: |
+          curl -L https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime/nuget/v3/flatcontainer/microsoft.ml.onnxruntime.linux-x64/1.22.0/microsoft.ml.onnxruntime.linux-x64.1.22.0.nupkg -o ort.nupkg
+          unzip -q ort.nupkg -d ort-extract
+          mkdir -p node_modules/onnxruntime-node/bin
+          cp ort-extract/runtimes/linux-x64/native/libonnxruntime.so node_modules/onnxruntime-node/bin/
 
       # Install only minimal dependencies required for testing
       - name: Install minimal test dependencies
