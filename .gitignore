@@ -9,6 +9,7 @@ build
 .next
 out
 .turbo
+packages/server/.build/
 
 # Testing
 coverage
@@ -43,4 +44,10 @@ pnpm-debug.log*
 *.db
 packages/dev.db
 packages/server/ml/
-packages/server/server_output.log 
+
+# Log files
+packages/server/*.log
+
+# Legacy Dockerfiles
+Dockerfile
+Dockerfile.dev 
