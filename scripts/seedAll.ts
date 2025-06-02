@@ -10,21 +10,32 @@ async function main() {
   console.log("Starting database seeding...");
 
   try {
-    // Bot operations using raw SQL (since Bot might not be accessible directly)
-    const existingBots = await prisma.$queryRaw`SELECT * FROM "Bot" WHERE name = 'hypertrades' LIMIT 1`;
-    const existingBot = Array.isArray(existingBots) && existingBots.length > 0 ? existingBots[0] : null;
+    // Bot - hypertrades
+    // First check if bot exists
+    const existingBot = await prisma.bot.findFirst({
+      where: { name: "hypertrades" }
+    });
 
     if (existingBot) {
-      await prisma.$executeRaw`
-        UPDATE "Bot" 
-        SET "type" = 'hypertrades', "enabled" = true, "equity" = 10000, "pnlToday" = 0
-        WHERE "id" = ${existingBot.id}
-      `;
+      await prisma.bot.update({
+        where: { id: existingBot.id },
+        data: { 
+          type: "hypertrades",
+          enabled: true,
+          equity: 10000,
+          pnlToday: 0
+        }
+      });
     } else {
-      await prisma.$executeRaw`
-        INSERT INTO "Bot" ("name", "type", "enabled", "equity", "pnlToday")
-        VALUES ('hypertrades', 'hypertrades', true, 10000, 0)
-      `;
+      await prisma.bot.create({
+        data: {
+          name: "hypertrades",
+          type: "hypertrades", 
+          enabled: true,
+          equity: 10000,
+          pnlToday: 0
+        }
+      });
     }
 
     // Run remaining operations in a transaction
@@ -98,7 +109,7 @@ async function main() {
       })
     ]);
 
-    // Update ATR parameters and other fields with raw SQL
+    // Update ATR parameters and gatekeeperThresh with direct query
     await prisma.$executeRaw`UPDATE "HyperSettings" SET 
       "atrMultiple" = 1.5, 
       "atrPeriod" = 14, 

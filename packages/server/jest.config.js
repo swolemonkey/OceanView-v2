@@ -13,7 +13,6 @@ export default {
       useESM: true,
     }],
   },
-  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js',
     '^(\\.{1,2}/.*)\\.js$': '$1'
