@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { prisma } from '../db.js';
+import { prisma } from '@/db.js';
 
 interface MetricsResponse {
   equity: number;

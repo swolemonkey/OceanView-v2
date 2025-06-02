@@ -1,4 +1,4 @@
-import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache.js';
+import { IndicatorCache } from '@/bots/hypertrades/indicators/cache.js';
 
 describe('IndicatorCache', () => {
   let cache: IndicatorCache;

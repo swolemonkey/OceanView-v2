@@ -1,8 +1,8 @@
 // This file tests the new strategies added in sprint 6
-import { TrendFollowMA } from '../src/bots/hypertrades/strategies/trendFollow.js';
-import { RangeBounce } from '../src/bots/hypertrades/strategies/rangeBounce.js';
-import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache.js';
-import { Perception, Candle } from '../src/bots/hypertrades/perception.js';
+import { TrendFollowMA } from '@/bots/hypertrades/strategies/trendFollow.js';
+import { RangeBounce } from '@/bots/hypertrades/strategies/rangeBounce.js';
+import { IndicatorCache } from '@/bots/hypertrades/indicators/cache.js';
+import { Perception, Candle } from '@/bots/hypertrades/perception.js';
 
 describe('Strategy Tests', () => {
   let perception: Perception;

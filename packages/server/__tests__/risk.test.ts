@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { RiskManager } from '../src/bots/hypertrades/risk.js';
+import { RiskManager } from '@/bots/hypertrades/risk.js';
 
 describe('RiskManager', () => {
   it('handles risk sizing & limits', () => {

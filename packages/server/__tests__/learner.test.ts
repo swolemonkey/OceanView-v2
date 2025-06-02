@@ -1,5 +1,5 @@
-import { nightlyUpdate } from '../src/bots/hypertrades/learner.js';
-import { prisma } from '../src/db.js';
+import { nightlyUpdate } from '@/bots/hypertrades/learner.js';
+import { prisma } from '@/db.js';
 import { jest, expect } from '@jest/globals';
 
 // Create a simplified test that just verifies the update math

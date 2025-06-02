@@ -1,5 +1,5 @@
-import { weeklyFork, weeklyEvaluate } from '../src/bots/hypertrades/forkManager.js';
-import { prisma } from '../src/db.js';
+import { weeklyFork, weeklyEvaluate } from '@/bots/hypertrades/forkManager.js';
+import { prisma } from '@/db.js';
 import { jest } from '@jest/globals';
 
 // Type definition to help TypeScript understand our mock
@@ -21,7 +21,7 @@ type MockClient = {
 };
 
 // Mock the Prisma client
-jest.mock('../src/db.js', () => ({
+jest.mock('@/db.js', () => ({
   prisma: {
     bot: {
       findFirst: jest.fn(),
@@ -47,7 +47,7 @@ describe('Fork Manager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Ensure mockPrisma is defined
-    const mockPrisma = jest.requireMock('../src/db.js').prisma;
+    const mockPrisma = jest.requireMock('@/db.js').prisma;
   });
 
   test('weeklyFork creates child bot with mutated parameters', async () => {
