@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  FLY_APP_NAME:  oceanview-staging     # deploy to staging environment
 jobs:
   deploy:
     name: Deploy app
@@ -13,7 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - name: Deploy app
+        run: flyctl deploy --remote-only --app $FLY_APP_NAME
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - name: Run seed script
