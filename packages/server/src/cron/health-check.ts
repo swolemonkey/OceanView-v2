@@ -1,6 +1,7 @@
 import * as cron from 'node-cron';
 import fetch from 'node-fetch';
 import { prisma } from '../db.js';
+import { notify } from '../ops/alertService.js';
 
 // Define the metrics response type
 interface MetricsResponse {
@@ -56,8 +57,9 @@ export async function dailyHealthCheck() {
     
     // Log results
     if (alerts.length > 0) {
-      const alertMessage = alerts.join(', ');
-      console.log(`[ALERT] Health check issues detected: ${alertMessage}`);
+      const alertMessage = `[ALERT] Health check issues detected: ${alerts.join(', ')}`;
+      console.log(alertMessage);
+      await notify(alertMessage);
       
       // Record heartbeat with alert status
       await (prisma as any).botHeartbeat.create({
@@ -81,7 +83,9 @@ export async function dailyHealthCheck() {
     return { alerts };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Health check failed:', errorMessage);
+    const alertText = `Health check failed: ${errorMessage}`;
+    console.error(alertText);
+    await notify(alertText);
     
     // Record error heartbeat
     await (prisma as any).botHeartbeat.create({
