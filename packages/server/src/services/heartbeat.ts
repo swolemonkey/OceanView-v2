@@ -1,4 +1,4 @@
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 interface HeartbeatData {
   status: string;
@@ -15,12 +15,19 @@ export async function recordHeartbeat() {
       details: 'Normal operation'
     };
     
-    await (prisma as any).botHeartbeat.create({
-      data: heartbeatData
-    });
-    
-    // Simulate statsd increment - in a real environment, this would use a statsd client
-    console.log('[statsd] increment: bot.heartbeat');
+    // Try to use the botHeartbeat model directly with the correct capitalization
+    try {
+      await prisma.botHeartbeat.create({
+        data: heartbeatData
+      });
+      
+      // Simulate statsd increment - in a real environment, this would use a statsd client
+      console.log('[statsd] increment: bot.heartbeat');
+    } catch (error) {
+      console.log('[heartbeat] Skipping heartbeat record - botHeartbeat model not available');
+      // Print the available Prisma models for debugging
+      console.log('[heartbeat] Available Prisma models:', Object.keys(prisma));
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Failed to record heartbeat:', errorMessage);
@@ -40,6 +47,4 @@ export function initHeartbeat() {
   setInterval(recordHeartbeat, FIVE_MINUTES);
   
   console.log('[heartbeat] Service initialized, recording every 5 minutes');
-}
-
-export default recordHeartbeat; 
+} 

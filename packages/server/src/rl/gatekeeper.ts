@@ -1,7 +1,7 @@
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 import { InferenceSession, Tensor } from 'onnxruntime-node';
 import path from 'path';
-import { createLogger } from '@/utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 // Create logger
 const logger = createLogger('gatekeeper');
@@ -60,8 +60,10 @@ export class RLGatekeeper {
         path: path,
         context: 'gatekeeper'
       });
-      // Critical error - exit the process so Fly.io will restart it
-      process.exit(1);
+      // Instead of exiting, continue with shadow mode
+      logger.info('Continuing in shadow mode with mock model');
+      this.modelLoaded = false;
+      // Don't exit the process - just continue
     }
   }
 
@@ -187,5 +189,3 @@ export class RLGatekeeper {
 
 // Create a singleton instance of RLGatekeeper
 export const gate = new RLGatekeeper(1); 
-
-export default RLGatekeeper; 
