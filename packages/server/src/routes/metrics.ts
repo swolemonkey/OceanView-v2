@@ -109,4 +109,6 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
       return { error: 'Failed to fetch metrics' };
     }
   });
-} 
+}
+
+export default registerMetricsRoute; 

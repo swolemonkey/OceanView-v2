@@ -394,4 +394,6 @@ export class AssetAgent {
       logger.info(`Open risk: ${portfolioRisk.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolioRisk.dayPnl.toFixed(2)}`);
     }
   }
-} 
+}
+
+export default AssetAgent; 

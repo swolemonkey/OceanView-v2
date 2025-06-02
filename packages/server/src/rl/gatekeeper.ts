@@ -187,3 +187,5 @@ export class RLGatekeeper {
 
 // Create a singleton instance of RLGatekeeper
 export const gate = new RLGatekeeper(1); 
+
+export default RLGatekeeper; 

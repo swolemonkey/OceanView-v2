@@ -40,4 +40,6 @@ export function initHeartbeat() {
   setInterval(recordHeartbeat, FIVE_MINUTES);
   
   console.log('[heartbeat] Service initialized, recording every 5 minutes');
-} 
+}
+
+export default recordHeartbeat; 

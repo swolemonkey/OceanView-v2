@@ -14,6 +14,7 @@ export default {
     }],
   },
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^onnxruntime-node$': '<rootDir>/__mocks__/onnxruntime-node.js',
     '^(\\.{1,2}/.*)\\.js$': '$1'
   }

@@ -21,4 +21,6 @@ export class TrendFollowMA extends BaseStrategy {
     
     return null;
   }
-} 
+}
+
+export default TrendFollowMA; 

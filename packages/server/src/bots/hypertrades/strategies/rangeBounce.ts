@@ -20,4 +20,6 @@ export class RangeBounce extends BaseStrategy {
     
     return null;
   }
-} 
+}
+
+export default RangeBounce; 

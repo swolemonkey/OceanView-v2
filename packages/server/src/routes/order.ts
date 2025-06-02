@@ -13,3 +13,5 @@ export async function registerOrderRoute(app:FastifyInstance){
     return { ok:true, order };
   });
 } 
+
+export default registerOrderRoute; 

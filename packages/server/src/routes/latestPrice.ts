@@ -73,3 +73,5 @@ export async function registerLatestPriceRoute(app: FastifyInstance) {
     return { symbol, price: Number(row.close), source: 'db' };
   });
 } 
+
+export default registerLatestPriceRoute; 

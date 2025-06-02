@@ -20,3 +20,5 @@ export async function nightlyUpdate(){
   });
   console.log(`[learner] updated smcThresh=${smcThresh.toFixed(4)} rsiOS=${rsiOS.toFixed(2)}`);
 } 
+
+export default nightlyUpdate; 

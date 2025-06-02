@@ -87,4 +87,6 @@ export async function placeSimOrder(
     fill: fill.price, 
     fee: fill.fee 
   };
-} 
+}
+
+export default SimEngine; 

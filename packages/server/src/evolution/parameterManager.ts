@@ -56,4 +56,6 @@ export function score(trades: { pnl: number }[]) {
   }
   
   return { sharpe, drawdown: maxDrawdown };
-} 
+}
+
+export default { mutate, score }; 

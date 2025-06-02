@@ -29,4 +29,6 @@ export async function registerControlsRoute(fastify: FastifyInstance) {
       return { error: 'Failed to update controls' };
     }
   });
-} 
+}
+
+export default registerControlsRoute; 
