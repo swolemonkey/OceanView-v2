@@ -53,7 +53,7 @@ jobs:
       # 3️⃣ Re-install only the server workspace so its own hooks run
       - name: Finalise server workspace
         working-directory: packages/server
-        run: pnpm install --ignore-workspace-root-check
+        run: pnpm install
       
       # 💡 2️⃣  Run database migrations
       - run: pnpm prisma migrate deploy
