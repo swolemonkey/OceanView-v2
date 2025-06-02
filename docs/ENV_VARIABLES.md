@@ -16,6 +16,8 @@ This document lists all environment variables used by the application, including
 - `ALPACA_API_KEY` - API key for Alpaca
 - `ALPACA_API_SECRET` - API secret for Alpaca
 - `POLYGON_API_KEY` - API key for Polygon.io (optional)
+- `SLACK_TOKEN` - Slack API token for sending alerts
+  - Required for production alert notifications
 
 ## API Endpoints
 
@@ -68,6 +70,7 @@ REDIS_URL="redis://localhost:6379"
 COINGECKO_API_KEY="your-key-here"
 ALPACA_API_KEY="your-key-here"
 ALPACA_API_SECRET="your-secret-here"
+SLACK_TOKEN="xoxb-your-slack-token"
 
 # Application Settings
 PORT=3334

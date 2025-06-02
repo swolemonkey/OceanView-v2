@@ -1,6 +1,7 @@
 import { AssetAgent } from '../bots/hypertrades/assetAgent.js';
 import { prisma } from '../db.js';
 import { createLogger } from '../utils/logger.js';
+import { notify } from '../ops/alertService.js';
 
 // Create logger
 const logger = createLogger('portfolioRisk');
@@ -50,6 +51,7 @@ export class PortfolioRiskManager {
       this.refreshTimer = setInterval(() => this.loadRiskLimits(), 60 * 60 * 1000);
     } catch (error) {
       console.error('Failed to initialize PortfolioRiskManager:', error);
+      await notify(`Failed to initialize PortfolioRiskManager: ${error}`);
     }
   }
   
@@ -68,6 +70,7 @@ export class PortfolioRiskManager {
       }
     } catch (error) {
       console.error('Failed to load risk limits from DB:', error);
+      await notify(`Failed to load risk limits from DB: ${error}`);
     }
   }
   
@@ -81,7 +84,9 @@ export class PortfolioRiskManager {
     
     // Check day loss limit
     if (dayLossPct >= this.maxDailyLoss) {
-      logger.warn('VETO-PORTFOLIO day loss limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      const alertMessage = `VETO-PORTFOLIO day loss limit exceeded: open=${this.openRiskPct}, loss=${dayLossPct}`;
+      logger.warn(alertMessage, { open: this.openRiskPct, loss: dayLossPct });
+      notify(alertMessage).catch(err => console.error('Failed to send Slack notification:', err));
       
       // Persist risk veto
       this.persistRiskVeto('day_loss', dayLossPct, this.openRiskPct);
@@ -91,7 +96,9 @@ export class PortfolioRiskManager {
     
     // Check open risk limit
     if (this.openRiskPct >= this.maxOpenRisk * 100) {
-      logger.warn('VETO-PORTFOLIO open risk limit exceeded', { open: this.openRiskPct, loss: dayLossPct });
+      const alertMessage = `VETO-PORTFOLIO open risk limit exceeded: open=${this.openRiskPct}, loss=${dayLossPct}`;
+      logger.warn(alertMessage, { open: this.openRiskPct, loss: dayLossPct });
+      notify(alertMessage).catch(err => console.error('Failed to send Slack notification:', err));
       
       // Persist risk veto
       this.persistRiskVeto('open_risk', dayLossPct, this.openRiskPct);
@@ -127,6 +134,7 @@ export class PortfolioRiskManager {
       });
     } catch (error) {
       logger.error('Failed to persist risk veto:', { error });
+      await notify(`Failed to persist risk veto: ${error}`).catch(err => console.error('Failed to send Slack notification:', err));
     }
   }
   
@@ -160,6 +168,7 @@ export class PortfolioRiskManager {
       });
     } catch (error) {
       console.error('Failed to update equity in DB:', error);
+      await notify(`Failed to update equity in DB: ${error}`).catch(err => console.error('Failed to send Slack notification:', err));
     }
   }
   
