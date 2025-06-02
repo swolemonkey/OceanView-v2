@@ -23,21 +23,18 @@ jobs:
         with:
           version: 9
       
-      - name: Install dependencies if needed
-        run: |
-          if [ -f "pnpm-lock.yaml" ]; then
-            pnpm install --frozen-lockfile
-            
-            # Block onnxruntime postinstall script AFTER installation
-            npm pkg set scripts.postinstall="echo skipped" \
-              --workspace packages/server/node_modules/onnxruntime-node
-            
-            # Manually download and extract ONNX Runtime CPU binary
-            curl -L https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime/nuget/v3/flatcontainer/microsoft.ml.onnxruntime.linux-x64/1.22.0/microsoft.ml.onnxruntime.linux-x64.1.22.0.nupkg -o ort.nupkg
-            unzip -q ort.nupkg -d ort-extract
-            mkdir -p node_modules/onnxruntime-node/bin
-            cp ort-extract/runtimes/linux-x64/native/libonnxruntime.so node_modules/onnxruntime-node/bin/
-          fi
+      # 1️⃣ Install everything but skip ALL postinstall hooks
+      - name: Install deps (skip scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # 2️⃣ Delete the onnxruntime postinstall script
+      - name: Remove ORT GPU script
+        run: npx --yes json -I -f packages/server/node_modules/onnxruntime-node/package.json 'delete this.scripts.postinstall'
+
+      # 3️⃣ Re-install only the server workspace so its own hooks run
+      - name: Finalise server workspace
+        working-directory: packages/server
+        run: pnpm install --ignore-workspace-root-check
       
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy app

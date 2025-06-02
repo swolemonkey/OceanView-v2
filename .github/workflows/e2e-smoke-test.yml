@@ -26,33 +26,24 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      # Update the lockfile if needed
-      - name: Update lockfile
-        run: pnpm install --no-frozen-lockfile
-        env:
-          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
+      # 1️⃣ Install everything but skip ALL postinstall hooks
+      - name: Install deps (skip scripts)
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
 
-      # Block onnxruntime postinstall script AFTER installation
-      - name: Block onnxruntime postinstall
-        run: |
-          npm pkg set scripts.postinstall="echo skipped" \
-            --workspace packages/server/node_modules/onnxruntime-node
+      # 2️⃣ Delete the onnxruntime postinstall script
+      - name: Remove ORT GPU script
+        run: npx --yes json -I -f packages/server/node_modules/onnxruntime-node/package.json 'delete this.scripts.postinstall'
 
-      # Manually download and extract ONNX Runtime CPU binary
-      - name: Download onnxruntime CPU binary
-        run: |
-          curl -L https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime/nuget/v3/flatcontainer/microsoft.ml.onnxruntime.linux-x64/1.22.0/microsoft.ml.onnxruntime.linux-x64.1.22.0.nupkg -o ort.nupkg
-          unzip -q ort.nupkg -d ort-extract
-          mkdir -p node_modules/onnxruntime-node/bin
-          cp ort-extract/runtimes/linux-x64/native/libonnxruntime.so node_modules/onnxruntime-node/bin/
+      # 3️⃣ Re-install only the server workspace so its own hooks run
+      - name: Finalise server workspace
+        working-directory: packages/server
+        run: pnpm install --ignore-workspace-root-check
 
       # Install only minimal dependencies required for testing
       - name: Install minimal test dependencies
         run: |
           # Use pnpm instead of npm for consistency
           pnpm add -D jest ts-jest @types/jest onnxruntime-node
-        env:
-          npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
       
       - name: Setup test directory structure
         run: |
