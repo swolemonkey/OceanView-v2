@@ -34,6 +34,13 @@ RUN npm install -g typescript
 # Build the server
 RUN pnpm --filter server run build
 
+# --- Build React UI ---
+WORKDIR /app/packages/ui
+RUN pnpm install --frozen-lockfile && pnpm build
+
+# Return to app directory
+WORKDIR /app
+
 # Copy seed scripts to the scripts directory in the Docker image
 RUN mkdir -p /app/scripts/
 COPY scripts/seedAll.ts /app/scripts/
@@ -42,6 +49,7 @@ COPY scripts/register_rl_model.ts /app/scripts/
 # Debug: List compiled files
 RUN ls -la /app/packages/server/dist
 RUN ls -la /app/packages/server/dist/src || echo "src directory not found in dist"
+RUN ls -la /app/packages/ui/dist || echo "UI dist directory not found"
 RUN cat /app/packages/server/package.json | grep start
 
 # Set environment variables
