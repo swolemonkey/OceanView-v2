@@ -49,7 +49,12 @@ async function main() {
             "RangeBounce": false,
             "SMCReversal": true
           }),
-          symbols: "bitcoin,ethereum"
+          symbols: "bitcoin,ethereum",
+          gatekeeperThresh: 0.55,
+          maxDailyLoss: 0.03,
+          maxOpenRisk: 0.05,
+          fastMAPeriod: 50,
+          slowMAPeriod: 200
         },
         create: {
           id: 1,
@@ -59,6 +64,11 @@ async function main() {
           symbols: "bitcoin,ethereum",
           riskPct: 1,
           smcMinRetrace: 0.5,
+          gatekeeperThresh: 0.55,
+          maxDailyLoss: 0.03,
+          maxOpenRisk: 0.05,
+          fastMAPeriod: 50,
+          slowMAPeriod: 200,
           strategyToggle: JSON.stringify({
             "TrendFollowMA": true,
             "RangeBounce": false,
@@ -71,12 +81,12 @@ async function main() {
       prisma.rLModel.upsert({
         where: { version: "gatekeeper_v1" },
         update: {
-          path: "./models/gatekeeper_v1.onnx",
+          path: "packages/server/models/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         },
         create: {
           version: "gatekeeper_v1",
-          path: "./models/gatekeeper_v1.onnx",
+          path: "packages/server/models/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         }
       }),
@@ -109,11 +119,10 @@ async function main() {
       })
     ]);
 
-    // Update ATR parameters and gatekeeperThresh with direct query
+    // Update ATR parameters with direct query
     await prisma.$executeRaw`UPDATE "HyperSettings" SET 
       "atrMultiple" = 1.5, 
-      "atrPeriod" = 14, 
-      "gatekeeperThresh" = 0.55
+      "atrPeriod" = 14
       WHERE id = 1`;
 
     console.log("Database seeding completed successfully!");

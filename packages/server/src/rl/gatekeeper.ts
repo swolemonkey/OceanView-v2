@@ -53,8 +53,13 @@ export class RLGatekeeper {
       this.session = await InferenceSession.create(path);
       this.modelLoaded = true;
       logger.info(`Successfully loaded RL model: ${path}`);
-    } catch (error) {
-      logger.error('Error loading RL model:', { error, path });
+    } catch (err) {
+      logger.error('Error loading RL model', {
+        error: err instanceof Error ? err.message : err,
+        stack: err instanceof Error ? err.stack : null,
+        path: path,
+        context: 'gatekeeper'
+      });
       // Critical error - exit the process so Fly.io will restart it
       process.exit(1);
     }
