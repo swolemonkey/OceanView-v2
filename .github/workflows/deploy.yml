@@ -1,0 +1,56 @@
+name: Fly Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which Fly app to deploy?
+        required: true
+        default: staging
+        type: choice
+        options: 
+          - staging
+          - prod
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  # Default – overridden per-job via matrix
+  FLY_APP_NAME: ocean-staging
+
+jobs:
+  test-build-deploy:
+    concurrency: deploy-group
+    runs-on: ubuntu-latest
+    # matrix lets us reuse the same steps for staging (default) and prod (when triggered manually)
+    strategy:
+      matrix:
+        include:
+          - envName: staging
+            flyApp: oceanview-staging
+          # uncomment when ready for prod cut-over
+          # - envName: prod
+          #   flyApp: oceanview-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      # 💡 1️⃣  Install deps & run lint/tests before we even call Fly
+      - uses: pnpm/action-setup@v2
+        with: { version: 8 }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --filter server
+      - run: pnpm run lint
+
+      # 💡 2️⃣  Set the app name for this matrix entry
+      - name: Set Fly App
+        run: echo "FLY_APP_NAME=${{ matrix.flyApp }}" >> $GITHUB_ENV
+
+      # 💡 3️⃣  Deploy via remote builder (uses Dockerfile.backend)
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Fly Deploy ${{ matrix.flyApp }}
+        run: flyctl deploy --remote-only --app $FLY_APP_NAME
+
+      # 💡 4️⃣  Run seed script once the app is up (SQLite schema & seeds)
+      - name: DB seed
+        run: flyctl ssh console -C "pnpm ts-node scripts/seedAll.ts" --app $FLY_APP_NAME 
