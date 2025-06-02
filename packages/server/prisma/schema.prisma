@@ -115,6 +115,11 @@ model HyperSettings {
   symbols   String   @default("bitcoin") // comma‑sep list e.g. "bitcoin,ethereum,solana"
   atrMultiple Float  @default(1.5) // ATR multiple for trailing stops
   atrPeriod Int      @default(14)  // ATR period for volatility calculation
+  gatekeeperThresh Float  @default(0.55)
+  maxDailyLoss      Float @default(0.03)
+  maxOpenRisk       Float @default(0.05)
+  fastMAPeriod      Int   @default(50)
+  slowMAPeriod      Int   @default(200)
   updatedAt DateTime @updatedAt
 }
 
