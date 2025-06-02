@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "postinstall": "patch-package",
     "dev:server": "pnpm --filter @oceanview/server run dev",
     "dev:ui": "pnpm --filter ui run dev",
     "dev": "pnpm run dev:server & pnpm run dev:ui",
@@ -33,6 +34,8 @@
     "@types/node": "^22.15.21",
     "jest": "^29.7.0",
     "onnxruntime-node": "1.22.0",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
     "prisma": "^5.15.0",
     "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
