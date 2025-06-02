@@ -17,7 +17,7 @@
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
     "start:docker": "prisma migrate deploy --schema=../../prisma/schema.prisma && node dist/src/index.js",
-    "prepare": "concurrently \"pnpm run clean\" \"tsc\"",
+    "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
     "run:multi-asset": "node scripts/run-multi-asset.js"
   },
