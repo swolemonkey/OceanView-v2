@@ -1,7 +1,7 @@
-import type { Candle } from '@/bots/hypertrades/perception.js';
-import type { Perception } from '@/bots/hypertrades/perception.js';
-import type { IndicatorCache } from '@/bots/hypertrades/indicators/cache.js';
-import type { Config } from '@/bots/hypertrades/config.js';
+import type { Candle } from '../perception.js';
+import type { Perception } from '../perception.js';
+import type { IndicatorCache } from '../indicators/cache.js';
+import type { Config } from '../config.js';
 
 export interface TradeIdea {
   side: 'buy' | 'sell';

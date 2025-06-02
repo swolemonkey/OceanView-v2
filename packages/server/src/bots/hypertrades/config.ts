@@ -1,4 +1,4 @@
-import { prisma } from '@/db.js';
+import { prisma } from '../../db.js';
 
 export type Config = {
   symbols: string[];
@@ -29,6 +29,7 @@ type ExtendedHyperSettings = {
   rsiOS: number;
   rsiOB?: number;
   symbols: string;
+  indicatorSet?: string;
   riskPct?: number;
   smcMinRetrace?: number;
   strategyToggle?: string;
@@ -41,15 +42,21 @@ type ExtendedHyperSettings = {
 export async function loadConfig(){
   // Get the config from the database
   const row = await prisma.hyperSettings.findUnique({ where:{ id:1 }});
+  console.log("Row from database:", row);
   if (!row) {
     throw new Error('HyperSettings not found in database. Please ensure ID 1 exists.');
   }
   
   // Cast row to the extended type
   const extendedRow = row as unknown as ExtendedHyperSettings;
+  console.log("ExtendedRow:", extendedRow);
+  
+  // Use default values if fields are missing
+  const symbolsStr = extendedRow.symbols || 'bitcoin';
+  console.log("Symbols string:", symbolsStr);
   
   // Get symbols from database, split and normalize
-  const symbols = extendedRow.symbols
+  const symbols = symbolsStr
                   .split(',')
                   .map((s: string) => s.trim().toLowerCase())
                   .filter((s: string) => s.length > 0);

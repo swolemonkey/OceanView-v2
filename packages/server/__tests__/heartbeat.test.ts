@@ -1,17 +1,15 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 // Mock Prisma client
-const mockCreateHeartbeat = jest.fn().mockResolvedValue({ 
-  id: 1, 
-  ts: new Date(), 
-  status: 'ok', 
-  details: 'Normal operation' 
-});
-
 jest.mock('../src/db.js', () => ({
   prisma: {
     botHeartbeat: {
-      create: mockCreateHeartbeat
+      create: jest.fn().mockResolvedValue({ 
+        id: 1, 
+        ts: new Date(), 
+        status: 'ok', 
+        details: 'Normal operation' 
+      })
     }
   }
 }));
@@ -37,7 +35,8 @@ describe('Heartbeat Service', () => {
     await recordHeartbeat();
     
     // Check if heartbeat was created
-    expect(mockCreateHeartbeat).toHaveBeenCalledWith({
+    const { prisma } = require('../src/db.js');
+    expect(prisma.botHeartbeat.create).toHaveBeenCalledWith({
       data: {
         status: 'ok',
         details: 'Normal operation'

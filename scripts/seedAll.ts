@@ -47,9 +47,7 @@ async function main() {
           symbols: "bitcoin,ethereum",
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
-          maxOpenRisk: 0.05,
-          fastMAPeriod: 50,
-          slowMAPeriod: 200
+          maxOpenRisk: 0.05
         },
         create: {
           id: 1,
@@ -59,9 +57,7 @@ async function main() {
           riskPct: 1,
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
-          maxOpenRisk: 0.05,
-          fastMAPeriod: 50,
-          slowMAPeriod: 200
+          maxOpenRisk: 0.05
         }
       }),
       

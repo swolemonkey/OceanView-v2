@@ -1,9 +1,8 @@
-import * as cron from 'node-cron';
 import fetch from 'node-fetch';
 // Import only the default function from ioredis-mock
 import IoRedisMock from 'ioredis-mock';
 import * as pino from 'pino';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 // Initialize logger
 const logger = pino.pino({

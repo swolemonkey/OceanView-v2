@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { placeSimOrder } from '@/execution/sim.js';
+import { placeSimOrder } from '../execution/sim.js';
 
 export async function registerOrderRoute(app:FastifyInstance){
   app.post('/api/order', async (req, reply)=>{
@@ -13,5 +13,3 @@ export async function registerOrderRoute(app:FastifyInstance){
     return { ok:true, order };
   });
 } 
-
-export default registerOrderRoute; 

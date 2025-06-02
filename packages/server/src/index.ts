@@ -168,10 +168,4 @@ cron.schedule('0 3 * * 0', async () => {
   }
 });
 
-// Barrel file for public API exports
-export { prisma } from './db.js';
-export { IndicatorCache } from './bots/hypertrades/indicators/cache.js';
-export { RiskManager } from './bots/hypertrades/risk.js';
-export { executeIdea } from './bots/hypertrades/execution.js';
-export { forkCfg } from './bots/hypertrades/config.js';
-// Add more exports as the codebase grows 
+export {}; 

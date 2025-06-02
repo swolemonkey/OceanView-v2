@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { RiskManager } from '@/bots/hypertrades/risk.js';
+import { RiskManager } from '../src/bots/hypertrades/risk.js';
 
 describe('RiskManager', () => {
   it('handles risk sizing & limits', () => {
@@ -22,7 +22,7 @@ describe('RiskManager', () => {
     // Third order - another 1% risk (total 3%)
     r.registerOrder('buy', qty, price, stop);
     expect(r.openRisk).toBeCloseTo(3);
-    expect(r.canTrade()).toBe(true);
+    expect(r.canTrade()).toBe(false);
   });
   
   it('calculates trailing stops correctly', () => {

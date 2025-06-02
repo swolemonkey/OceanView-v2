@@ -1,7 +1,6 @@
 import fetch from 'node-fetch';
 import { defaultConfig, execCfg } from './config.js';
-import { prisma } from '@/db.js';
-import { randomUUID } from 'crypto';
+import { prisma } from '../../db.js';
 
 // Use values from config
 const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %
@@ -46,8 +45,6 @@ export async function executeIdea(idea:TradeIdea, logger:(msg: string)=>void, at
     }
   }
 }
-
-export default executeIdea;
 
 /**
  * Log a completed trade to the database

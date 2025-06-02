@@ -1,5 +1,5 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import type { Candle } from '@/bots/hypertrades/perception.js';
+import type { Candle } from '../perception.js';
 
 export class RangeBounce extends BaseStrategy {
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {
@@ -20,6 +20,4 @@ export class RangeBounce extends BaseStrategy {
     
     return null;
   }
-}
-
-export default RangeBounce; 
+} 

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 export async function registerPortfolioRoute(app: FastifyInstance) {
   app.get('/api/portfolio', async (_, reply) => {

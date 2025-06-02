@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import fetch from 'node-fetch';
-import { prisma } from '@/db.js';
-import { notify } from '@/ops/alertService.js';
+import { prisma } from '../db.js';
+import { notify } from '../ops/alertService.js';
 
 // Define the metrics response type
 interface MetricsResponse {
@@ -62,22 +62,44 @@ export async function dailyHealthCheck() {
       await notify(alertMessage);
       
       // Record heartbeat with alert status
-      await (prisma as any).botHeartbeat.create({
-        data: {
-          status: 'alert',
-          details: alertMessage
-        }
-      });
+      const botHeartbeatModel = 
+        (prisma as any).botHeartbeat || 
+        (prisma as any).BotHeartbeat || 
+        (prisma as any).botHeartBeat || 
+        (prisma as any).botHEARTBEAT;
+        
+      if (botHeartbeatModel && typeof botHeartbeatModel.create === 'function') {
+        await botHeartbeatModel.create({
+          data: {
+            status: 'alert',
+            details: alertMessage
+          }
+        });
+      } else {
+        console.log('[health] Skipping heartbeat record - botHeartbeat model not available');
+        console.log('[health] Available Prisma models:', Object.keys(prisma));
+      }
     } else {
       console.log('[health] Daily health check passed');
       
       // Record normal heartbeat
-      await (prisma as any).botHeartbeat.create({
-        data: {
-          status: 'ok',
-          details: 'Daily health check passed'
-        }
-      });
+      const botHeartbeatModel = 
+        (prisma as any).botHeartbeat || 
+        (prisma as any).BotHeartbeat || 
+        (prisma as any).botHeartBeat || 
+        (prisma as any).botHEARTBEAT;
+        
+      if (botHeartbeatModel && typeof botHeartbeatModel.create === 'function') {
+        await botHeartbeatModel.create({
+          data: {
+            status: 'ok',
+            details: 'Daily health check passed'
+          }
+        });
+      } else {
+        console.log('[health] Skipping heartbeat record - botHeartbeat model not available');
+        console.log('[health] Available Prisma models:', Object.keys(prisma));
+      }
     }
     
     return { alerts };
@@ -88,12 +110,23 @@ export async function dailyHealthCheck() {
     await notify(alertText);
     
     // Record error heartbeat
-    await (prisma as any).botHeartbeat.create({
-      data: {
-        status: 'alert',
-        details: `Health check error: ${errorMessage}`
-      }
-    });
+    const botHeartbeatModel = 
+      (prisma as any).botHeartbeat || 
+      (prisma as any).BotHeartbeat || 
+      (prisma as any).botHeartBeat || 
+      (prisma as any).botHEARTBEAT;
+      
+    if (botHeartbeatModel && typeof botHeartbeatModel.create === 'function') {
+      await botHeartbeatModel.create({
+        data: {
+          status: 'alert',
+          details: `Health check error: ${errorMessage}`
+        }
+      });
+    } else {
+      console.log('[health] Skipping heartbeat record - botHeartbeat model not available');
+      console.log('[health] Available Prisma models:', Object.keys(prisma));
+    }
     
     return { error: 'Health check failed' };
   }

@@ -30,6 +30,4 @@ export class Perception {
     }
     return candle;
   }
-}
-
-export default Perception; 
+} 

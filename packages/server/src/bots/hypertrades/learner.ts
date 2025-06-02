@@ -1,4 +1,4 @@
-import { prisma } from '@/db.js';
+import { prisma } from '../../db.js';
 
 export async function nightlyUpdate(){
   const exps = await prisma.experience.findMany({
@@ -20,5 +20,3 @@ export async function nightlyUpdate(){
   });
   console.log(`[learner] updated smcThresh=${smcThresh.toFixed(4)} rsiOS=${rsiOS.toFixed(2)}`);
 } 
-
-export default nightlyUpdate; 

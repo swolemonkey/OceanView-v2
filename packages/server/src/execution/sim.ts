@@ -1,5 +1,5 @@
 import { ExecutionEngine, Order, Fill } from './interface.js';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 import { randomUUID } from 'crypto';
 
 export class SimEngine implements ExecutionEngine {
@@ -87,6 +87,4 @@ export async function placeSimOrder(
     fill: fill.price, 
     fee: fill.fee 
   };
-}
-
-export default SimEngine; 
+} 

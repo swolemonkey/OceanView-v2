@@ -1,11 +1,11 @@
 import { parentPort, workerData } from 'worker_threads';
-import { loadConfig } from '@/bots/hypertrades/config.js';
-import { AssetAgent } from '@/bots/hypertrades/assetAgent.js';
-import { logCompletedTrade } from '@/bots/hypertrades/execution.js';
-import { prisma } from '@/db.js';
-import type { Candle } from '@/bots/hypertrades/perception.js';
-import { PortfolioRiskManager } from '@/risk/portfolioRisk.js';
-import { RLGatekeeper, FeatureVector } from '@/rl/gatekeeper.js';
+import { loadConfig } from '../../bots/hypertrades/config.js';
+import { AssetAgent } from '../../bots/hypertrades/assetAgent.js';
+import { logCompletedTrade } from '../../bots/hypertrades/execution.js';
+import { prisma } from '../../db.js';
+import type { Candle } from '../../bots/hypertrades/perception.js';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
+import { RLGatekeeper, FeatureVector } from '../../rl/gatekeeper.js';
 
 const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 
@@ -26,7 +26,12 @@ const rlEntryIds = new Map<string, number>();
 async function init() {
   // Get config and bot info
   const cfg = await loadConfig();
-  const { botId, stratVersion } = workerData as { botId: number; stratVersion: string };
+  
+  // Use default values if workerData is null
+  const botData = workerData || { botId: 1, stratVersion: 'dev-local' };
+  const { botId, stratVersion } = botData as { botId: number; stratVersion: string };
+  
+  console.log(`HyperTrades loaded config for symbols: ${cfg.symbols.join(',')}`);
   
   // Upsert the strategy version
   const versionRow = await (prisma as any).strategyVersion.upsert({

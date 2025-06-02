@@ -1,7 +1,6 @@
 import * as cron from 'node-cron';
 import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 interface NewsItem {
   title: string;

@@ -7,13 +7,10 @@
 import { Worker } from 'worker_threads';
 import { spawn } from 'child_process';
 import path from 'path';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 import { mutate, score } from './parameterManager.js';
-import { getStrategyVersion } from '@/lib/getVersion.js';
+import { getStrategyVersion } from '../lib/getVersion.js';
 import type { EvolutionResult, EvolutionEvaluation } from './types.js';
-import IoRedisMock from 'ioredis-mock';
-import { addDays, startOfDay } from 'date-fns';
-import { v4 as uuidv4 } from 'uuid';
 
 // Number of children to spawn for each generation
 const NUM_CHILDREN = 5;

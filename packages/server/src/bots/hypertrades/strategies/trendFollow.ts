@@ -1,5 +1,5 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import { Candle } from '@/bots/hypertrades/perception.js';
+import { Candle } from '../perception.js';
 
 export class TrendFollowMA extends BaseStrategy {
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea|null {
@@ -21,6 +21,4 @@ export class TrendFollowMA extends BaseStrategy {
     
     return null;
   }
-}
-
-export default TrendFollowMA; 
+} 

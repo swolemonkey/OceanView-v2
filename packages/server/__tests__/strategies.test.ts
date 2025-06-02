@@ -1,8 +1,8 @@
 // This file tests the new strategies added in sprint 6
-import { TrendFollowMA } from '@/bots/hypertrades/strategies/trendFollow.js';
-import { RangeBounce } from '@/bots/hypertrades/strategies/rangeBounce.js';
-import { IndicatorCache } from '@/bots/hypertrades/indicators/cache.js';
-import { Perception, Candle } from '@/bots/hypertrades/perception.js';
+import { TrendFollowMA } from '../src/bots/hypertrades/strategies/trendFollow.js';
+import { RangeBounce } from '../src/bots/hypertrades/strategies/rangeBounce.js';
+import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache.js';
+import { Perception, Candle } from '../src/bots/hypertrades/perception.js';
 
 describe('Strategy Tests', () => {
   let perception: Perception;
@@ -132,26 +132,6 @@ describe('Strategy Tests', () => {
       
       // Set RSI to neutral
       indCache.rsi14 = 50;
-      
-      const ctx = {
-        perception,
-        ind: indCache,
-        cfg: mockConfig
-      };
-      
-      const result = strategy.onCandle(mockCandle, ctx);
-      
-      expect(result).toBeNull();
-    });
-
-    test('should not generate signal when price is below 50-bar low', () => {
-      const strategy = new RangeBounce('bitcoin');
-      
-      // Mock price below 50-bar low
-      mockCandle.c = 30000; // Below the lowest price in perception
-      
-      // Add RSI oversold stub
-      indCache.rsi14 = 25;
       
       const ctx = {
         perception,

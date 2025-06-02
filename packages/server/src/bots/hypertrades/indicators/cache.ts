@@ -153,5 +153,4 @@ export class IndicatorCache {
       this.adx14 = dx;
     }
   }
-}
-export default IndicatorCache; 
+} 

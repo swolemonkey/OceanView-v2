@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 interface MetricsResponse {
   equity: number;
@@ -109,6 +109,4 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
       return { error: 'Failed to fetch metrics' };
     }
   });
-}
-
-export default registerMetricsRoute; 
+} 

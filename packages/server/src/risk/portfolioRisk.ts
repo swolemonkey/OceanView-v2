@@ -1,7 +1,7 @@
-import { AssetAgent } from '@/bots/hypertrades/assetAgent.js';
-import { prisma } from '@/db.js';
-import { createLogger } from '@/utils/logger.js';
-import { notify } from '@/ops/alertService.js';
+import { AssetAgent } from '../bots/hypertrades/assetAgent.js';
+import { prisma } from '../db.js';
+import { createLogger } from '../utils/logger.js';
+import { notify } from '../ops/alertService.js';
 
 // Create logger
 const logger = createLogger('portfolioRisk');
@@ -64,8 +64,8 @@ export class PortfolioRiskManager {
       if (settings) {
         // Cast to our extended type
         const typedSettings = settings as unknown as HyperSettings;
-        this.maxDailyLoss = typedSettings.maxDailyLoss;
-        this.maxOpenRisk = typedSettings.maxOpenRisk;
+        this.maxDailyLoss = typedSettings.maxDailyLoss || 0.03; // Default to 3% if undefined
+        this.maxOpenRisk = typedSettings.maxOpenRisk || 0.05;   // Default to 5% if undefined
         console.log(`Loaded risk limits from DB: maxDailyLoss=${this.maxDailyLoss}, maxOpenRisk=${this.maxOpenRisk}`);
       }
     } catch (error) {

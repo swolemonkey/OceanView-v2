@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 // Import only the default function from ioredis-mock
 import IoRedisMock from 'ioredis-mock';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 import * as pino from 'pino';
 
 // Initialize logger
@@ -73,5 +73,3 @@ export async function registerLatestPriceRoute(app: FastifyInstance) {
     return { symbol, price: Number(row.close), source: 'db' };
   });
 } 
-
-export default registerLatestPriceRoute; 

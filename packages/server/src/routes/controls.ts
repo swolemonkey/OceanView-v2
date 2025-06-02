@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 interface ControlsBody {
   equity?: number;
@@ -29,6 +29,4 @@ export async function registerControlsRoute(fastify: FastifyInstance) {
       return { error: 'Failed to update controls' };
     }
   });
-}
-
-export default registerControlsRoute; 
+} 

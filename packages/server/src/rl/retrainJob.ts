@@ -1,8 +1,7 @@
-import * as tf from '@tensorflow/tfjs-node';
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
-import { prisma } from '@/db.js';
-import { createLogger } from '@/utils/logger.js';
+import { prisma } from '../db.js';
+import { createLogger } from '../utils/logger.js';
 
 const exec = promisify(execCallback);
 const logger = createLogger('gatekeeper');

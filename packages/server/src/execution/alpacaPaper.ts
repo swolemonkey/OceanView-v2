@@ -1,7 +1,7 @@
-import { Order, Fill, ExecutionEngine } from './interface.js';
+import { ExecutionEngine, Order, Fill } from './interface.js';
 import fetch from 'node-fetch';
 import * as pino from 'pino';
-import { prisma } from '@/db.js';
+import { prisma } from '../db.js';
 
 // Initialize logger
 const logger = pino.pino({
