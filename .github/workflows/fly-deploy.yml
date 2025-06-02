@@ -29,7 +29,10 @@ jobs:
 
       # 2️⃣ Delete the onnxruntime postinstall script
       - name: Remove ORT GPU script
-        run: npx --yes json -I -f packages/server/node_modules/onnxruntime-node/package.json 'delete this.scripts.postinstall'
+        run: |
+          npx --yes json -I \
+            -f packages/server/node_modules/onnxruntime-node/package.json \
+            -e 'delete this.scripts.postinstall'
 
       # 3️⃣ Re-install only the server workspace so its own hooks run
       - name: Finalise server workspace

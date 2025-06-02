@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "patch-package",
-    "fix:onnx": "npx json -I -f node_modules/onnxruntime-node/package.json 'delete this.scripts.postinstall'",
+    "fix:onnx": "npx json -I -f node_modules/onnxruntime-node/package.json -e 'delete this.scripts.postinstall'",
     "dev:server": "pnpm --filter @oceanview/server run dev",
     "dev:ui": "pnpm --filter ui run dev",
     "dev": "pnpm run dev:server & pnpm run dev:ui",
