@@ -39,14 +39,15 @@ jobs:
       - uses: pnpm/action-setup@v2
         with: { version: 9 }
         
-      # Block onnxruntime postinstall script
-      - name: Block onnxruntime postinstall
-        run: npm pkg set scripts.postinstall="echo skipped"
-        working-directory: packages/server/node_modules/onnxruntime-node || true
-        
       - run: pnpm install --frozen-lockfile
         env:
           npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
+          
+      # Block onnxruntime postinstall script AFTER installation
+      - name: Block onnxruntime postinstall
+        run: |
+          npm pkg set scripts.postinstall="echo skipped" \
+            --workspace packages/server/node_modules/onnxruntime-node
           
       # Manually download and extract ONNX Runtime CPU binary
       - name: Download onnxruntime CPU binary

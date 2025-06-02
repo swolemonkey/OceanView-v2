@@ -24,15 +24,16 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      # Block onnxruntime postinstall script
-      - name: Block onnxruntime postinstall
-        run: npm pkg set scripts.postinstall="echo skipped"
-        working-directory: packages/server/node_modules/onnxruntime-node || true
-
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --ignore-scripts
         env:
           npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
+          
+      # Block onnxruntime postinstall script AFTER installation
+      - name: Block onnxruntime postinstall
+        run: |
+          npm pkg set scripts.postinstall="echo skipped" \
+            --workspace packages/server/node_modules/onnxruntime-node
           
       # Manually download and extract ONNX Runtime CPU binary
       - name: Download onnxruntime CPU binary
