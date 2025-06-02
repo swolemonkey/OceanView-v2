@@ -57,7 +57,10 @@ print(f'AUC: {auc:.4f}')
 
 # Convert model to ONNX format
 initial_types = [('input', FloatTensorType([None, X.shape[1]]))]
-onnx_model = skl2onnx.convert_sklearn(model, initial_types=initial_types)
+onnx_model = skl2onnx.convert_sklearn(model, initial_types=initial_types, target_opset=22)
+
+# Set IR version to 10 for compatibility with onnxruntime-node 1.22.0
+onnx_model.ir_version = 10
 
 # Save the model
 with open('ml/gatekeeper_v1.onnx', 'wb') as f:
@@ -101,4 +104,4 @@ except Exception as e:
     print("Continuing without database update")
 
 if __name__ == "__main__":
-    main() 
+    pass  # Script already runs in the main body 
