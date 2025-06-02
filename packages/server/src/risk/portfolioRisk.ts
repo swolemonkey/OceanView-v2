@@ -64,8 +64,8 @@ export class PortfolioRiskManager {
       if (settings) {
         // Cast to our extended type
         const typedSettings = settings as unknown as HyperSettings;
-        this.maxDailyLoss = typedSettings.maxDailyLoss;
-        this.maxOpenRisk = typedSettings.maxOpenRisk;
+        this.maxDailyLoss = typedSettings.maxDailyLoss || 0.03; // Default to 3% if undefined
+        this.maxOpenRisk = typedSettings.maxOpenRisk || 0.05;   // Default to 5% if undefined
         console.log(`Loaded risk limits from DB: maxDailyLoss=${this.maxDailyLoss}, maxOpenRisk=${this.maxOpenRisk}`);
       }
     } catch (error) {

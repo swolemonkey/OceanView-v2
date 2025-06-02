@@ -43,25 +43,27 @@ export class RLGatekeeper {
 
   /**
    * Initialize the ONNX model
-   * @param path Path to the ONNX model file
+   * @param modelPath Path to the ONNX model file (defaults to ml/gatekeeper_v1.onnx)
    * @returns Promise that resolves when the model is loaded
    */
-  async init(path: string): Promise<void> {
+  async init(modelPath: string = 'ml/gatekeeper_v1.onnx'): Promise<void> {
     try {
-      this.modelPath = path;
-      logger.info(`Loading RL model from ${path}`);
-      this.session = await InferenceSession.create(path);
+      this.modelPath = modelPath;
+      logger.info(`Loading RL model from ${modelPath}`);
+      this.session = await InferenceSession.create(modelPath);
       this.modelLoaded = true;
-      logger.info(`Successfully loaded RL model: ${path}`);
+      logger.info(`Successfully loaded RL model: ${modelPath}`);
     } catch (err) {
       logger.error('Error loading RL model', {
         error: err instanceof Error ? err.message : err,
         stack: err instanceof Error ? err.stack : null,
-        path: path,
+        path: modelPath,
         context: 'gatekeeper'
       });
-      // Critical error - exit the process so Fly.io will restart it
-      process.exit(1);
+      // Instead of exiting, continue with shadow mode
+      logger.info('Continuing in shadow mode with mock model');
+      this.modelLoaded = false;
+      // Don't exit the process - just continue
     }
   }
 

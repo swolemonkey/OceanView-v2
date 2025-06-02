@@ -38,6 +38,22 @@ async function main() {
       });
     }
 
+    // Add ethereum to SymbolRegistry
+    await prisma.symbolRegistry.upsert({
+      where: { symbol: "ethereum" },
+      update: { 
+        assetClass: "crypto", 
+        exchange: "binance", 
+        active: true 
+      },
+      create: {
+        symbol: "ethereum",
+        assetClass: "crypto",
+        exchange: "binance",
+        active: true
+      }
+    });
+
     // Run remaining operations in a transaction
     await prisma.$transaction([
       // HyperSettings with strategyToggle JSON
@@ -47,9 +63,7 @@ async function main() {
           symbols: "bitcoin,ethereum",
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
-          maxOpenRisk: 0.05,
-          fastMAPeriod: 50,
-          slowMAPeriod: 200
+          maxOpenRisk: 0.05
         },
         create: {
           id: 1,
@@ -59,9 +73,7 @@ async function main() {
           riskPct: 1,
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
-          maxOpenRisk: 0.05,
-          fastMAPeriod: 50,
-          slowMAPeriod: 200
+          maxOpenRisk: 0.05
         }
       }),
       
@@ -69,12 +81,12 @@ async function main() {
       prisma.rLModel.upsert({
         where: { version: "gatekeeper_v1" },
         update: {
-          path: "packages/server/models/gatekeeper_v1.onnx",
+          path: "ml/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         },
         create: {
           version: "gatekeeper_v1",
-          path: "packages/server/models/gatekeeper_v1.onnx",
+          path: "ml/gatekeeper_v1.onnx",
           description: "Baseline gatekeeper model"
         }
       }),
@@ -103,6 +115,26 @@ async function main() {
           dailyPnl: 0,
           maxOpenRisk: 0,
           maxDrawdown: 0
+        }
+      }),
+      
+      // Create a basic BotHeartbeat record
+      prisma.botHeartbeat.create({
+        data: {
+          status: "ok",
+          details: "Initial heartbeat"
+        }
+      }),
+      
+      // Create a sample EvolutionMetric
+      prisma.evolutionMetric.create({
+        data: {
+          parentId: 1,
+          childId: 2,
+          sharpe: 0.5,
+          drawdown: 0.02,
+          promoted: false,
+          childParams: "{}"
         }
       })
     ]);

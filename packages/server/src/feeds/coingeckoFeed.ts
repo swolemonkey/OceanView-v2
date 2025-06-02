@@ -20,6 +20,16 @@ const SYMBOL_MAP: Record<string, string> = {
   'AVAX': 'avalanche-2'
 };
 
+// Case-insensitive lookup function for symbol map
+function getGeckoId(symbol: string): string | undefined {
+  // Try direct lookup first (for performance)
+  if (SYMBOL_MAP[symbol]) return SYMBOL_MAP[symbol];
+  
+  // If not found, try case-insensitive lookup
+  const upperSymbol = symbol.toUpperCase();
+  return SYMBOL_MAP[upperSymbol];
+}
+
 export class CoinGeckoFeed implements DataFeed {
   private url: string;
   private subscribers: Map<string, ((tick: Tick) => void)[]>;
@@ -84,7 +94,7 @@ export class CoinGeckoFeed implements DataFeed {
       
       // Convert to CoinGecko IDs
       const geckoIds = symbols
-        .map(s => SYMBOL_MAP[s])
+        .map(s => getGeckoId(s))
         .filter(id => id !== undefined);
       
       if (geckoIds.length === 0) {
@@ -120,7 +130,7 @@ export class CoinGeckoFeed implements DataFeed {
       this.lastPollTime = now;
       
       for (const symbol of symbols) {
-        const geckoId = SYMBOL_MAP[symbol];
+        const geckoId = getGeckoId(symbol);
         if (!geckoId || !data[geckoId]) continue;
         
         const price = data[geckoId].usd;

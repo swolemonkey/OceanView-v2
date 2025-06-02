@@ -7,8 +7,8 @@ on:
       - main
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-  FLY_APP_NAME:  oceanview-staging     # deploy to staging environment
+  FLY_APP_NAME:  ocean-staging     # deploy to staging environment
+  npm_config_onnxruntime_gpu: "false"  # Force CPU variant of ONNX runtime
 
 jobs:
   deploy:
@@ -17,6 +17,28 @@ jobs:
     concurrency: deploy-group    # optional: ensure only one action runs at a time
     steps:
       - uses: actions/checkout@v4
+      
+      # Add pnpm setup and install dependencies if needed
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      # 1️⃣ Install everything but skip ALL postinstall hooks
+      - name: Install deps (skip scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # 2️⃣ Delete the onnxruntime postinstall script
+      - name: Remove ORT GPU script
+        run: |
+          npx --yes json -I \
+            -f packages/server/node_modules/onnxruntime-node/package.json \
+            -e 'delete this.scripts.postinstall'
+
+      # 3️⃣ Re-install only the server workspace so its own hooks run
+      - name: Finalise server workspace
+        working-directory: packages/server
+        run: pnpm install
+      
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy app
         run: flyctl deploy --remote-only --app $FLY_APP_NAME

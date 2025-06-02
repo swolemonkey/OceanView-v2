@@ -23,6 +23,7 @@ model HyperSettings {
   rsiOS         Float    @default(35)
   rsiOB         Float    @default(65)
   symbols       String   @default("bitcoin")
+  indicatorSet  String   @default("core")
   riskPct       Float    @default(1)
   smcMinRetrace Float    @default(0.5)
   maxDailyLoss  Float    @default(0.03)

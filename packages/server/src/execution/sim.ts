@@ -4,14 +4,20 @@ import { randomUUID } from 'crypto';
 
 export class SimEngine implements ExecutionEngine {
   private botId?: number;
+  private strategyName?: string;
   
-  constructor(botId?: number) {
+  constructor(botId?: number, strategyName?: string) {
     this.botId = botId;
+    this.strategyName = strategyName;
   }
 
-  async place(order: Order): Promise<Fill> {
+  async place(order: Order, ctx?: { botId?: number, strategyName?: string }): Promise<Fill> {
+    // Get context values or use constructor values
+    const botId = ctx?.botId || this.botId || 1; // Default to 1 if not provided
+    const strategyName = ctx?.strategyName || this.strategyName || 'default';
+    
     // Look up wallet equity
-    const bot = await prisma.bot.findUnique({ where: { id: this.botId } });
+    const bot = await prisma.bot.findUnique({ where: { id: botId } });
     const equity = bot?.equity ?? 10_000;
 
     // Calculate slippage based on order size relative to equity
@@ -29,7 +35,10 @@ export class SimEngine implements ExecutionEngine {
         qty: order.qty, 
         price: order.price,
         type: order.type || 'market',
-        botId: this.botId
+        botId: botId,
+        status: 'filled',
+        exchange: 'simulation',
+        clientOrderId: `sim-${Date.now()}`
       }
     });
     
@@ -44,9 +53,8 @@ export class SimEngine implements ExecutionEngine {
         side: order.side, 
         qty: order.qty, 
         price: fillPrice, 
-        feePaid: fee, 
-        pnl: 0,
-        botId: this.botId
+        fee: fee, 
+        strategy: strategyName
       }
     });
     
@@ -72,10 +80,14 @@ export async function placeSimOrder(
   side: 'buy' | 'sell',
   qty: number,
   price: number,
-  botId?: number
+  botId?: number,
+  strategyName?: string
 ) {
-  const engine = new SimEngine(botId);
-  const fill = await engine.place({ symbol, side, qty, price });
+  const engine = new SimEngine(botId, strategyName);
+  const fill = await engine.place(
+    { symbol, side, qty, price }, 
+    { botId, strategyName }
+  );
   
   // Return in the legacy format
   return { 

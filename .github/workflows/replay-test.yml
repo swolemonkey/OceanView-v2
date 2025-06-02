@@ -24,8 +24,21 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      - name: Install dependencies
+      # 1️⃣ Install everything but skip ALL postinstall hooks
+      - name: Install deps (skip scripts)
         run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+      # 2️⃣ Delete the onnxruntime postinstall script
+      - name: Remove ORT GPU script
+        run: |
+          npx --yes json -I \
+            -f packages/server/node_modules/onnxruntime-node/package.json \
+            -e 'delete this.scripts.postinstall'
+
+      # 3️⃣ Re-install only the server workspace so its own hooks run
+      - name: Finalise server workspace
+        working-directory: packages/server
+        run: pnpm install --no-frozen-lockfile
       
       - name: Create test data directory
         run: mkdir -p data

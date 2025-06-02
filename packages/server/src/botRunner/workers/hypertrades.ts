@@ -26,7 +26,12 @@ const rlEntryIds = new Map<string, number>();
 async function init() {
   // Get config and bot info
   const cfg = await loadConfig();
-  const { botId, stratVersion } = workerData as { botId: number; stratVersion: string };
+  
+  // Use default values if workerData is null
+  const botData = workerData || { botId: 1, stratVersion: 'dev-local' };
+  const { botId, stratVersion } = botData as { botId: number; stratVersion: string };
+  
+  console.log(`HyperTrades loaded config for symbols: ${cfg.symbols.join(',')}`);
   
   // Upsert the strategy version
   const versionRow = await (prisma as any).strategyVersion.upsert({

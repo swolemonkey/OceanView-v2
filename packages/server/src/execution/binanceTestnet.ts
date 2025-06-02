@@ -19,20 +19,26 @@ export class BinanceTestnetEngine implements ExecutionEngine {
   private apiSecret: string;
   private baseUrl: string;
   private botId?: number;
+  private strategyName?: string;
   
-  constructor(apiKey?: string, apiSecret?: string, botId?: number) {
+  constructor(apiKey?: string, apiSecret?: string, botId?: number, strategyName?: string) {
     this.apiKey = apiKey || process.env.BINANCE_TESTNET_API_KEY || '';
     this.apiSecret = apiSecret || process.env.BINANCE_TESTNET_API_SECRET || '';
     this.baseUrl = 'https://testnet.binance.vision/api';
     this.botId = botId;
+    this.strategyName = strategyName;
     
     if (!this.apiKey || !this.apiSecret) {
       logger.warn('Binance Testnet API credentials not provided! Using demo mode with limited functionality.');
     }
   }
   
-  async place(order: Order): Promise<Fill> {
+  async place(order: Order, ctx?: { botId?: number, strategyName?: string }): Promise<Fill> {
     try {
+      // Get context values or use constructor values
+      const botId = ctx?.botId || this.botId || 1; // Default to 1 if not provided
+      const strategyName = ctx?.strategyName || this.strategyName || 'default';
+      
       logger.info(`Placing ${order.side} order for ${order.qty} ${order.symbol} @ $${order.price}`);
       
       // Create order in local DB first
@@ -43,7 +49,10 @@ export class BinanceTestnetEngine implements ExecutionEngine {
           qty: order.qty,
           price: order.price,
           type: order.type || 'market',
-          botId: this.botId
+          botId: botId,
+          status: 'pending',
+          exchange: 'binance_testnet',
+          clientOrderId: `binance-${Date.now()}`
         }
       });
       
@@ -91,11 +100,20 @@ export class BinanceTestnetEngine implements ExecutionEngine {
         logger.error(`Binance API error: ${response.status} ${response.statusText} - ${errorText}`);
         
         // Fallback to simulation if API fails
-        return this.fallbackToSimulation(order, dbOrder.id);
+        return this.fallbackToSimulation(order, dbOrder.id, botId, strategyName);
       }
       
       const binanceResponse = await response.json() as any;
       logger.info(`Binance order placed: ${binanceResponse.orderId}`);
+      
+      // Update order with exchange order ID
+      await prisma.order.update({
+        where: { id: dbOrder.id },
+        data: {
+          exchangeOrderId: binanceResponse.orderId.toString(),
+          status: binanceResponse.status.toLowerCase()
+        }
+      });
       
       // For market orders, Binance returns filled info immediately
       if (binanceResponse.status === 'FILLED') {
@@ -131,10 +149,9 @@ export class BinanceTestnetEngine implements ExecutionEngine {
             side: order.side,
             qty: filledQty,
             price: avgPrice,
-            feePaid: fee,
-            pnl: 0,
-            botId: this.botId,
-            externalId: binanceResponse.orderId.toString()
+            fee: fee,
+            strategy: strategyName,
+            exchangeTradeId: binanceResponse.orderId.toString()
           }
         });
         
@@ -155,7 +172,7 @@ export class BinanceTestnetEngine implements ExecutionEngine {
       
       // For non-filled orders, wait for fill
       const orderId = binanceResponse.orderId.toString();
-      const fill = await this.waitForFill(orderId, order);
+      const fill = await this.waitForFill(orderId, order, botId, strategyName);
       
       // Record the fill in our database
       const trade = await prisma.trade.create({
@@ -165,10 +182,9 @@ export class BinanceTestnetEngine implements ExecutionEngine {
           side: fill.side,
           qty: fill.qty,
           price: fill.price,
-          feePaid: fill.fee,
-          pnl: 0,
-          botId: this.botId,
-          externalId: orderId
+          fee: fill.fee,
+          strategy: strategyName,
+          exchangeTradeId: orderId
         }
       });
       
@@ -181,11 +197,17 @@ export class BinanceTestnetEngine implements ExecutionEngine {
       logger.error(`Error placing order with Binance: ${String(error)}`);
       
       // Fall back to simulation
-      return this.fallbackToSimulation(order);
+      return this.fallbackToSimulation(order, undefined, ctx?.botId || this.botId, ctx?.strategyName || this.strategyName);
     }
   }
   
-  private async waitForFill(binanceOrderId: string, originalOrder: Order, maxAttempts = 10): Promise<Fill> {
+  private async waitForFill(
+    binanceOrderId: string, 
+    originalOrder: Order, 
+    botId?: number, 
+    strategyName?: string, 
+    maxAttempts = 10
+  ): Promise<Fill> {
     // Poll for order status
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -255,14 +277,23 @@ export class BinanceTestnetEngine implements ExecutionEngine {
     
     // If we get here, order wasn't filled after max attempts or was rejected
     logger.warn(`Order ${binanceOrderId} not filled after ${maxAttempts} attempts, falling back to simulation`);
-    return this.fallbackToSimulation(originalOrder);
+    return this.fallbackToSimulation(originalOrder, undefined, botId, strategyName);
   }
   
-  private async fallbackToSimulation(order: Order, orderId?: number): Promise<Fill> {
+  private async fallbackToSimulation(
+    order: Order, 
+    orderId?: number, 
+    botId?: number, 
+    strategyName?: string
+  ): Promise<Fill> {
     logger.info(`Falling back to simulation for ${order.side} ${order.qty} ${order.symbol}`);
     
+    // Use provided or default values
+    const finalBotId = botId || this.botId || 1;
+    const finalStrategy = strategyName || this.strategyName || 'default';
+    
     // Look up wallet equity
-    const bot = await prisma.bot.findUnique({ where: { id: this.botId } });
+    const bot = await prisma.bot.findUnique({ where: { id: finalBotId } });
     const equity = bot?.equity ?? 10_000;
     
     // Calculate slippage
@@ -282,7 +313,10 @@ export class BinanceTestnetEngine implements ExecutionEngine {
           qty: order.qty,
           price: order.price,
           type: order.type || 'market',
-          botId: this.botId
+          botId: finalBotId,
+          status: 'filled',
+          exchange: 'binance_sim',
+          clientOrderId: `binsim-${Date.now()}`
         }
       });
       dbOrderId = dbOrder.id;
@@ -301,10 +335,9 @@ export class BinanceTestnetEngine implements ExecutionEngine {
         side: order.side,
         qty: order.qty,
         price: fillPrice,
-        feePaid: fee,
-        pnl: 0,
-        botId: this.botId,
-        externalId: `sim-${Date.now()}`
+        fee: fee,
+        strategy: finalStrategy,
+        exchangeTradeId: `sim-${Date.now()}`
       }
     });
     
