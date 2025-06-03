@@ -14,19 +14,25 @@ const logger = pino.pino({
 
 // Symbol mapping for CoinGecko
 const SYMBOL_MAP: Record<string, string> = {
+  // Standard symbol mappings
   'BTC': 'bitcoin',
   'ETH': 'ethereum',
   'SOL': 'solana',
-  'AVAX': 'avalanche-2'
+  'AVAX': 'avalanche-2',
+  
+  // Full name mappings for convenience
+  'BITCOIN': 'bitcoin',
+  'ETHEREUM': 'ethereum',
+  'SOLANA': 'solana',
+  'AVALANCHE': 'avalanche-2'
 };
 
 // Case-insensitive lookup function for symbol map
 function getGeckoId(symbol: string): string | undefined {
-  // Try direct lookup first (for performance)
-  if (SYMBOL_MAP[symbol]) return SYMBOL_MAP[symbol];
-  
-  // If not found, try case-insensitive lookup
+  // Convert to uppercase for consistent key lookup in SYMBOL_MAP
   const upperSymbol = symbol.toUpperCase();
+  
+  // Look up the symbol in the map
   return SYMBOL_MAP[upperSymbol];
 }
 
@@ -98,7 +104,7 @@ export class CoinGeckoFeed implements DataFeed {
         .filter(id => id !== undefined);
       
       if (geckoIds.length === 0) {
-        logger.warn(`No valid CoinGecko IDs for symbols: ${symbols.join(', ')}`);
+        logger.warn(`No valid CoinGecko IDs found for symbols: ${symbols.join(', ')}. Available mappings are: ${Object.keys(SYMBOL_MAP).join(', ')}`);
         return;
       }
       
