@@ -182,4 +182,25 @@ model OrderBookMetric {
   imbalance Float    // -1 to 1, where 1 is buy pressure
   depth     Int      // number of levels used
   @@index([symbol, ts])
+}
+
+model SymbolRegistry {
+  id         Int      @id @default(autoincrement())
+  symbol     String   @unique
+  assetClass String
+  exchange   String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model EvolutionMetric {
+  id          Int      @id @default(autoincrement())
+  parentId    Int
+  childId     Int
+  sharpe      Float
+  drawdown    Float
+  promoted    Boolean  @default(false)
+  childParams String   // JSON string of parameters
+  createdAt   DateTime @default(now())
 } 
