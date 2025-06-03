@@ -2,7 +2,7 @@ import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
 import { prisma } from '../db.js';
 import { createLogger } from '../utils/logger.js';
-import { registerOnnxModel, promoteOnnxModel } from './modelPromotion.js';
+import { registerOnnxModel, promoteOnnxModel, getActiveModel } from './modelPromotion.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -64,7 +64,7 @@ export async function retrainGatekeeper(options: {
   
   // Create dated model file path
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const modelFileName = options.outputPath || `ml/gatekeeper_${timestamp}.onnx`;
+  const modelFileName = options.outputPath || `ml/gatekeeper_retrained_${timestamp}.onnx`;
   
   // Train the model
   logger.debug(`Training model to ${modelFileName}...`);
@@ -82,15 +82,13 @@ export async function retrainGatekeeper(options: {
     logger.info('Auto-promote enabled, evaluating model performance...');
     
     // Get the current active model
-    const currentModel = await prisma.rLModel.findFirst({
-      where: { version: 'gatekeeper_v1' }
-    });
+    const currentModel = await getActiveModel();
     
     if (!currentModel) {
       // If no current model exists, automatically promote this one
       logger.info('No current active model found, promoting new model');
-      await promoteOnnxModel(newModel.version);
-      return { version: 'gatekeeper_v1', path: modelFileName };
+      await promoteOnnxModel(newModel.id);
+      return { id: newModel.id, path: modelFileName, promoted: true };
     }
     
     // Calculate Sharpe ratios for both models
@@ -102,14 +100,14 @@ export async function retrainGatekeeper(options: {
     // If new model performs better, promote it
     if (newSharpe > currentSharpe) {
       logger.info(`New model outperforms current (${newSharpe.toFixed(4)} > ${currentSharpe.toFixed(4)}), promoting`);
-      await promoteOnnxModel(newModel.version);
-      return { version: 'gatekeeper_v1', path: modelFileName, promoted: true };
+      await promoteOnnxModel(newModel.id);
+      return { id: newModel.id, path: modelFileName, promoted: true };
     } else {
       logger.info(`Current model performs better, keeping it active`);
-      return { version: newModel.version, path: modelFileName, promoted: false };
+      return { id: newModel.id, path: modelFileName, promoted: false };
     }
   }
   
   logger.info('Gatekeeper retraining completed successfully');
-  return { version: newModel.version, path: modelFileName };
+  return { id: newModel.id, path: modelFileName };
 } 

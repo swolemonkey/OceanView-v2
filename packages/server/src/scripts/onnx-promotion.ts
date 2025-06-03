@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import 'dotenv/config';
-import { promoteOnnxModel, registerOnnxModel, getActiveModel, listAllModels } from '../rl/modelPromotion.js';
+import { promoteOnnxModel, registerOnnxModel, getActiveModel, listAllModels, updateModelFilePaths } from '../rl/modelPromotion.js';
 import { prisma } from '../db.js';
 
 // Create a new command program
@@ -18,7 +18,7 @@ interface RegisterOptions {
 }
 
 interface PromoteOptions {
-  version: string;
+  id: string;
 }
 
 // Command to register a new ONNX model
@@ -30,7 +30,8 @@ program
   .action(async (options: RegisterOptions) => {
     try {
       const model = await registerOnnxModel(options.path, options.note);
-      console.log(`Successfully registered model ${model.version} with ID ${model.id}`);
+      console.log(`Successfully registered model with ID ${model.id}, version ${model.version}`);
+      console.log(`Path: ${model.path}`);
       await prisma.$disconnect();
     } catch (error) {
       console.error('Error registering model:', error);
@@ -42,14 +43,14 @@ program
 program
   .command('promote')
   .description('Promote an existing ONNX model to be the active one')
-  .requiredOption('-v, --version <version>', 'Version ID of the model to promote (e.g., gatekeeper_20250602)')
+  .requiredOption('-i, --id <id>', 'ID of the model to promote')
   .action(async (options: PromoteOptions) => {
     try {
-      const result = await promoteOnnxModel(options.version);
+      const result = await promoteOnnxModel(options.id);
       if (result) {
-        console.log(`Successfully promoted model ${options.version} to gatekeeper_v1`);
+        console.log(`Successfully promoted model with ID ${options.id} to primary`);
       } else {
-        console.error(`Failed to promote model ${options.version}`);
+        console.error(`Failed to promote model with ID ${options.id}`);
         process.exit(1);
       }
       await prisma.$disconnect();
@@ -67,11 +68,12 @@ program
     try {
       const models = await listAllModels();
       console.log('ONNX Models:');
-      console.log('---------------------------------------------');
+      console.log('----------------------------------------------------------------');
       console.log('ID | Version | Path | Created At | Description');
-      console.log('---------------------------------------------');
+      console.log('----------------------------------------------------------------');
       models.forEach(model => {
-        console.log(`${model.id} | ${model.version} | ${model.path} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
+        const isPrimary = model.version.includes('primary') ? '(PRIMARY)' : '';
+        console.log(`${model.id} | ${model.version} ${isPrimary} | ${model.path} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
       });
       
       // Get and mark the active model
@@ -110,6 +112,26 @@ program
       await prisma.$disconnect();
     } catch (error) {
       console.error('Error getting active model:', error);
+      process.exit(1);
+    }
+  });
+
+// Command to update model file paths
+program
+  .command('fix-paths')
+  .description('Update file paths for models to match actual files')
+  .action(async () => {
+    try {
+      const result = await updateModelFilePaths();
+      if (result) {
+        console.log('Successfully updated model file paths');
+      } else {
+        console.error('Failed to update model file paths');
+        process.exit(1);
+      }
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error('Error updating file paths:', error);
       process.exit(1);
     }
   });
