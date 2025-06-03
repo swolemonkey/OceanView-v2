@@ -64,7 +64,7 @@ export async function retrainGatekeeper(options: {
   
   // Create dated model file path
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const modelFileName = options.outputPath || `ml/gatekeeper_retrained_${timestamp}.onnx`;
+  const modelFileName = options.outputPath || `ml/gatekeeper_retrain_${timestamp}.onnx`;
   
   // Train the model
   logger.debug(`Training model to ${modelFileName}...`);
@@ -88,7 +88,7 @@ export async function retrainGatekeeper(options: {
       // If no current model exists, automatically promote this one
       logger.info('No current active model found, promoting new model');
       await promoteOnnxModel(newModel.id);
-      return { id: newModel.id, path: modelFileName, promoted: true };
+      return { id: newModel.id, path: newModel.path, promoted: true };
     }
     
     // Calculate Sharpe ratios for both models
@@ -101,13 +101,13 @@ export async function retrainGatekeeper(options: {
     if (newSharpe > currentSharpe) {
       logger.info(`New model outperforms current (${newSharpe.toFixed(4)} > ${currentSharpe.toFixed(4)}), promoting`);
       await promoteOnnxModel(newModel.id);
-      return { id: newModel.id, path: modelFileName, promoted: true };
+      return { id: newModel.id, path: newModel.path, promoted: true };
     } else {
       logger.info(`Current model performs better, keeping it active`);
-      return { id: newModel.id, path: modelFileName, promoted: false };
+      return { id: newModel.id, path: newModel.path, promoted: false };
     }
   }
   
   logger.info('Gatekeeper retraining completed successfully');
-  return { id: newModel.id, path: modelFileName };
+  return { id: newModel.id, path: newModel.path };
 } 

@@ -22,7 +22,7 @@ import { initHealthCheck } from './cron/health-check.js';
 import cron from 'node-cron';
 import { createLogger } from './utils/logger.js';
 import { gate } from './rl/gatekeeper.js';
-import { getActiveModel, registerOnnxModel, updateModelFilePaths } from './rl/modelPromotion.js';
+import { getActiveModel, registerOnnxModel, promoteOnnxModel } from './rl/modelPromotion.js';
 import { retrainGatekeeper } from './rl/retrainJob.js';
 import fs from 'fs';
 import path from 'path';
@@ -40,63 +40,70 @@ process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
 const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
 logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
 
-// Default ONNX model path
-const DEFAULT_MODEL_PATH = 'ml/gatekeeper_v1.onnx';
-
 // Initialize RLModel in the database
 async function initializeRLModel() {
   try {
-    // First, update file paths to ensure they match actual files,
-    // but respect existing paths (only update missing files)
-    await updateModelFilePaths({ respectExistingPaths: true });
-    
-    // Get the active model (the one with version starting with gatekeeper_primary)
+    // Get the active model (the one with primary status)
     const activeModel = await getActiveModel();
     
-    // If no active model exists, initialize with the default v1 model
+    // If no active model exists, initialize with the default model
     if (!activeModel) {
       // Check if default model file exists
-      if (!fs.existsSync(DEFAULT_MODEL_PATH)) {
-        logger.error(`Default model file ${DEFAULT_MODEL_PATH} not found`);
-        throw new Error(`Default model file ${DEFAULT_MODEL_PATH} not found`);
+      const defaultModelPath = 'ml/gatekeeper_v1.onnx';
+      if (!fs.existsSync(defaultModelPath)) {
+        logger.error(`Default model file ${defaultModelPath} not found`);
+        throw new Error(`Default model file ${defaultModelPath} not found`);
       }
       
       // Create initial model entry
       const newModel = await registerOnnxModel(
-        DEFAULT_MODEL_PATH,
+        defaultModelPath,
         'Initial baseline gatekeeper model'
       );
       
-      // Promote it to be the active model (this will rename it to gatekeeper_primary{id})
-      await prisma.rLModel.update({
-        where: { id: newModel.id },
-        data: { version: `gatekeeper_primary${newModel.id}` }
-      });
+      // Promote it to be the active model
+      await promoteOnnxModel(newModel.id);
       
-      logger.info(`Gatekeeper initialized with default model ${DEFAULT_MODEL_PATH}`);
+      logger.info(`Gatekeeper initialized with default model ${newModel.path}`);
       
       // Initialize the model
-      await gate.init(DEFAULT_MODEL_PATH);
+      await gate.init(newModel.path);
     } else {
       logger.info(`Gatekeeper using existing model ${activeModel.path}`);
       
-      // If USE_V2_MODEL is set, force using v2 model
-      if (process.env.USE_V2_MODEL === 'true') {
-        const v2Path = 'ml/gatekeeper_v2.onnx';
-        if (fs.existsSync(v2Path)) {
-          logger.info(`USE_V2_MODEL is set, forcing use of ${v2Path}`);
-          await gate.init(v2Path);
-          return;
-        } else {
-          logger.error(`USE_V2_MODEL is set but ${v2Path} not found`);
-        }
-      }
-      
       // Check if the model file exists
       if (!fs.existsSync(activeModel.path)) {
-        logger.error(`Model file ${activeModel.path} not found, falling back to default`);
-        // Fall back to default if the file doesn't exist
-        await gate.init(DEFAULT_MODEL_PATH);
+        logger.error(`Model file ${activeModel.path} not found, looking for fallbacks`);
+        
+        // Look for fallback files in the ml directory
+        const fallbacks = [
+          'ml/gatekeeper_v1.onnx',
+          `ml/gatekeeper_${activeModel.id}.onnx`,
+          'ml/gatekeeper_v2.onnx'
+        ];
+        
+        let fallbackFound = false;
+        for (const fallback of fallbacks) {
+          if (fs.existsSync(fallback)) {
+            logger.info(`Using fallback model file: ${fallback}`);
+            
+            // Update the database entry to point to the found file
+            await prisma.rLModel.update({
+              where: { id: activeModel.id },
+              data: { path: fallback }
+            });
+            
+            // Initialize with the fallback file
+            await gate.init(fallback);
+            fallbackFound = true;
+            break;
+          }
+        }
+        
+        if (!fallbackFound) {
+          logger.error('No fallback model files found, cannot continue');
+          throw new Error('No valid model files found');
+        }
       } else {
         // Initialize the model with the path from the database
         await gate.init(activeModel.path);
@@ -197,7 +204,7 @@ cron.schedule('0 2 * * 1', async () => {
     // Retrain with auto-promotion enabled
     const result = await retrainGatekeeper({ autoPromote: true });
     if (result.promoted) {
-      logger.info(`Weekly model retraining completed - Promoted new model ID ${result.id} to primary`);
+      logger.info(`Weekly model retraining completed - Promoted new model to active`);
     } else {
       logger.info(`Weekly model retraining completed - Current model retained`);
     }

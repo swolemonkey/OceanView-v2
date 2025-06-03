@@ -5,63 +5,127 @@ import path from 'path';
 
 const logger = createLogger('modelPromotion');
 
-// Constants
-const PRIMARY_MODEL_PREFIX = 'gatekeeper_primary';
-const MODEL_PREFIX = 'gatekeeper_';
-const ML_DIR = 'ml';
+/**
+ * Get the primary model identifier for a given model ID
+ * @param id Model ID from the database
+ * @returns The primary model identifier string
+ */
+function getPrimaryName(id: number): string {
+  return `gatekeeper_primary${id}`;
+}
 
 /**
- * Promotes a new ONNX model to be the active gatekeeper
- * This implements the "promotion" approach where we keep the old row and rename the new one
+ * Get the standard model identifier for a given model ID
+ * @param id Model ID from the database
+ * @returns The standard model identifier string
+ */
+function getStandardName(id: number): string {
+  return `gatekeeper_${id}`;
+}
+
+/**
+ * Rename a physical ONNX model file to match its new version identifier
+ * @param oldPath Original file path
+ * @param newVersionName New version name to use in the file name
+ * @returns Promise that resolves with the new file path
+ */
+async function renameModelFile(oldPath: string, newVersionName: string): Promise<string> {
+  try {
+    // Get the directory and extension
+    const dir = path.dirname(oldPath);
+    const ext = path.extname(oldPath);
+    
+    // Create the new file path
+    const newPath = path.join(dir, `${newVersionName}${ext}`);
+    
+    // Skip if the paths are the same
+    if (oldPath === newPath) {
+      return oldPath;
+    }
+    
+    // Check if old file exists
+    if (!fs.existsSync(oldPath)) {
+      logger.error(`File not found: ${oldPath}`);
+      return oldPath; // Return old path without attempting rename
+    }
+    
+    // Rename the file
+    fs.copyFileSync(oldPath, newPath);
+    logger.info(`Copied model file from ${oldPath} to ${newPath}`);
+    
+    return newPath;
+  } catch (error) {
+    logger.error('Error renaming model file:', { error, oldPath });
+    return oldPath; // Return old path on error
+  }
+}
+
+/**
+ * Promotes a model to be the active gatekeeper
+ * This updates the database and renames the model files to follow the new naming convention
  * 
- * @param modelId ID of the model to promote
+ * @param modelId ID of the model to promote in the database
  * @returns Promise that resolves when the promotion is complete
  */
-export async function promoteOnnxModel(modelId: string | number): Promise<boolean> {
-  const id = typeof modelId === 'string' ? parseInt(modelId, 10) : modelId;
-  
-  if (isNaN(id)) {
-    logger.error(`Invalid model ID: ${modelId}`);
-    return false;
-  }
-  
-  logger.info(`Attempting to promote model ID ${id} to primary`);
+export async function promoteOnnxModel(modelId: number): Promise<boolean> {
+  logger.info(`Attempting to promote model ID ${modelId} to primary status`);
   
   try {
     // Find the model to promote
     const modelToPromote = await prisma.rLModel.findUnique({
-      where: { id }
+      where: { id: modelId }
     });
     
     if (!modelToPromote) {
-      logger.error(`Model with ID ${id} not found in database`);
+      logger.error(`Model ID ${modelId} not found in database`);
       return false;
     }
     
     // Find the current primary model
-    const currentPrimary = await prisma.rLModel.findFirst({
-      where: { version: { startsWith: PRIMARY_MODEL_PREFIX } }
+    const currentModels = await prisma.rLModel.findMany({
+      where: { 
+        version: { 
+          startsWith: 'gatekeeper_primary' 
+        } 
+      }
     });
     
-    // If there is a current primary model, rename it
-    if (currentPrimary) {
-      const oldVersionName = `${MODEL_PREFIX}${currentPrimary.id}`;
-      logger.info(`Demoting current primary model (ID: ${currentPrimary.id}) to ${oldVersionName}`);
+    // Demote all current primary models (should only be one, but handle multiple for safety)
+    for (const model of currentModels) {
+      // Generate the new standard name for this model
+      const newVersion = getStandardName(model.id);
       
+      // Generate and use new file path
+      const newPath = await renameModelFile(model.path, newVersion);
+      
+      // Update the database entry
       await prisma.rLModel.update({
-        where: { id: currentPrimary.id },
-        data: { version: oldVersionName }
+        where: { id: model.id },
+        data: { 
+          version: newVersion,
+          path: newPath
+        }
       });
+      
+      logger.info(`Demoted primary model ${model.id} to ${newVersion}`);
     }
     
+    // Generate the new primary name for the model to promote
+    const newPrimaryVersion = getPrimaryName(modelId);
+    
+    // Generate and use new file path
+    const newPrimaryPath = await renameModelFile(modelToPromote.path, newPrimaryVersion);
+    
     // Promote the new model
-    const newPrimaryVersion = `${PRIMARY_MODEL_PREFIX}${id}`;
     await prisma.rLModel.update({
-      where: { id },
-      data: { version: newPrimaryVersion }
+      where: { id: modelId },
+      data: { 
+        version: newPrimaryVersion,
+        path: newPrimaryPath
+      }
     });
     
-    logger.info(`Successfully promoted model ID ${id} to primary as ${newPrimaryVersion}`);
+    logger.info(`Successfully promoted model ${modelId} to ${newPrimaryVersion}`);
     return true;
   } catch (error) {
     logger.error('Error promoting ONNX model:', { error });
@@ -70,49 +134,41 @@ export async function promoteOnnxModel(modelId: string | number): Promise<boolea
 }
 
 /**
- * Inserts a new ONNX model into the database
- * @param filepath Path to the ONNX model file (either full path or relative to ml directory)
+ * Inserts a new ONNX model into the database and renames the file to follow the convention
+ * @param filePath Path to the ONNX model file
  * @param note Description of the model
  * @returns Promise that resolves with the created model record
  */
-export async function registerOnnxModel(filepath: string, note: string = 'New ONNX model'): Promise<any> {
+export async function registerOnnxModel(filePath: string, note: string = 'New ONNX model'): Promise<any> {
+  logger.info(`Registering new ONNX model: ${filePath}`);
+  
   try {
-    // Get just the filename if a path is provided
-    const filename = path.basename(filepath);
-    
-    // Make sure path starts with ml/ for consistency
-    const dbPath = filepath.startsWith(`${ML_DIR}/`) ? filepath : `${ML_DIR}/${filename}`;
-    
-    // Ensure the file exists
-    const fullPath = path.resolve(process.cwd(), dbPath);
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`File not found: ${fullPath}`);
-    }
-    
-    // Create the model record
+    // First create the database entry to get an ID
     const model = await prisma.rLModel.create({
       data: {
-        version: '', // Temporary placeholder, will be updated after we know the ID
-        path: dbPath,
+        // Use a temporary version that will be updated
+        version: 'gatekeeper_temp',
+        path: filePath,
         description: note,
         createdAt: new Date()
       }
     });
     
-    // Update the version with the ID-based naming
-    const versionName = `${MODEL_PREFIX}${model.id}`;
+    // Now that we have an ID, generate the proper version and path
+    const standardVersion = getStandardName(model.id);
+    const standardPath = await renameModelFile(filePath, standardVersion);
     
-    await prisma.rLModel.update({
+    // Update the entry with the proper version and path
+    const updatedModel = await prisma.rLModel.update({
       where: { id: model.id },
-      data: { version: versionName }
+      data: {
+        version: standardVersion,
+        path: standardPath
+      }
     });
     
-    logger.info(`Successfully registered model as ${versionName} with path ${dbPath}`);
-    
-    // Return the updated model
-    return await prisma.rLModel.findUnique({
-      where: { id: model.id }
-    });
+    logger.info(`Successfully registered model ${standardVersion}`);
+    return updatedModel;
   } catch (error) {
     logger.error('Error registering ONNX model:', { error });
     throw error;
@@ -125,7 +181,11 @@ export async function registerOnnxModel(filepath: string, note: string = 'New ON
  */
 export async function getActiveModel(): Promise<any> {
   return prisma.rLModel.findFirst({
-    where: { version: { startsWith: PRIMARY_MODEL_PREFIX } }
+    where: { 
+      version: { 
+        startsWith: 'gatekeeper_primary' 
+      } 
+    }
   });
 }
 
@@ -137,56 +197,4 @@ export async function listAllModels(): Promise<any[]> {
   return prisma.rLModel.findMany({
     orderBy: { createdAt: 'desc' }
   });
-}
-
-/**
- * Updates file paths for existing models to ensure they match the actual files
- * @param options Configuration options
- * @returns Promise that resolves when the update is complete
- */
-export async function updateModelFilePaths(options: { respectExistingPaths?: boolean } = {}): Promise<boolean> {
-  // Default to respecting existing paths - only change if file doesn't exist
-  const respectExistingPaths = options.respectExistingPaths !== false;
-  
-  try {
-    const models = await listAllModels();
-    
-    for (const model of models) {
-      // Check if file exists at current path
-      const fullPath = path.resolve(process.cwd(), model.path);
-      
-      // If the file exists and we're respecting existing paths, skip this model
-      if (respectExistingPaths && fs.existsSync(fullPath)) {
-        continue;
-      }
-      
-      // If file doesn't exist at the specified path, try to find it
-      if (!fs.existsSync(fullPath)) {
-        // Try to find the file with a different naming pattern
-        const alternateNames = [
-          `${ML_DIR}/gatekeeper_v1.onnx`,
-          `${ML_DIR}/gatekeeper_v2.onnx`,
-          `${ML_DIR}/gatekeeper_${model.id}.onnx`,
-          `${ML_DIR}/gatekeeper_primary${model.id}.onnx`
-        ];
-        
-        for (const altPath of alternateNames) {
-          const altFullPath = path.resolve(process.cwd(), altPath);
-          if (fs.existsSync(altFullPath)) {
-            logger.info(`Updating path for model ${model.id} from ${model.path} to ${altPath}`);
-            await prisma.rLModel.update({
-              where: { id: model.id },
-              data: { path: altPath }
-            });
-            break;
-          }
-        }
-      }
-    }
-    
-    return true;
-  } catch (error) {
-    logger.error('Error updating model file paths:', { error });
-    return false;
-  }
 } 

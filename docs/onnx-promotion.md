@@ -9,7 +9,16 @@ The ONNX model promotion system allows for:
 1. **Tracking multiple model versions**: Every ONNX model is registered in the database with a unique ID.
 2. **Seamless promotion**: Models can be promoted to be the active production model without code changes or redeployments.
 3. **Automatic evaluation**: Weekly retraining includes automatic evaluation and promotion of better-performing models.
-4. **Fallback safety**: If a model file is missing, the system falls back to a default model.
+4. **Fallback safety**: If a model file is missing, the system falls back to a valid model file.
+
+## Naming Convention
+
+The system uses a consistent naming convention for models:
+
+- **Primary (active) models**: `gatekeeper_primary{ID}` (e.g., `gatekeeper_primary2`)
+- **Standard models**: `gatekeeper_{ID}` (e.g., `gatekeeper_1`)
+
+This convention applies to both the database records and the physical files.
 
 ## How It Works
 
@@ -17,15 +26,7 @@ The system uses the database as the single source of truth for determining which
 
 1. The server looks for a row in the `RLModel` table with a version that starts with `gatekeeper_primary`.
 2. It loads the model file specified in the `path` column of that row.
-3. To promote a new model, we simply update which row has the `gatekeeper_primary` prefix.
-
-## Model States
-
-Models follow a consistent naming convention:
-
-- `gatekeeper_primary{ID}`: The active production model that is loaded on server startup.
-- `gatekeeper_{ID}`: Normal models that are not active.
-- Each model has a numeric ID that is included in its version name for easy reference.
+3. To promote a new model, we update its version to use the primary naming convention, and we update the previously primary model to use the standard naming convention.
 
 ## Promotion Methods
 
@@ -49,13 +50,10 @@ pnpm tsx packages/server/src/scripts/onnx-promotion.ts list
 pnpm tsx packages/server/src/scripts/onnx-promotion.ts register -p "path/to/model.onnx" -n "Description"
 
 # Promote a model by ID
-pnpm tsx packages/server/src/scripts/onnx-promotion.ts promote -i "2"
+pnpm tsx packages/server/src/scripts/onnx-promotion.ts promote -i 2
 
 # Check active model
 pnpm tsx packages/server/src/scripts/onnx-promotion.ts active
-
-# Fix file paths if needed
-pnpm tsx packages/server/src/scripts/onnx-promotion.ts fix-paths
 ```
 
 For convenience, a script is provided to register and promote the v2 model:
@@ -64,12 +62,25 @@ For convenience, a script is provided to register and promote the v2 model:
 ./promote-v2.sh
 ```
 
+## Migration to New Naming Convention
+
+If you have models that use the old naming convention, you can migrate them to the new convention using:
+
+```bash
+pnpm tsx packages/server/src/scripts/onnx-promotion.ts migrate-naming
+```
+
+This will:
+1. Rename physical model files to match the new convention
+2. Update database records to use the new convention
+3. Keep the primary model status unchanged
+
 ## Database Schema
 
 The system uses the `RLModel` table with these columns:
 
-- `id`: Auto-incremented ID (also used in the version naming)
-- `version`: Unique identifier string (e.g., "gatekeeper_primary1" or "gatekeeper_2")
+- `id`: Auto-incremented ID
+- `version`: Model identifier following the naming convention (`gatekeeper_primary{ID}` or `gatekeeper_{ID}`)
 - `path`: File path to the ONNX model
 - `description`: Optional description
 - `createdAt`: Timestamp of model creation
@@ -79,30 +90,13 @@ The system uses the `RLModel` table with these columns:
 1. **Always register new models** before promotion to keep track of all available models.
 2. **Keep old models** on disk as a fallback if newer models have issues.
 3. **Monitor performance** after promotion to ensure the new model behaves as expected.
-4. **Use fix-paths command** if file paths in the database don't match actual files.
+4. **Use the CLI tools** for managing models to ensure naming convention is followed.
 
 ## Troubleshooting
 
 If the server fails to load a model:
 
-1. Run the `fix-paths` command to update file paths in the database:
-   ```bash
-   pnpm tsx packages/server/src/scripts/onnx-promotion.ts fix-paths
-   ```
-
-2. Check if the file exists at the specified path.
-
-3. Verify the active model by running:
-   ```bash
-   pnpm tsx packages/server/src/scripts/onnx-promotion.ts active
-   ```
-
-4. If necessary, promote a different model that is known to work.
-
-## Restart Required
-
-After promoting a model, you need to restart the server for changes to take effect:
-
-```bash
-pm2 restart all
-``` 
+1. Check if the file exists at the specified path.
+2. Verify the active model by running `pnpm tsx packages/server/src/scripts/onnx-promotion.ts active`.
+3. The system will try several fallback files if the primary file is not found.
+4. If necessary, promote a different model that is known to work. 

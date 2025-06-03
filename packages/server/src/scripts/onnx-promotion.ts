@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import 'dotenv/config';
-import { promoteOnnxModel, registerOnnxModel, getActiveModel, listAllModels, updateModelFilePaths } from '../rl/modelPromotion.js';
+import { promoteOnnxModel, registerOnnxModel, getActiveModel, listAllModels } from '../rl/modelPromotion.js';
 import { prisma } from '../db.js';
 
 // Create a new command program
@@ -30,7 +30,8 @@ program
   .action(async (options: RegisterOptions) => {
     try {
       const model = await registerOnnxModel(options.path, options.note);
-      console.log(`Successfully registered model with ID ${model.id}, version ${model.version}`);
+      console.log(`Successfully registered model with ID ${model.id}`);
+      console.log(`Version: ${model.version}`);
       console.log(`Path: ${model.path}`);
       await prisma.$disconnect();
     } catch (error) {
@@ -46,11 +47,17 @@ program
   .requiredOption('-i, --id <id>', 'ID of the model to promote')
   .action(async (options: PromoteOptions) => {
     try {
-      const result = await promoteOnnxModel(options.id);
+      const modelId = parseInt(options.id, 10);
+      if (isNaN(modelId)) {
+        console.error('Invalid model ID. Please provide a valid number.');
+        process.exit(1);
+      }
+      
+      const result = await promoteOnnxModel(modelId);
       if (result) {
-        console.log(`Successfully promoted model with ID ${options.id} to primary`);
+        console.log(`Successfully promoted model with ID ${modelId} to primary status`);
       } else {
-        console.error(`Failed to promote model with ID ${options.id}`);
+        console.error(`Failed to promote model with ID ${modelId}`);
         process.exit(1);
       }
       await prisma.$disconnect();
@@ -68,19 +75,23 @@ program
     try {
       const models = await listAllModels();
       console.log('ONNX Models:');
-      console.log('----------------------------------------------------------------');
+      console.log('---------------------------------------------');
       console.log('ID | Version | Path | Created At | Description');
-      console.log('----------------------------------------------------------------');
+      console.log('---------------------------------------------');
       models.forEach(model => {
-        const isPrimary = model.version.includes('primary') ? '(PRIMARY)' : '';
-        console.log(`${model.id} | ${model.version} ${isPrimary} | ${model.path} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
+        const isPrimary = model.version.startsWith('gatekeeper_primary') ? '* ' : '  ';
+        console.log(`${isPrimary}${model.id} | ${model.version} | ${model.path} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
       });
       
       // Get and mark the active model
       const activeModel = await getActiveModel();
       if (activeModel) {
-        console.log('\nActive model:');
-        console.log(`${activeModel.id} | ${activeModel.version} | ${activeModel.path} | ${activeModel.createdAt.toISOString()} | ${activeModel.description || ''}`);
+        console.log('\nActive (primary) model:');
+        console.log(`ID: ${activeModel.id}`);
+        console.log(`Version: ${activeModel.version}`);
+        console.log(`Path: ${activeModel.path}`);
+        console.log(`Created At: ${activeModel.createdAt.toISOString()}`);
+        console.log(`Description: ${activeModel.description || ''}`);
       } else {
         console.log('\nNo active model found');
       }
@@ -116,22 +127,74 @@ program
     }
   });
 
-// Command to update model file paths
+// Command to rename all existing models to follow the new convention
 program
-  .command('fix-paths')
-  .description('Update file paths for models to match actual files')
+  .command('migrate-naming')
+  .description('Migrate all existing models to the new naming convention')
   .action(async () => {
     try {
-      const result = await updateModelFilePaths();
-      if (result) {
-        console.log('Successfully updated model file paths');
-      } else {
-        console.error('Failed to update model file paths');
-        process.exit(1);
+      const models = await listAllModels();
+      console.log('Starting migration of model naming convention...');
+      
+      for (const model of models) {
+        // Skip models that already follow the convention
+        if (model.version.startsWith('gatekeeper_primary') || 
+            model.version === `gatekeeper_${model.id}`) {
+          console.log(`Model ${model.id} already follows the naming convention: ${model.version}`);
+          continue;
+        }
+        
+        // Determine if this is the primary model
+        const isPrimary = model.version === 'gatekeeper_v1';
+        const newVersion = isPrimary ? `gatekeeper_primary${model.id}` : `gatekeeper_${model.id}`;
+        
+        // Get directory and extension for the path
+        const pathParts = model.path.split('/');
+        const filename = pathParts.pop();
+        const dir = pathParts.join('/');
+        const ext = filename?.includes('.') ? filename.substring(filename.lastIndexOf('.')) : '';
+        
+        // Create the new path
+        const newPath = `${dir}/${newVersion}${ext}`;
+        
+        console.log(`Migrating model ${model.id}:`);
+        console.log(`  From: ${model.version} (${model.path})`);
+        console.log(`  To:   ${newVersion} (${newPath})`);
+        
+        try {
+          // Rename the file if it exists
+          const fs = await import('fs');
+          if (fs.existsSync(model.path)) {
+            fs.copyFileSync(model.path, newPath);
+            console.log(`  File copied from ${model.path} to ${newPath}`);
+          } else {
+            console.log(`  Warning: Source file ${model.path} not found, only updating database`);
+          }
+        } catch (fileError) {
+          console.error(`  Error copying file: ${fileError}`);
+        }
+        
+        // Update the database entry
+        await prisma.rLModel.update({
+          where: { id: model.id },
+          data: {
+            version: newVersion,
+            path: newPath
+          }
+        });
+        
+        console.log(`  Database updated for model ${model.id}`);
       }
+      
+      console.log('\nMigration complete. New model listing:');
+      const updatedModels = await listAllModels();
+      updatedModels.forEach(model => {
+        console.log(`${model.id} | ${model.version} | ${model.path}`);
+      });
+      
       await prisma.$disconnect();
     } catch (error) {
-      console.error('Error updating file paths:', error);
+      console.error('Error during migration:', error);
       process.exit(1);
     }
   });
