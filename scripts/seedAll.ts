@@ -77,16 +77,16 @@ async function main() {
         }
       }),
       
-      // RLModel - gatekeeper_v1
+      // RLModel - gatekeeper_primary8
       prisma.rLModel.upsert({
-        where: { version: "gatekeeper_v1" },
+        where: { version: "gatekeeper_primary8" },
         update: {
-          path: "ml/gatekeeper_v1.onnx",
+          path: "ml/gatekeeper_primary8.onnx",
           description: "Baseline gatekeeper model"
         },
         create: {
-          version: "gatekeeper_v1",
-          path: "ml/gatekeeper_v1.onnx",
+          version: "gatekeeper_primary8",
+          path: "ml/gatekeeper_primary8.onnx",
           description: "Baseline gatekeeper model"
         }
       }),
