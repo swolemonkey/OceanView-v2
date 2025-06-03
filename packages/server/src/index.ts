@@ -46,8 +46,9 @@ const DEFAULT_MODEL_PATH = 'ml/gatekeeper_v1.onnx';
 // Initialize RLModel in the database
 async function initializeRLModel() {
   try {
-    // First, update file paths to ensure they match actual files
-    await updateModelFilePaths();
+    // First, update file paths to ensure they match actual files,
+    // but respect existing paths (only update missing files)
+    await updateModelFilePaths({ respectExistingPaths: true });
     
     // Get the active model (the one with version starting with gatekeeper_primary)
     const activeModel = await getActiveModel();
@@ -78,6 +79,18 @@ async function initializeRLModel() {
       await gate.init(DEFAULT_MODEL_PATH);
     } else {
       logger.info(`Gatekeeper using existing model ${activeModel.path}`);
+      
+      // If USE_V2_MODEL is set, force using v2 model
+      if (process.env.USE_V2_MODEL === 'true') {
+        const v2Path = 'ml/gatekeeper_v2.onnx';
+        if (fs.existsSync(v2Path)) {
+          logger.info(`USE_V2_MODEL is set, forcing use of ${v2Path}`);
+          await gate.init(v2Path);
+          return;
+        } else {
+          logger.error(`USE_V2_MODEL is set but ${v2Path} not found`);
+        }
+      }
       
       // Check if the model file exists
       if (!fs.existsSync(activeModel.path)) {

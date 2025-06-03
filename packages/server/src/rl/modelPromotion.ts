@@ -141,18 +141,28 @@ export async function listAllModels(): Promise<any[]> {
 
 /**
  * Updates file paths for existing models to ensure they match the actual files
+ * @param options Configuration options
  * @returns Promise that resolves when the update is complete
  */
-export async function updateModelFilePaths(): Promise<boolean> {
+export async function updateModelFilePaths(options: { respectExistingPaths?: boolean } = {}): Promise<boolean> {
+  // Default to respecting existing paths - only change if file doesn't exist
+  const respectExistingPaths = options.respectExistingPaths !== false;
+  
   try {
     const models = await listAllModels();
     
     for (const model of models) {
-      // Check if file exists
+      // Check if file exists at current path
       const fullPath = path.resolve(process.cwd(), model.path);
+      
+      // If the file exists and we're respecting existing paths, skip this model
+      if (respectExistingPaths && fs.existsSync(fullPath)) {
+        continue;
+      }
+      
+      // If file doesn't exist at the specified path, try to find it
       if (!fs.existsSync(fullPath)) {
         // Try to find the file with a different naming pattern
-        const filename = path.basename(model.path);
         const alternateNames = [
           `${ML_DIR}/gatekeeper_v1.onnx`,
           `${ML_DIR}/gatekeeper_v2.onnx`,
