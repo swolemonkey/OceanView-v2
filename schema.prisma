@@ -200,6 +200,7 @@ model Order {
 model Trade {
   id              Int      @id @default(autoincrement())
   orderId         Int
+  order           Order    @relation(fields: [orderId], references: [id])
   symbol          String
   side            String
   qty             Float
@@ -208,5 +209,14 @@ model Trade {
   ts              DateTime @default(now())
   exchangeTradeId String?
   strategy        String?
-  order           Order    @relation(fields: [orderId], references: [id])
+}
+
+model price1m {
+  id       Int      @id @default(autoincrement())
+  ts       DateTime @map("ts")
+  symbol   String
+  usd      Float
+  
+  @@unique([symbol, ts], name: "symbol_ts")
+  @@index([symbol, ts])
 }

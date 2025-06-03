@@ -250,9 +250,20 @@ export async function pollAndStore(){
     // 3) write 1-min candle stub → DB (merge later)
     // @ts-ignore - Working with mock Prisma client
     await prisma.price1m.upsert({
-      where:{ symbol_timestamp:{symbol:id,timestamp:ts}},
-      update:{ close: price },
-      create:{ symbol:id, timestamp:ts, open:price, high:price, low:price, close:price, volume:0 }
+      where: { 
+        symbol_ts: {
+          symbol: id,
+          ts: ts
+        }
+      },
+      update: { 
+        usd: price 
+      },
+      create: { 
+        symbol: id, 
+        ts: ts, 
+        usd: price 
+      }
     });
   }
   
