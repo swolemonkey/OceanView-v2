@@ -3,6 +3,19 @@ import { Command } from 'commander';
 import 'dotenv/config';
 import { promoteOnnxModel, registerOnnxModel, getActiveModel, listAllModels } from '../rl/modelPromotion.js';
 import { prisma } from '../db.js';
+import path from 'path';
+import fs from 'fs';
+
+// Helper function to resolve paths
+function resolveProjectPath(filePath: string): string {
+  // If it's already an absolute path, return it
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  
+  // Try to resolve from project root
+  return path.resolve(process.cwd(), '..', '..', filePath);
+}
 
 // Create a new command program
 const program = new Command();
@@ -29,7 +42,16 @@ program
   .option('-n, --note <note>', 'Description of the model', 'Manual registration')
   .action(async (options: RegisterOptions) => {
     try {
-      const model = await registerOnnxModel(options.path, options.note);
+      // Resolve the path to absolute
+      const absolutePath = resolveProjectPath(options.path);
+      
+      // Check if file exists
+      if (!fs.existsSync(absolutePath)) {
+        console.error(`Error: Model file not found at ${absolutePath}`);
+        process.exit(1);
+      }
+      
+      const model = await registerOnnxModel(absolutePath, options.note);
       console.log(`Successfully registered model with ID ${model.id}`);
       console.log(`Version: ${model.version}`);
       console.log(`Path: ${model.path}`);
@@ -80,7 +102,9 @@ program
       console.log('---------------------------------------------');
       models.forEach(model => {
         const isPrimary = model.version.startsWith('gatekeeper_primary') ? '* ' : '  ';
-        console.log(`${isPrimary}${model.id} | ${model.version} | ${model.path} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
+        // Check if file exists
+        const fileExists = fs.existsSync(resolveProjectPath(model.path)) ? '✓' : '✗';
+        console.log(`${isPrimary}${model.id} | ${model.version} | ${model.path} ${fileExists} | ${model.createdAt.toISOString()} | ${model.description || ''}`);
       });
       
       // Get and mark the active model
@@ -90,6 +114,8 @@ program
         console.log(`ID: ${activeModel.id}`);
         console.log(`Version: ${activeModel.version}`);
         console.log(`Path: ${activeModel.path}`);
+        const fileExists = fs.existsSync(resolveProjectPath(activeModel.path)) ? 'File exists' : 'File missing';
+        console.log(`Status: ${fileExists}`);
         console.log(`Created At: ${activeModel.createdAt.toISOString()}`);
         console.log(`Description: ${activeModel.description || ''}`);
       } else {
@@ -115,6 +141,8 @@ program
         console.log(`ID: ${activeModel.id}`);
         console.log(`Version: ${activeModel.version}`);
         console.log(`Path: ${activeModel.path}`);
+        const fileExists = fs.existsSync(resolveProjectPath(activeModel.path)) ? 'File exists' : 'File missing';
+        console.log(`Status: ${fileExists}`);
         console.log(`Created At: ${activeModel.createdAt.toISOString()}`);
         console.log(`Description: ${activeModel.description || ''}`);
       } else {
@@ -149,7 +177,8 @@ program
         const newVersion = isPrimary ? `gatekeeper_primary${model.id}` : `gatekeeper_${model.id}`;
         
         // Get directory and extension for the path
-        const pathParts = model.path.split('/');
+        const absolutePath = resolveProjectPath(model.path);
+        const pathParts = absolutePath.split('/');
         const filename = pathParts.pop();
         const dir = pathParts.join('/');
         const ext = filename?.includes('.') ? filename.substring(filename.lastIndexOf('.')) : '';
@@ -163,12 +192,11 @@ program
         
         try {
           // Rename the file if it exists
-          const fs = await import('fs');
-          if (fs.existsSync(model.path)) {
-            fs.copyFileSync(model.path, newPath);
-            console.log(`  File copied from ${model.path} to ${newPath}`);
+          if (fs.existsSync(absolutePath)) {
+            fs.copyFileSync(absolutePath, newPath);
+            console.log(`  File copied from ${absolutePath} to ${newPath}`);
           } else {
-            console.log(`  Warning: Source file ${model.path} not found, only updating database`);
+            console.log(`  Warning: Source file ${absolutePath} not found, only updating database`);
           }
         } catch (fileError) {
           console.error(`  Error copying file: ${fileError}`);
@@ -189,7 +217,8 @@ program
       console.log('\nMigration complete. New model listing:');
       const updatedModels = await listAllModels();
       updatedModels.forEach(model => {
-        console.log(`${model.id} | ${model.version} | ${model.path}`);
+        const fileExists = fs.existsSync(resolveProjectPath(model.path)) ? '✓' : '✗';
+        console.log(`${model.id} | ${model.version} | ${model.path} ${fileExists}`);
       });
       
       await prisma.$disconnect();

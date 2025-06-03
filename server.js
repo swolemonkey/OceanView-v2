@@ -4,8 +4,10 @@ import { createServer } from 'http';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { run_bot } from './packages/server/.build/src/agent.js';
-import { pollAndStore } from './packages/server/.build/src/services/marketData.js';
+import { run_bot } from './packages/server/dist/src/agent.js';
+import { pollAndStore } from './packages/server/dist/src/services/marketData.js';
+import { getActiveModel } from './packages/server/dist/src/rl/modelPromotion.js';
+import { gate } from './packages/server/dist/src/rl/gatekeeper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -46,9 +48,31 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, 'packages/ui/dist/index.html'));
 });
 
+// Initialize the Gatekeeper model
+async function initializeGatekeeper() {
+  try {
+    console.log('Initializing Gatekeeper model...');
+    const activeModel = await getActiveModel();
+    
+    if (activeModel) {
+      console.log(`Loading active model: ${activeModel.version}`);
+      console.log(`Model path: ${activeModel.path}`);
+      await gate.init(activeModel.path);
+      console.log('Gatekeeper model initialized successfully');
+    } else {
+      console.log('No active model found in database');
+    }
+  } catch (error) {
+    console.error('Error initializing Gatekeeper:', error);
+  }
+}
+
 // Start the server
 server.listen(PORT, HOST, async () => {
   console.log(`Server running at http://${HOST}:${PORT}`);
+  
+  // Initialize the Gatekeeper model
+  await initializeGatekeeper();
   
   // Start market data polling
   console.log('Starting market data polling...');

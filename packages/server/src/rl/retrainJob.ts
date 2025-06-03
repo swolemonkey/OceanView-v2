@@ -9,6 +9,17 @@ import fs from 'fs';
 const exec = promisify(execCallback);
 const logger = createLogger('gatekeeper');
 
+// Helper function to resolve paths
+function resolveProjectPath(relativePath: string): string {
+  // If it's already an absolute path, return it
+  if (path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+  
+  // Try to resolve from project root
+  return path.resolve(process.cwd(), '..', '..', relativePath);
+}
+
 /**
  * Calculate Sharpe ratio based on model's predictions and outcomes
  * @param modelId The ID of the model to evaluate
@@ -64,16 +75,17 @@ export async function retrainGatekeeper(options: {
   
   // Create dated model file path
   const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const modelFileName = options.outputPath || `ml/gatekeeper_retrain_${timestamp}.onnx`;
+  const relativeModelPath = options.outputPath || `ml/gatekeeper_retrain_${timestamp}.onnx`;
+  const absoluteModelPath = resolveProjectPath(relativeModelPath);
   
   // Train the model
-  logger.debug(`Training model to ${modelFileName}...`);
-  await exec(`python ml/train_gatekeeper.py --output ${modelFileName}`);
+  logger.debug(`Training model to ${absoluteModelPath}...`);
+  await exec(`python ml/train_gatekeeper.py --output ${absoluteModelPath}`);
   
   // Register the model in the database
   logger.debug('Registering new model...');
   const newModel = await registerOnnxModel(
-    modelFileName,
+    absoluteModelPath,
     `Auto-retrained model ${timestamp}`
   );
   

@@ -6,6 +6,21 @@ import path from 'path';
 const logger = createLogger('modelPromotion');
 
 /**
+ * Resolve a path to be absolute if it's not already
+ * @param filePath Path to resolve
+ * @returns Absolute path
+ */
+function resolveProjectPath(filePath: string): string {
+  // If it's already an absolute path, return it
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+  
+  // Try to resolve from project root
+  return path.resolve(process.cwd(), '..', '..', filePath);
+}
+
+/**
  * Get the primary model identifier for a given model ID
  * @param id Model ID from the database
  * @returns The primary model identifier string
@@ -31,27 +46,30 @@ function getStandardName(id: number): string {
  */
 async function renameModelFile(oldPath: string, newVersionName: string): Promise<string> {
   try {
+    // Resolve paths to absolute paths
+    const absoluteOldPath = resolveProjectPath(oldPath);
+    
     // Get the directory and extension
-    const dir = path.dirname(oldPath);
-    const ext = path.extname(oldPath);
+    const dir = path.dirname(absoluteOldPath);
+    const ext = path.extname(absoluteOldPath);
     
     // Create the new file path
     const newPath = path.join(dir, `${newVersionName}${ext}`);
     
     // Skip if the paths are the same
-    if (oldPath === newPath) {
+    if (absoluteOldPath === newPath) {
       return oldPath;
     }
     
     // Check if old file exists
-    if (!fs.existsSync(oldPath)) {
-      logger.error(`File not found: ${oldPath}`);
+    if (!fs.existsSync(absoluteOldPath)) {
+      logger.error(`File not found: ${absoluteOldPath}`);
       return oldPath; // Return old path without attempting rename
     }
     
     // Rename the file
-    fs.copyFileSync(oldPath, newPath);
-    logger.info(`Copied model file from ${oldPath} to ${newPath}`);
+    fs.copyFileSync(absoluteOldPath, newPath);
+    logger.info(`Copied model file from ${absoluteOldPath} to ${newPath}`);
     
     return newPath;
   } catch (error) {
@@ -140,15 +158,22 @@ export async function promoteOnnxModel(modelId: number): Promise<boolean> {
  * @returns Promise that resolves with the created model record
  */
 export async function registerOnnxModel(filePath: string, note: string = 'New ONNX model'): Promise<any> {
-  logger.info(`Registering new ONNX model: ${filePath}`);
+  // Resolve to absolute path
+  const absoluteFilePath = resolveProjectPath(filePath);
+  logger.info(`Registering new ONNX model: ${absoluteFilePath}`);
   
   try {
+    // Check if file exists
+    if (!fs.existsSync(absoluteFilePath)) {
+      throw new Error(`Model file ${absoluteFilePath} not found`);
+    }
+    
     // First create the database entry to get an ID
     const model = await prisma.rLModel.create({
       data: {
         // Use a temporary version that will be updated
         version: 'gatekeeper_temp',
-        path: filePath,
+        path: absoluteFilePath,
         description: note,
         createdAt: new Date()
       }
@@ -156,7 +181,7 @@ export async function registerOnnxModel(filePath: string, note: string = 'New ON
     
     // Now that we have an ID, generate the proper version and path
     const standardVersion = getStandardName(model.id);
-    const standardPath = await renameModelFile(filePath, standardVersion);
+    const standardPath = await renameModelFile(absoluteFilePath, standardVersion);
     
     // Update the entry with the proper version and path
     const updatedModel = await prisma.rLModel.update({

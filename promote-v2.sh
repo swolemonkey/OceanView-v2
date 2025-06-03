@@ -12,9 +12,18 @@ pnpm tsx packages/server/src/scripts/onnx-promotion.ts migrate-naming
 echo ""
 echo "1. Registering gatekeeper_v2.onnx"
 
+# Get the absolute path to the model file
+MODEL_PATH="$(pwd)/ml/gatekeeper_v2.onnx"
+
+# Check if file exists
+if [ ! -f "$MODEL_PATH" ]; then
+  echo "Error: Model file not found at $MODEL_PATH"
+  exit 1
+fi
+
 # First register the v2 model
 REGISTER_OUTPUT=$(pnpm tsx packages/server/src/scripts/onnx-promotion.ts register \
-  -p "ml/gatekeeper_v2.onnx" \
+  -p "$MODEL_PATH" \
   -n "Replay-augmented model for prod")
 
 echo "$REGISTER_OUTPUT"

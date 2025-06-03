@@ -2,9 +2,32 @@ import { prisma } from '../db.js';
 import { InferenceSession, Tensor } from 'onnxruntime-node';
 import path from 'path';
 import { createLogger } from '../utils/logger.js';
+import fs from 'fs';
 
 // Create logger
 const logger = createLogger('gatekeeper');
+
+// Helper function to resolve paths
+function resolveModelPath(modelPath: string): string {
+  // If it's already an absolute path, return it
+  if (path.isAbsolute(modelPath)) {
+    return modelPath;
+  }
+  
+  // Check if the file exists in the current directory
+  if (fs.existsSync(modelPath)) {
+    return modelPath;
+  }
+  
+  // Try to resolve from project root
+  const projectRootPath = path.resolve(process.cwd(), '..', '..', modelPath);
+  if (fs.existsSync(projectRootPath)) {
+    return projectRootPath;
+  }
+  
+  // If we can't find it, return the original path and let the caller handle it
+  return modelPath;
+}
 
 /**
  * Feature vector for RL model input
@@ -48,11 +71,14 @@ export class RLGatekeeper {
    */
   async init(modelPath: string = 'ml/gatekeeper_v1.onnx'): Promise<void> {
     try {
-      this.modelPath = modelPath;
-      logger.info(`Loading RL model from ${modelPath}`);
-      this.session = await InferenceSession.create(modelPath);
+      // Resolve the model path to an absolute path
+      const resolvedPath = resolveModelPath(modelPath);
+      this.modelPath = resolvedPath;
+      
+      logger.info(`Loading RL model from ${resolvedPath}`);
+      this.session = await InferenceSession.create(resolvedPath);
       this.modelLoaded = true;
-      logger.info(`Successfully loaded RL model: ${modelPath}`);
+      logger.info(`Successfully loaded RL model: ${resolvedPath}`);
     } catch (err) {
       logger.error('Error loading RL model', {
         error: err instanceof Error ? err.message : err,

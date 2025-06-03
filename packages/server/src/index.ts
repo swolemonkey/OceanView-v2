@@ -40,6 +40,12 @@ process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
 const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
 logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
 
+// Add a function to resolve absolute paths
+function resolveProjectPath(relativePath: string): string {
+  // Go up two directories from current file (__dirname) to reach project root
+  return path.resolve(process.cwd(), '..', '..', relativePath);
+}
+
 // Initialize RLModel in the database
 async function initializeRLModel() {
   try {
@@ -48,8 +54,8 @@ async function initializeRLModel() {
     
     // If no active model exists, initialize with the default model
     if (!activeModel) {
-      // Check if default model file exists
-      const defaultModelPath = 'ml/gatekeeper_v1.onnx';
+      // Check if default model file exists - use absolute path
+      const defaultModelPath = resolveProjectPath('ml/gatekeeper_v1.onnx');
       if (!fs.existsSync(defaultModelPath)) {
         logger.error(`Default model file ${defaultModelPath} not found`);
         throw new Error(`Default model file ${defaultModelPath} not found`);
@@ -69,17 +75,19 @@ async function initializeRLModel() {
       // Initialize the model
       await gate.init(newModel.path);
     } else {
-      logger.info(`Gatekeeper using existing model ${activeModel.path}`);
+      // Get the absolute path for the model
+      const absoluteModelPath = resolveProjectPath(activeModel.path);
+      logger.info(`Gatekeeper using existing model ${absoluteModelPath}`);
       
       // Check if the model file exists
-      if (!fs.existsSync(activeModel.path)) {
-        logger.error(`Model file ${activeModel.path} not found, looking for fallbacks`);
+      if (!fs.existsSync(absoluteModelPath)) {
+        logger.error(`Model file ${absoluteModelPath} not found, looking for fallbacks`);
         
         // Look for fallback files in the ml directory
         const fallbacks = [
-          'ml/gatekeeper_v1.onnx',
-          `ml/gatekeeper_${activeModel.id}.onnx`,
-          'ml/gatekeeper_v2.onnx'
+          resolveProjectPath('ml/gatekeeper_v1.onnx'),
+          resolveProjectPath(`ml/gatekeeper_${activeModel.id}.onnx`),
+          resolveProjectPath('ml/gatekeeper_v2.onnx')
         ];
         
         let fallbackFound = false;
@@ -105,8 +113,8 @@ async function initializeRLModel() {
           throw new Error('No valid model files found');
         }
       } else {
-        // Initialize the model with the path from the database
-        await gate.init(activeModel.path);
+        // Initialize the model with the absolute path
+        await gate.init(absoluteModelPath);
       }
     }
 
