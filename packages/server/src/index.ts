@@ -22,6 +22,10 @@ import { initHealthCheck } from './cron/health-check.js';
 import cron from 'node-cron';
 import { createLogger } from './utils/logger.js';
 import { gate } from './rl/gatekeeper.js';
+import { getActiveModel, registerOnnxModel } from './rl/modelPromotion.js';
+import { retrainGatekeeper } from './rl/retrainJob.js';
+import fs from 'fs';
+import path from 'path';
 
 // Initialize logger
 const logger = createLogger('server');
@@ -39,33 +43,51 @@ logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
 // Initialize RLModel in the database
 async function initializeRLModel() {
   try {
-    // Check if the model exists already
-    const existingModels = await prisma.rLModel.findMany();
-    const gatekeeperModel = existingModels.find(model => model.version === 'gatekeeper_v1');
+    // Get the active model (the one with version 'gatekeeper_v1')
+    const activeModel = await getActiveModel();
     
-    // If model doesn't exist, create it
-    if (!gatekeeperModel) {
-      await prisma.rLModel.create({
-        data: {
-          version: 'gatekeeper_v1',
-          description: 'baseline LR',
-          path: 'ml/gatekeeper_v1.onnx',
-        }
+    // If no active model exists, initialize with the default v1 model
+    if (!activeModel) {
+      // Check if default model file exists
+      const defaultModelPath = 'ml/gatekeeper_v1.onnx';
+      if (!fs.existsSync(defaultModelPath)) {
+        logger.error(`Default model file ${defaultModelPath} not found`);
+        throw new Error(`Default model file ${defaultModelPath} not found`);
+      }
+      
+      // Create initial model entry
+      const newModel = await registerOnnxModel(
+        defaultModelPath,
+        'Initial baseline gatekeeper model'
+      );
+      
+      // Promote it to be the active model
+      await prisma.rLModel.update({
+        where: { id: newModel.id },
+        data: { version: 'gatekeeper_v1' }
       });
-      logger.info(`Gatekeeper initialized with model ml/gatekeeper_v1.onnx`);
+      
+      logger.info(`Gatekeeper initialized with default model ${defaultModelPath}`);
       
       // Initialize the model
-      await gate.init('ml/gatekeeper_v1.onnx');
+      await gate.init(defaultModelPath);
     } else {
-      logger.info(`Gatekeeper using existing model ${gatekeeperModel.path}`);
+      logger.info(`Gatekeeper using existing model ${activeModel.path}`);
       
-      // Initialize the model with the path from the database
-      await gate.init(gatekeeperModel.path);
+      // Check if the model file exists
+      if (!fs.existsSync(activeModel.path)) {
+        logger.error(`Model file ${activeModel.path} not found, falling back to default`);
+        // Fall back to default if the file doesn't exist
+        await gate.init('ml/gatekeeper_v1.onnx');
+      } else {
+        // Initialize the model with the path from the database
+        await gate.init(activeModel.path);
+      }
     }
 
     // Load gatekeeper threshold from database
     const hyperSettings = await prisma.hyperSettings.findUnique({ where: { id: 1 } });
-    const gatekeeperThresh = (hyperSettings as any)?.gatekeeperThresh || 0.55;
+    const gatekeeperThresh = hyperSettings?.gatekeeperThresh || 0.55;
     logger.info(`Gatekeeper threshold set to ${gatekeeperThresh}`);
 
     // Check and initialize account state
@@ -147,6 +169,22 @@ cron.schedule('0 0 * * *', async () => {
     logger.info('Nightly learning update completed');
   } catch (err) {
     logger.error('Nightly learning update error:', { error: err });
+  }
+});
+
+// Schedule weekly model retraining with automatic promotion
+// Runs every Monday at 2:00 UTC (before the fork at 3:00)
+cron.schedule('0 2 * * 1', async () => {
+  try {
+    // Retrain with auto-promotion enabled
+    const result = await retrainGatekeeper({ autoPromote: true });
+    if (result.promoted) {
+      logger.info(`Weekly model retraining completed - Promoted new model to active`);
+    } else {
+      logger.info(`Weekly model retraining completed - Current model retained`);
+    }
+  } catch (err) {
+    logger.error('Weekly model retraining error:', { error: err });
   }
 });
 
