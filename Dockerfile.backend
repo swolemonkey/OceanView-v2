@@ -24,8 +24,7 @@ RUN pnpm exec prisma generate --schema=./packages/server/prisma/schema.prisma
 # now copy the rest (source code, etc.) AFTER deps are cached
 COPY --chown=node:node . .
 
-# Build UI only, skip server TS compile (we'll use the existing JS files)
-RUN pnpm --filter ui run build
+# Skip TypeScript and UI builds for now - we're using this only for backend
 
 ENV NODE_ENV=production PORT=3334
 EXPOSE 3334
