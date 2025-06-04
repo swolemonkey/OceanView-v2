@@ -5,51 +5,28 @@ WORKDIR /app
 # Setup pnpm first
 RUN corepack enable
 
-# copy package files
-COPY package.json pnpm-lock.yaml ./
+# Set runtime environment variables
+ENV NODE_ENV=production PORT=3334
 
-# Copy server prisma schema
-COPY packages/server/prisma ./packages/server/prisma
+# Copy the package.json files first
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches/
+COPY packages/server/package.json ./packages/server/
+COPY packages/ui/package.json     ./packages/ui/
+COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
-# Install all dependencies to ensure build tools are available
-RUN pnpm install
+# Install dependencies normally
+RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client using the server schema
-RUN cd packages/server && pnpm prisma generate
+# Generate Prisma client
+RUN pnpm exec prisma generate
 
 # Copy the rest of the codebase
 COPY . .
 
-# Install system libs only
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libstdc++6
-
-# Make sure server dependencies are installed
-RUN cd packages/server && pnpm install
-
-# Build the server
+# Build server + UI
 RUN pnpm --filter server run build
+RUN pnpm --filter ui     run build
 
-# --- Build React UI ---
-WORKDIR /app/packages/ui
-RUN pnpm install --frozen-lockfile && pnpm build
-
-# Return to app directory
-WORKDIR /app
-
-# Copy seed scripts to the scripts directory in the Docker image
-RUN mkdir -p /app/scripts/
-COPY scripts/seedAll.ts /app/scripts/
-COPY scripts/register_rl_model.ts /app/scripts/
-
-# Debug: List compiled files
-RUN ls -la /app/packages/server/dist
-RUN ls -la /app/packages/server/dist/src || echo "src directory not found in dist"
-RUN ls -la /app/packages/ui/dist || echo "UI dist directory not found"
-RUN cat /app/packages/server/package.json | grep start
-
-# Set environment variables
-ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
-
-# Switch CMD to production start using the Docker-specific start script
-CMD ["pnpm", "--filter", "server", "run", "start:docker"] 
+EXPOSE 3334
+CMD ["pnpm","--filter","server","run","start:docker"] 
