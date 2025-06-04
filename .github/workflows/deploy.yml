@@ -56,7 +56,7 @@ jobs:
         run: pnpm install
       
       # 💡 2️⃣  Run database migrations
-      - run: pnpm prisma migrate deploy
+      - run: cd packages/server && pnpm prisma migrate deploy
       
       # 💡 3️⃣  Build the application
       - run: pnpm build

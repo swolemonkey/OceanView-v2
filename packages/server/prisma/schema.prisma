@@ -17,6 +17,7 @@ model Price1m {
   close     Decimal
   volume    Decimal
   @@index([symbol, timestamp])
+  @@unique([symbol, timestamp], name: "symbol_timestamp")
 }
 
 model Order {
@@ -111,6 +112,7 @@ model HyperSettings {
   id        Int      @id @default(1)
   smcThresh Float    @default(0.002)
   rsiOS     Float    @default(35)
+  rsiOB     Float    @default(65)
   riskPct   Float    @default(1)
   symbols   String   @default("bitcoin") // comma‑sep list e.g. "bitcoin,ethereum,solana"
   atrMultiple Float  @default(1.5) // ATR multiple for trailing stops
@@ -121,6 +123,9 @@ model HyperSettings {
   fastMAPeriod      Int   @default(50)
   slowMAPeriod      Int   @default(200)
   updatedAt DateTime @updatedAt
+  strategyParams   String   @default("{}")
+  strategyToggle   String   @default("{\"TrendFollowMA\":true,\"RangeBounce\":true}")
+  smcMinRetrace    Float    @default(0.5)
 }
 
 model PortfolioMetric {
@@ -139,6 +144,7 @@ model RLModel {
   version   String   @unique
   path      String
   description String?
+  dataset   RLDataset[]
 }
 
 model RLDataset {
@@ -148,7 +154,12 @@ model RLDataset {
   featureVec String   // JSON string representation
   action    String  // buy|sell|skip
   outcome   Float   // realised pnl
-  strategyVersionId Int
+  strategyVersionId Int?
+  gateScore Float?
+  modelId   Int?
+  model     RLModel? @relation(fields: [modelId], references: [id])
+  
+  @@index([symbol, ts])
 }
 
 model AccountState {
@@ -181,6 +192,8 @@ model OrderBookMetric {
   symbol    String
   imbalance Float    // -1 to 1, where 1 is buy pressure
   depth     Int      // number of levels used
+  bidVol    Float?
+  askVol    Float?
   @@index([symbol, ts])
 }
 
@@ -203,4 +216,14 @@ model EvolutionMetric {
   promoted    Boolean  @default(false)
   childParams String   // JSON string of parameters
   createdAt   DateTime @default(now())
+}
+
+model Experience {
+  id        Int      @id @default(autoincrement())
+  symbol    String
+  price     Float
+  smcThresh Float
+  rsiOS     Float
+  reward    Float
+  ts        DateTime @default(now())
 } 
