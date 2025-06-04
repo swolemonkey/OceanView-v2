@@ -6,12 +6,9 @@ WORKDIR /app
 RUN corepack enable
 
 # Set runtime environment variables
-ENV NODE_ENV=production PORT=3334
-
-# Ensure onnxruntime uses CPU only
-ENV npm_config_onnxruntime_gpu=0
-ENV NPM_CONFIG_ONNXRUNTIME_GPU=0
-ENV ONNXRUNTIME_PREFER=cpu
+ENV NODE_ENV=production \
+    PORT=3334 \
+    ONNXRUNTIME_SKIP_DOWNLOAD=1      # skip the NuGet step entirely
 
 # Copy the package.json files first
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -21,7 +18,7 @@ COPY packages/ui/package.json     ./packages/ui/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
 # Install dependencies normally
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Run the fix:onnx script to disable the onnxruntime-node postinstall script
 RUN pnpm run fix:onnx
