@@ -1,1 +1,17 @@
 console.log('ONNX Runtime install script skipped.'); 
+
+diff --git a/node_modules/onnxruntime-node/package.json b/node_modules/onnxruntime-node/package.json
+index 000000000..111111111 100644
+--- a/node_modules/onnxruntime-node/package.json
++++ b/node_modules/onnxruntime-node/package.json
+@@ -17,7 +17,7 @@
+   "engines": {
+     "node": ">=14.0.0"
+   },
+-  "scripts": {
++  "_scripts": {
+     "postinstall": "node ./script/install"
+   },
+   "dependencies": {
+``` 
+</rewritten_file>
