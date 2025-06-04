@@ -5,6 +5,9 @@ WORKDIR /app
 # Setup pnpm first
 RUN corepack enable
 
+# Install TypeScript globally
+RUN npm install -g typescript
+
 # copy only the metadata first to leverage Docker layer cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches/
