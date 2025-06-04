@@ -24,12 +24,8 @@ RUN pnpm exec prisma generate --schema=./packages/server/prisma/schema.prisma
 # now copy the rest (source code, etc.) AFTER deps are cached
 COPY --chown=node:node . .
 
-# build with looser TypeScript constraints for Docker
-RUN cd packages/server && rm -rf dist && tsc --project tsconfig.docker.json
-
-# Build server + UI
-RUN pnpm --filter server run build
-RUN pnpm --filter ui     run build
+# Build UI only, skip server TS compile (we'll use the existing JS files)
+RUN pnpm --filter ui run build
 
 ENV NODE_ENV=production PORT=3334
 EXPOSE 3334
