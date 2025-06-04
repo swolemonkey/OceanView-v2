@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "suppressImplicitAnyIndexErrors": true,
+    "skipDefaultLibCheck": true,
+    "noStrictGenericChecks": true
+  }
+} 
