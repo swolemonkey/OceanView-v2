@@ -27,7 +27,7 @@ RUN pnpm exec prisma generate --schema=./packages/server/prisma/schema.prisma
 COPY --chown=node:node . .
 
 # run incremental install to catch any new workspace dependencies
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # Build server + UI
 RUN pnpm --filter server run build
