@@ -15,8 +15,8 @@ COPY packages/*/package.json ./packages/*/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 COPY packages/server/tsconfig.docker.json ./packages/server/
 
-# Install dependencies normally
-RUN pnpm install --frozen-lockfile
+# Install dependencies with no-frozen-lockfile to handle any mismatches
+RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma client
 RUN pnpm exec prisma generate --schema=./packages/server/prisma/schema.prisma
