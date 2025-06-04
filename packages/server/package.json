@@ -16,7 +16,7 @@
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
-    "start:docker": "prisma migrate deploy && node dist/src/index.js",
+    "start:docker": "prisma migrate deploy --schema=./prisma/schema.prisma && node dist/src/index.js",
     "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
     "run:multi-asset": "node scripts/run-multi-asset.js"
@@ -41,7 +41,7 @@
     "@babel/preset-typescript": "^7.22.5",
     "@types/ioredis-mock": "^8.2.6",
     "@types/jest": "^29.5.3",
-    "@types/node": "^22.15.21",
+    "@types/node": "^22.15.29",
     "@types/node-fetch": "^3.0.3",
     "@types/pino": "^7.0.5",
     "@types/ws": "^8.18.1",
