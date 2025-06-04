@@ -5,10 +5,10 @@ WORKDIR /app
 # Setup pnpm first
 RUN corepack enable
 
-# Set runtime environment variables
+# Set env vars and skip onnxruntime binary download
 ENV NODE_ENV=production \
     PORT=3334 \
-    ONNXRUNTIME_SKIP_DOWNLOAD=1      # skip the NuGet step entirely
+    ONNXRUNTIME_SKIP_DOWNLOAD=1
 
 # Copy the package.json files first
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -19,6 +19,9 @@ COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
 # Install dependencies normally
 RUN pnpm install --frozen-lockfile
+
+# optional: remove the flag for run-time clarity
+ENV ONNXRUNTIME_SKIP_DOWNLOAD=
 
 # Run the fix:onnx script to disable the onnxruntime-node postinstall script
 RUN pnpm run fix:onnx
