@@ -12,7 +12,7 @@ COPY packages/*/package.json ./packages/*/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
 # TEMP: stay on last good release until 1.22.1 is published
-RUN pnpm add -w onnxruntime-node@1.21.3
+RUN pnpm add -w onnxruntime-node@1.21.0
 
 # Install dependencies normally
 RUN pnpm install --frozen-lockfile
