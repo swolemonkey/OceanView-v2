@@ -5,29 +5,21 @@ WORKDIR /app
 # Setup pnpm first
 RUN corepack enable
 
-# Set env vars and skip onnxruntime binary download
-ENV NODE_ENV=production \
-    PORT=3334 \
-    ONNXRUNTIME_SKIP_DOWNLOAD=1
-
-# Copy the package.json files first
+# copy only the metadata first to leverage Docker layer cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches/
 COPY packages/server/package.json ./packages/server/
-COPY packages/ui/package.json     ./packages/ui/
+COPY packages/ui/package.json ./packages/ui/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
+
+# TEMP: stay on last good release until 1.22.1 is published
+RUN pnpm add -w onnxruntime-node@1.21.3
 
 # Install dependencies normally
 RUN pnpm install --frozen-lockfile
 
-# optional: remove the flag for run-time clarity
-ENV ONNXRUNTIME_SKIP_DOWNLOAD=
-
-# Run the fix:onnx script to disable the onnxruntime-node postinstall script
-RUN pnpm run fix:onnx
-
 # Generate Prisma client
-RUN pnpm exec prisma generate
+RUN pnpm exec prisma generate     # generates once for the whole monorepo
 
 # Copy the rest of the codebase
 COPY . .
@@ -36,5 +28,6 @@ COPY . .
 RUN pnpm --filter server run build
 RUN pnpm --filter ui     run build
 
+ENV NODE_ENV=production PORT=3334
 EXPOSE 3334
-CMD ["pnpm","--filter","server","run","start:docker"] 
+CMD ["pnpm", "--filter", "server", "run", "start:docker"] 
