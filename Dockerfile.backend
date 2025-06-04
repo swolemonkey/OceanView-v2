@@ -8,8 +8,7 @@ RUN corepack enable
 # copy only the metadata first to leverage Docker layer cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches/
-COPY packages/server/package.json ./packages/server/
-COPY packages/ui/package.json ./packages/ui/
+COPY packages/*/package.json ./packages/*/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
 # TEMP: stay on last good release until 1.22.1 is published
@@ -21,8 +20,8 @@ RUN pnpm install --frozen-lockfile
 # Generate Prisma client
 RUN pnpm exec prisma generate     # generates once for the whole monorepo
 
-# Copy the rest of the codebase
-COPY . .
+# now copy the rest (source code, etc.) AFTER deps are cached
+COPY --chown=node:node . .
 
 # Build server + UI
 RUN pnpm --filter server run build
