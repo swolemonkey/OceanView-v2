@@ -248,23 +248,51 @@ export async function pollAndStore(){
     // 2) Store latest price in a hash for O(1) lookup
     pipe.hset('latest:crypto', id, price.toString());
     // 3) write 1-min candle stub → DB (merge later)
+    
+    // Check if we already have a price record for this minute to update it
     // @ts-ignore - Working with mock Prisma client
-    await prisma.price1m.upsert({
+    const existingRecord = await prisma.price1m.findUnique({
       where: { 
-        symbol_ts: {
+        symbol_timestamp: {
           symbol: id,
-          ts: ts
+          timestamp: ts
         }
-      },
-      update: { 
-        usd: price 
-      },
-      create: { 
-        symbol: id, 
-        ts: ts, 
-        usd: price 
       }
     });
+    
+    if (existingRecord) {
+      // Update existing record with new OHLCV data
+      // @ts-ignore - Working with mock Prisma client
+      await prisma.price1m.update({
+        where: { 
+          id: existingRecord.id 
+        },
+        data: { 
+          // Update high if the new price is higher
+          high: price > existingRecord.high ? price : existingRecord.high,
+          // Update low if the new price is lower
+          low: price < existingRecord.low ? price : existingRecord.low,
+          // Always update close with the latest price
+          close: price,
+          // Volume could be incremented if we had volume data
+          // For now, keep it unchanged
+        }
+      });
+    } else {
+      // Create a new record with the current price for all OHLCV values
+      // @ts-ignore - Working with mock Prisma client
+      await prisma.price1m.create({
+        data: { 
+          symbol: id, 
+          timestamp: ts, 
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: 0 // We don't have volume data from the price APIs
+        }
+      });
+    }
   }
   
   // DEBUG: Log Redis commands before executing

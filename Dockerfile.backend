@@ -5,15 +5,17 @@ WORKDIR /app
 # Setup pnpm first
 RUN corepack enable
 
-# copy prisma schema once for generate & runtime
-COPY prisma ./prisma
+# copy package files
 COPY package.json pnpm-lock.yaml ./
+
+# Copy server prisma schema
+COPY packages/server/prisma ./packages/server/prisma
 
 # Install all dependencies to ensure build tools are available
 RUN pnpm install
 
-# Generate Prisma client at root level with correct schema path
-RUN pnpm prisma generate --schema=./prisma/schema.prisma
+# Generate Prisma client using the server schema
+RUN cd packages/server && pnpm prisma generate
 
 # Copy the rest of the codebase
 COPY . .
@@ -24,12 +26,6 @@ RUN apt-get update && \
 
 # Make sure server dependencies are installed
 RUN cd packages/server && pnpm install
-
-# Generate server-specific Prisma client
-RUN pnpm --filter server prisma generate --schema=/app/prisma/schema.prisma
-
-# Install TypeScript globally
-RUN npm install -g typescript
 
 # Build the server
 RUN pnpm --filter server run build

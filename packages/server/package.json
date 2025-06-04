@@ -3,20 +3,20 @@
   "version": "0.0.1",
   "type": "module",
   "prisma": {
-    "seed": "tsx ../../prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "dev:no-prisma": "tsx watch src/index.ts",
-    "db:generate": "prisma generate --schema=../../prisma/schema.prisma",
+    "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "db:migrate": "prisma migrate deploy --schema=../../prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy",
     "db:apply-migration": "node scripts/apply-migration.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
-    "start:docker": "prisma migrate deploy --schema=../../prisma/schema.prisma && node dist/src/index.js",
+    "start:docker": "prisma migrate deploy && node dist/src/index.js",
     "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
     "run:multi-asset": "node scripts/run-multi-asset.js"

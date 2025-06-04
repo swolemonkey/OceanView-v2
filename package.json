@@ -11,6 +11,8 @@
     "dev:ui": "pnpm --filter ui run dev",
     "dev": "pnpm run dev:server & pnpm run dev:ui",
     "db:generate": "pnpm --filter @oceanview/server db:generate",
+    "db:migrate": "pnpm --filter @oceanview/server db:migrate",
+    "db:studio": "cd packages/server && pnpm exec prisma studio",
     "start": "node server.js",
     "gatekeeper": "tsx scripts/gatekeeper.ts",
     "gatekeeper:retrain": "tsx scripts/gatekeeper.ts retrain",
