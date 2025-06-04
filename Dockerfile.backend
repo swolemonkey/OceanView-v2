@@ -15,9 +15,6 @@ COPY packages/*/package.json ./packages/*/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 COPY packages/server/tsconfig.docker.json ./packages/server/
 
-# TEMP: stay on last good release until 1.22.1 is published
-RUN pnpm add -w onnxruntime-node@1.21.0
-
 # Install dependencies normally
 RUN pnpm install --frozen-lockfile
 
@@ -26,9 +23,6 @@ RUN pnpm exec prisma generate --schema=./packages/server/prisma/schema.prisma
 
 # now copy the rest (source code, etc.) AFTER deps are cached
 COPY --chown=node:node . .
-
-# run incremental install to catch any new workspace dependencies
-RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # build with looser TypeScript constraints for Docker
 RUN cd packages/server && rm -rf dist && tsc --project tsconfig.docker.json
