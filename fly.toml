@@ -13,10 +13,7 @@ primary_region = 'syd'
   PORT = '3334'
 
 [processes]
-  app = "cd packages/server && node dist/src/index.js"
-
-[deploy]
-  release_command = "sh -c 'cd packages/server && prisma migrate deploy --schema=./prisma/schema.prisma'"
+  app = "node /app/packages/server/dist/src/index.js"
 
 [[mounts]]
   source = 'ovbackend_data'
