@@ -7,7 +7,6 @@
     "typeRoots": ["./node_modules/@types", "./types"],
     "rootDir": ".",
     "moduleResolution": "node16",
-    "types": ["node"],
     "target": "ES2022",
     "module": "Node16"
   },
