@@ -30,8 +30,8 @@ RUN cd packages/server && rm -rf dist && \
     echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
     (npx tsc -p tsconfig.build.json || true)
 
-# 5. install production deps for *server* only
-RUN pnpm --filter ./packages/server install --prod --frozen-lockfile
+# 5. install production deps for all packages
+RUN pnpm install --prod --frozen-lockfile
 
 
 # ---------- 2️⃣  Runtime stage ----------
@@ -50,7 +50,6 @@ ENV NODE_ENV=production \
 
 # ——— copy artefacts from build stage ———
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/server/node_modules ./packages/server/node_modules
 COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
