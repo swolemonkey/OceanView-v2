@@ -5,7 +5,11 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "typeRoots": ["./node_modules/@types", "./types"],
-    "rootDir": "."
+    "rootDir": ".",
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "target": "ES2022",
+    "module": "Node16"
   },
   "include": ["src/**/*", "test-multi-asset.ts"],
   "exclude": ["__tests__/**/*", "node_modules"]
