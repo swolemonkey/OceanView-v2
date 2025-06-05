@@ -16,7 +16,7 @@ primary_region = 'syd'
   app = "node /app/packages/server/dist/src/index.js"
 
 [deploy]
-  release_command = "cd packages/server && pnpm exec prisma migrate deploy --schema=./prisma/schema.prisma"
+  release_command = "pnpm exec prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma"
 
 [[mounts]]
   source = 'ovbackend_data'
