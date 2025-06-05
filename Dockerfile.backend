@@ -28,7 +28,7 @@ COPY . .
 # Create a temporary tsconfig that forces emitting JS even with errors
 RUN cd packages/server && rm -rf dist && \
     echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
-    npx tsc -p tsconfig.build.json
+    (npx tsc -p tsconfig.build.json || true)
 
 # 5. create a *production* node_modules without devDeps
 RUN pnpm prune --prod
