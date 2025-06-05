@@ -1,41 +1,40 @@
 # ---------- 1️⃣  Build stage ----------
 FROM node:20-slim AS build
-
 WORKDIR /app
+
+# System deps needed at build time
 RUN apt-get update && \
-    # tools prisma/onnxruntime want at *build* time
-    apt-get install -y --no-install-recommends \
-        git openssl build-essential python3 && \
+    apt-get install -y --no-install-recommends git openssl build-essential python3 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable
+RUN corepack enable  # gives us pnpm
 
-# 1. metadata first  –> cache win
+# ---- 1. restore & patch workspace ----
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY .npmrc ./
 COPY patches ./patches/
 COPY packages/*/package.json ./packages/*/
 COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
 
-# 2. full install (incl. devDeps) + patch-package + onnx fixes
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --no-frozen-lockfile          # full workspace (incl devDeps)
+RUN pnpm exec prisma generate \
+      --schema packages/server/prisma/schema.prisma
 
-# 3. generate Prisma client **once**
-RUN pnpm exec prisma generate --schema packages/server/prisma/schema.prisma
-
-# 4. copy sources & build TS
+# ---- 2. compile TS once ----
 COPY . .
-# Create a temporary tsconfig that forces emitting JS even with errors
 RUN cd packages/server && rm -rf dist && \
     echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
     (npx tsc -p tsconfig.build.json || true)
 
+# ---- 3. strip to production-only deps ----
+RUN pnpm prune --prod    # keeps patched modules & prisma client
+
 # ---------- 2️⃣  Runtime stage ----------
 FROM node:20-slim
-
 WORKDIR /app
+
+# tiny set of libs Prisma / onnxruntime need at *runtime*
 RUN apt-get update && \
-    # runtime libs prisma / onnxruntime need
     apt-get install -y --no-install-recommends openssl libstdc++6 && \
     rm -rf /var/lib/apt/lists/*
 
@@ -44,21 +43,16 @@ RUN corepack enable
 ENV NODE_ENV=production \
     PORT=3334
 
-# Copy package.json files and workspace config
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY .npmrc ./
-COPY patches ./patches/
-COPY packages/server/package.json ./packages/server/
+# ---- copy everything that was produced in build ----
+COPY --from=build /app/node_modules            ./node_modules
+COPY --from=build /app/packages/server/node_modules \
+                                              ./packages/server/node_modules
+COPY --from=build /app/packages/server/dist    ./packages/server/dist
+COPY --from=build /app/packages/server/prisma  ./packages/server/prisma
+COPY --from=build /app/packages/server/package.json ./packages/server/
+COPY patches ./patches/        # optional – for inspection only
+COPY .npmrc package.json pnpm-workspace.yaml ./
 
-# Copy built JS code
-COPY --from=build /app/packages/server/dist ./packages/server/dist
-COPY --from=build /app/packages/server/prisma ./packages/server/prisma
-
-# Install only production dependencies and skip prepare/postinstall scripts
-RUN pnpm install --prod --filter=server --ignore-scripts && \
-    # Generate Prisma client explicitly
-    cd packages/server && pnpm exec prisma generate --schema=./prisma/schema.prisma
-
-# no npm/pnpm install here – everything's baked in
+# nothing else to install!
 EXPOSE 3334
 # The command is defined in fly.toml 
