@@ -65,4 +65,4 @@ COPY patches ./patches/
 EXPOSE 3334
 
 ## 6. Entrypoint
-CMD ["node", "/app/packages/server/dist/src/index.js"] 
+CMD ["pnpm", "--dir=packages/server", "start:docker"] 

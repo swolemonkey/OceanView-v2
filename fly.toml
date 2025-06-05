@@ -16,7 +16,7 @@ primary_region = 'syd'
   app = "node /app/packages/server/dist/src/index.js"
 
 [deploy]
-  release_command = "pnpm exec prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma"
+  # Release command removed as it's now handled in start:docker script
 
 [[mounts]]
   source = 'ovbackend_data'
