@@ -54,8 +54,10 @@ COPY packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 
-# Install only production dependencies
-RUN pnpm install --prod --filter=server
+# Install only production dependencies and skip prepare/postinstall scripts
+RUN pnpm install --prod --filter=server --ignore-scripts && \
+    # Generate Prisma client explicitly
+    cd packages/server && pnpm exec prisma generate --schema=./prisma/schema.prisma
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
