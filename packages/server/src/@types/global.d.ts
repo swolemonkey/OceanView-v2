@@ -36,7 +36,9 @@ declare module 'ws' {
     close(): void;
   }
   
-  export namespace WebSocket {
+  namespace WebSocket {
     interface Data {}
   }
+  
+  export { WebSocket };
 } 
