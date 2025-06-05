@@ -60,4 +60,5 @@ COPY patches ./patches/
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
-CMD ["node", "packages/server/dist/src/index.js"] 
+# Change to server directory and use start script
+CMD ["sh", "-c", "cd packages/server && prisma migrate deploy --schema=./prisma/schema.prisma && node dist/src/index.js"] 
