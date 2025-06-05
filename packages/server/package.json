@@ -13,7 +13,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:apply-migration": "node scripts/apply-migration.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "build": "rm -rf dist && tsc --transpile-only",
+    "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
     "start:docker": "prisma migrate deploy --schema=./prisma/schema.prisma && node dist/src/index.js",

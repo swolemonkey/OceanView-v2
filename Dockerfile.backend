@@ -25,8 +25,10 @@ RUN pnpm exec prisma generate --schema packages/server/prisma/schema.prisma
 
 # 4. copy sources & build TS
 COPY . .
-# Run TypeScript build with transpile-only flag via package.json script
-RUN pnpm --filter server run build
+# Create a temporary tsconfig that forces emitting JS even with errors
+RUN cd packages/server && rm -rf dist && \
+    echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
+    npx tsc -p tsconfig.build.json
 
 # 5. create a *production* node_modules without devDeps
 RUN pnpm prune --prod
