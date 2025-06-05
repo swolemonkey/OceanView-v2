@@ -30,10 +30,6 @@ RUN cd packages/server && rm -rf dist && \
     echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
     (npx tsc -p tsconfig.build.json || true)
 
-# 5. Make sure server has all its dependencies installed
-RUN cd packages/server && pnpm install --prod
-
-
 # ---------- 2️⃣  Runtime stage ----------
 FROM node:20-slim
 
@@ -48,17 +44,18 @@ RUN corepack enable
 ENV NODE_ENV=production \
     PORT=3334
 
-# ——— copy artefacts from build stage ———
-# copy deps that live at the root
-COPY --from=build /app/node_modules ./node_modules
-# copy the server-specific node_modules
-COPY --from=build /app/packages/server/node_modules ./packages/server/node_modules
-COPY --from=build /app/packages/server/dist ./packages/server/dist
-COPY --from=build /app/packages/server/package.json ./packages/server/
-COPY --from=build /app/packages/server/prisma ./packages/server/prisma
-COPY .npmrc package.json pnpm-workspace.yaml ./
-# Optional: include patch-package diffs so you can inspect them later
+# Copy package.json files and workspace config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY .npmrc ./
 COPY patches ./patches/
+COPY packages/server/package.json ./packages/server/
+
+# Copy built JS code
+COPY --from=build /app/packages/server/dist ./packages/server/dist
+COPY --from=build /app/packages/server/prisma ./packages/server/prisma
+
+# Install only production dependencies
+RUN pnpm install --prod --filter=server
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
