@@ -12,8 +12,7 @@ primary_region = 'syd'
 [env]
   PORT = '3334'
 
-[processes]
-  app = "node /app/packages/server/dist/src/index.js"
+# [processes] block removed to let Dockerfile CMD take precedence
 
 [deploy]
   # Release command removed as it's now handled in start:docker script
