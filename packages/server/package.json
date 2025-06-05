@@ -16,7 +16,7 @@
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
-    "start:docker": "pnpm exec prisma migrate deploy --schema=./prisma/schema.prisma && node dist/src/index.js",
+    "start:docker": "pnpm exec prisma migrate deploy --schema=./prisma/schema.prisma && node -e \"(async()=>{ const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); const exists = await prisma.hyperSettings.findUnique({ where: { id: 1 } }); if(!exists){ console.log('⚙️  Seeding HyperSettings row 1'); await prisma.hyperSettings.create({ data: { id:1, symbols:'bitcoin,ethereum', smcThresh:0.002, rsiOS:35, rsiOB:65, riskPct:1, atrMultiple:1.5, atrPeriod:14, gatekeeperThresh:0.55, maxDailyLoss:0.03, maxOpenRisk:0.05, fastMAPeriod:50, slowMAPeriod:200, strategyParams:'{}', strategyToggle:'{\\\"TrendFollowMA\\\":true,\\\"RangeBounce\\\":true}', smcMinRetrace:0.5 } }); } await prisma.$disconnect(); })()\" && node dist/src/index.js",
     "start:nodb": "node dist/src/index.js",
     "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
