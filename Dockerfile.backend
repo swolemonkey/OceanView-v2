@@ -26,9 +26,12 @@ RUN pnpm install --frozen-lockfile
 ## 4. Copy full source *after* deps to keep cache efficient
 COPY . .
 
-## 5. Generate Prisma client & build
+## 5. Create necessary directories to avoid errors during build
+RUN mkdir -p packages/server/src
+
+## 6. Generate Prisma client & build without running clean script
 RUN pnpm --filter @oceanview/server prisma generate
-RUN pnpm --filter @oceanview/server run build
+RUN cd packages/server && npx tsc
 RUN pnpm --filter @oceanview/ui run build
 
 # Create production build with only required dependencies
