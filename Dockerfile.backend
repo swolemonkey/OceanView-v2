@@ -32,7 +32,7 @@ RUN pnpm --filter @oceanview/server run build
 RUN pnpm --filter @oceanview/ui run build
 
 # Create production build with only required dependencies
-RUN pnpm --filter @oceanview/server install --prod --frozen-lockfile
+RUN pnpm prune --prod
 
 # ---------- 2️⃣  Runtime stage ----------
 FROM node:20-slim
@@ -40,7 +40,7 @@ FROM node:20-slim
 WORKDIR /app
 RUN apt-get update && \
     # runtime libs prisma / onnxruntime need
-    apt-get install -y --no-install-recommends openssl libstdc++6 && \
+    apt-get install -y --no-install-recommends openssl libstdc++6 libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable

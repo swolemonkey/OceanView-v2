@@ -8,9 +8,9 @@
 **/dist
 **/build
 docker-compose.yml
-ml/**
-data/**
-*.onnx
+# Keep ML models for inference
+# ml/**
+# *.onnx
 *.csv 
 
 # caches & test artifacts
