@@ -30,9 +30,8 @@ RUN cd packages/server && rm -rf dist && \
     echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
     (npx tsc -p tsconfig.build.json || true)
 
-# 5. create a *production* node_modules without devDeps
-RUN pnpm prune --prod
-#    ↑ leaves only runtime deps, but *keeps* patched modules & prisma client
+# 5. install production deps for *server* only
+RUN pnpm --filter ./packages/server install --prod --frozen-lockfile
 
 
 # ---------- 2️⃣  Runtime stage ----------
