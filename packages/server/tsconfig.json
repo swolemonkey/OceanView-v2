@@ -4,7 +4,6 @@
     "outDir": "dist",
     "esModuleInterop": true,
     "isolatedModules": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
     "rootDir": ".",
     "moduleResolution": "node16",
     "target": "ES2022",
