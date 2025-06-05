@@ -51,14 +51,17 @@ ENV NODE_ENV=production \
 # ——— copy artefacts from build stage ———
 # copy deps that live at the root
 COPY --from=build /app/node_modules ./node_modules
-# and the ones that live inside the server package
-COPY --from=build /app/packages/server/node_modules ./packages/server/node_modules
 COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
 COPY patches ./patches/
+
+# Create required directories and symlinks for server
+RUN mkdir -p ./packages/server && \
+    # Ensure server can resolve dependencies directly from root node_modules
+    ln -s /app/node_modules ./packages/server/node_modules
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
