@@ -25,11 +25,8 @@ RUN pnpm exec prisma generate --schema packages/server/prisma/schema.prisma
 
 # 4. copy sources & build TS
 COPY . .
-# Use special build script to bypass type checking
-RUN cd packages/server && rm -rf dist && \
-    mkdir -p dist && \
-    echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":true}}' > tsconfig.build.json && \
-    npx tsc -p tsconfig.build.json || true
+# Run TypeScript build with transpile-only flag via package.json script
+RUN pnpm --filter server run build
 
 # 5. create a *production* node_modules without devDeps
 RUN pnpm prune --prod
