@@ -34,8 +34,9 @@ RUN cd packages/server && npx prisma generate --schema=./prisma/schema.prisma
 RUN cd packages/server && mkdir -p dist && npx tsc --outDir dist || true
 RUN cd packages/ui && npm run build || true
 
-# Create production build with only required dependencies
-RUN pnpm prune --prod
+# Create production build with only required dependencies but disable scripts
+RUN pnpm config set enable-pre-post-scripts false && \
+    pnpm prune --prod
 
 # ---------- 2️⃣  Runtime stage ----------
 FROM node:20-slim
