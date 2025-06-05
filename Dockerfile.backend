@@ -58,6 +58,7 @@ COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/ui/dist ./packages/ui/dist
 COPY --from=build /app/ml /app/ml
+COPY --from=build /app/scripts ./scripts
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
 COPY patches ./patches/
