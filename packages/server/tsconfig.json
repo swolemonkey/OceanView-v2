@@ -9,7 +9,8 @@
     "target": "ES2022",
     "module": "Node16",
     "noImplicitAny": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmitOnError": false
   },
   "include": ["src/**/*", "test-multi-asset.ts"],
   "exclude": ["__tests__/**/*", "node_modules"]
