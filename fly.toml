@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'oceanview'
+app = 'ocean-staging'
 primary_region = 'syd'
 
 [build]
@@ -13,7 +13,10 @@ primary_region = 'syd'
   PORT = '3334'
 
 [processes]
-  app = "pnpm --filter server run start:docker"
+  app = "node /app/packages/server/dist/src/index.js"
+
+[deploy]
+  release_command = "pnpm exec prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma"
 
 [[mounts]]
   source = 'ovbackend_data'

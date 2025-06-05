@@ -3,4 +3,20 @@
 **/.next
 **/dist
 **/build
-docker-compose.yml 
+docker-compose.yml
+ml/**
+data/**
+*.onnx
+*.csv 
+
+# caches & test artifacts
+**/.cache
+**/coverage
+**/cypress
+**/tests/fixtures
+*.log
+
+# design assets / large binaries
+assets/**/*.{png,jpg,jpeg,gif,psd,ai,svg,mp4,webm}
+*.db
+*.sqlite 

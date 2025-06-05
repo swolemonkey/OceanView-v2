@@ -20,7 +20,9 @@ async function spawnBot(botId:number, name:string, type:string){
   // Keep respawning the worker as long as the bot should be running
   while (running) {
     try {
-      const workerPath = path.resolve(`src/botRunner/workers/${type}.ts`);
+      // Use JS files in production, TS files in development
+      const fileExt = process.env.NODE_ENV === 'production' ? 'js' : 'ts';
+      const workerPath = path.resolve(`dist/src/botRunner/workers/${type}.js`);
       console.log(`Attempting to spawn bot ${name} with worker path: ${workerPath}`);
       
       const worker = new Worker(workerPath, {

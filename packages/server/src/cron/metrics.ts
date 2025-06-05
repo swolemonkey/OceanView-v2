@@ -50,7 +50,7 @@ export async function computeYesterdayMetrics() {
           date: yesterday,
           symbol,
           strategyVersionId: versionId
-        } 
+        }
       },
       update: { 
         grossPnl: gross, 
@@ -58,7 +58,8 @@ export async function computeYesterdayMetrics() {
         winRate: wins/tradeBatch.length as number,
         sharpe, 
         maxDrawdown: maxDD, 
-        trades: tradeBatch.length 
+        trades: tradeBatch.length,
+        botName: bot
       },
       create: { 
         date: yesterday, 
