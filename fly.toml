@@ -13,7 +13,7 @@ primary_region = 'syd'
   PORT = '3334'
 
 [processes]
-  app = "pnpm --filter server run start:docker"
+  app = "pnpm --filter server run start:nodb"
 
 [[mounts]]
   source = 'ovbackend_data'
