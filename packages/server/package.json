@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "prisma": {
-    "seed": "node ../../scripts/seedAll.js"
+    "seed": "tsx ../../scripts/seedAll.ts"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
