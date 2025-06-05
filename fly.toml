@@ -19,7 +19,7 @@ primary_region = 'syd'
 
 [[mounts]]
   source = 'ovbackend_data'
-  destination = '/app/packages/server/prisma'
+  destination = '/data'
 
 [http_service]
   internal_port = 3334
