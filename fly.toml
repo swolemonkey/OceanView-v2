@@ -13,7 +13,10 @@ primary_region = 'syd'
   PORT = '3334'
 
 [processes]
-  app = "pnpm --filter server run start:nodb"
+  app = "cd packages/server && node dist/src/index.js"
+
+[deploy]
+  release_command = "cd packages/server && prisma migrate deploy --schema=./prisma/schema.prisma"
 
 [[mounts]]
   source = 'ovbackend_data'
