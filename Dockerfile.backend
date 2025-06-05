@@ -1,38 +1,38 @@
-# ---------- 1️⃣  Build stage ----------
-FROM node:20-slim AS build
-
+# ───────────────────────────────────────────────────────────
+# 1. Base image + workspace
+FROM node:20 AS build
 WORKDIR /app
+RUN corepack enable   # enables pnpm
+
+# System dependencies
 RUN apt-get update && \
     # tools prisma/onnxruntime want at *build* time
     apt-get install -y --no-install-recommends \
         git openssl build-essential python3 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable
-
-# 1. metadata first  –> cache win
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+## 2. Copy all workspace manifests BEFORE install
+COPY pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml ./
 COPY .npmrc ./
 COPY patches ./patches/
-COPY packages/*/package.json ./packages/*/
-COPY packages/server/prisma/schema.prisma ./packages/server/prisma/
+COPY packages/server/package.json packages/server/
+COPY packages/ui/package.json packages/ui/
+COPY packages/server/prisma/schema.prisma packages/server/prisma/
 
-# 2. full install (incl. devDeps) + patch-package + onnx fixes
-RUN pnpm install --no-frozen-lockfile
+## 3. Single workspace-aware install
+RUN pnpm install --frozen-lockfile
 
-# 3. generate Prisma client **once**
-RUN pnpm exec prisma generate --schema packages/server/prisma/schema.prisma
-
-# 4. copy sources & build TS
+## 4. Copy full source *after* deps to keep cache efficient
 COPY . .
-# Create a temporary tsconfig that forces emitting JS even with errors
-RUN cd packages/server && rm -rf dist && \
-    echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
-    (npx tsc -p tsconfig.build.json || true)
 
-# 5. install production deps for *server* only
-RUN pnpm --filter ./packages/server install --prod --frozen-lockfile
+## 5. Generate Prisma client & build
+RUN pnpm --filter @oceanview/server prisma generate
+RUN pnpm --filter @oceanview/server run build
+RUN pnpm --filter @oceanview/ui run build
 
+# Create production build with only required dependencies
+RUN pnpm --filter @oceanview/server install --prod --frozen-lockfile
 
 # ---------- 2️⃣  Runtime stage ----------
 FROM node:20-slim
@@ -53,10 +53,13 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
+COPY --from=build /app/packages/ui/dist ./packages/ui/dist
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
 COPY patches ./patches/
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
-# The command is defined in fly.toml 
+
+## 6. Entrypoint
+CMD ["pnpm","--filter","@oceanview/server","run","start:docker"] 

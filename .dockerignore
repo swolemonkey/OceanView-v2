@@ -1,3 +1,7 @@
+# Docker ignore file
+# Exclude non-essential files to reduce build context size
+
+# Node modules and build artifacts (but make sure they're not needed during build)
 **/node_modules
 **/.git
 **/.next
@@ -20,3 +24,10 @@ data/**
 assets/**/*.{png,jpg,jpeg,gif,psd,ai,svg,mp4,webm}
 *.db
 *.sqlite 
+
+# DO NOT ignore these essential files
+!pnpm-workspace.yaml
+!package.json
+!pnpm-lock.yaml
+!packages/**/package.json
+!packages/server/prisma/schema.prisma 
