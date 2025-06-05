@@ -52,9 +52,12 @@ ml/venv/
 .DS_Store
 Thumbs.db
 
+# design assets / large binaries
+assets/**/*.{png,jpg,jpeg,gif,psd,ai,svg,mp4,webm}
+
 # DO NOT ignore these essential files
 !pnpm-workspace.yaml
 !package.json
 !pnpm-lock.yaml
 !packages/**/package.json
-!packages/server/prisma/schema.prisma 
+!packages/server/prisma/schema.prisma
