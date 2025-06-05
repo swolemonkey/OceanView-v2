@@ -57,8 +57,11 @@ COPY --from=build /app/packages/server/dist ./packages/server/dist
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/ui/dist ./packages/ui/dist
-COPY --from=build /app/ml /app/ml
+# Copy ML directory with model files
+COPY --from=build /app/ml ./ml
 COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/packages/server/ml ./packages/server/ml
+COPY docker-entrypoint.js ./docker-entrypoint.js
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
 COPY patches ./patches/
@@ -66,5 +69,6 @@ COPY patches ./patches/
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
 
-## 6. Entrypoint
+## 6. Entrypoint - Use the docker-entrypoint.js to ensure migrations and seeding happen
+ENTRYPOINT ["node", "docker-entrypoint.js"]
 CMD ["pnpm", "--dir=packages/server", "start:docker"] 

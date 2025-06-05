@@ -7,24 +7,41 @@ import fs from 'node:fs'
 const env = { ...process.env }
 
 // If running the web server then migrate existing database
-if (process.argv.slice(-3).join(' ') === 'pnpm run start') {
+if (process.argv.slice(-3).join(' ') === 'pnpm run start' || 
+    process.argv.slice(-3).join(' ') === 'pnpm --dir=packages/server start:docker') {
+  console.log("Starting database setup...")
+  
   // place Sqlite3 database on volume
-  const source = path.resolve('./dev.db')
-  const target = '/data/' + path.basename(source)
-  if (!fs.existsSync(source) && fs.existsSync('/data')) fs.symlinkSync(target, source)
-  let newDb = !fs.existsSync(target)
+  const dbDir = '/data'
+  const dbFile = path.join(dbDir, 'dev.db')
+  
+  // Create data directory if it doesn't exist
+  if (!fs.existsSync(dbDir)) {
+    console.log(`Creating data directory: ${dbDir}`)
+    fs.mkdirSync(dbDir, { recursive: true })
+  }
+  
+  // Check if we need to restore from backup
+  let newDb = !fs.existsSync(dbFile)
   if (newDb && process.env.BUCKET_NAME) {
-    await exec(`litestream restore -config litestream.yml -if-replica-exists ${target}`)
-    newDb = !fs.existsSync(target)
+    await exec(`litestream restore -config litestream.yml -if-replica-exists ${dbFile}`)
+    newDb = !fs.existsSync(dbFile)
   }
 
   // prepare database
-  await exec('npx prisma migrate deploy')
+  console.log("Running database migrations...")
+  await exec('npx prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma')
   
   // Run the seedAll script to ensure all mandatory rows exist
-  await exec('pnpm ts-node scripts/seedAll.ts')
+  console.log("Running database seeding...")
+  await exec('pnpm tsx scripts/seedAll.ts')
   
-  if (newDb) await exec('ts-node packages/server/prisma/seed.ts')
+  // Set correct permission on database file
+  if (fs.existsSync(dbFile)) {
+    fs.chmodSync(dbFile, 0o666)
+  }
+  
+  console.log("Database setup completed.")
 }
 
 // launch application
@@ -35,6 +52,7 @@ if (process.env.BUCKET_NAME) {
 }
 
 function exec(command) {
+  console.log(`Executing: ${command}`)
   const child = spawn(command, { shell: true, stdio: 'inherit', env })
   return new Promise((resolve, reject) => {
     child.on('exit', code => {
