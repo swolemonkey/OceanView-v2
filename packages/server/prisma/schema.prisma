@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = "file:/data/dev.db"
 }
 
 generator client {
@@ -28,6 +28,11 @@ model Order {
   price Decimal
   status String @default("filled") // sim always fills
   createdAt DateTime @default(now())
+  type String @default("market") // Adding 'type' field
+  exchangeOrderId String? // Adding exchangeOrderId field
+  botId Int? // Add botId field
+  exchange String? // Add exchange field
+  clientOrderId String? // Add clientOrderId field
   
   trades Trade[]
 }
@@ -40,8 +45,13 @@ model Trade {
   qty Decimal
   price Decimal
   feePaid Decimal @default(0)
-  pnl Decimal
+  pnl Decimal? // Make pnl optional
   ts DateTime @default(now())
+  botId Int? // Adding botId field
+  fee Decimal? // Adding fee field
+  externalId String? // Add externalId field
+  strategy String? // Add strategy field
+  exchangeTradeId String? // Add exchangeTradeId field
 
   Order Order @relation(fields:[orderId], references:[id])
 }
@@ -96,9 +106,10 @@ model StrategyTrade {
 
 model DailyMetric {
   id        Int      @id @default(autoincrement())
-  date      DateTime @unique
+  date      DateTime
   strategyVersionId Int
   botName   String
+  symbol    String   @default("")  // Adding this field
   trades    Int
   grossPnl  Float
   netPnl    Float
@@ -106,6 +117,8 @@ model DailyMetric {
   sharpe    Float
   maxDrawdown Float
   StrategyVersion StrategyVersion @relation(fields: [strategyVersionId], references: [id])
+  
+  @@unique([date, symbol, strategyVersionId], name: "date_symbol_strategyVersionId")
 }
 
 model HyperSettings {

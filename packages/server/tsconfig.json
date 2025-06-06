@@ -4,8 +4,13 @@
     "outDir": "dist",
     "esModuleInterop": true,
     "isolatedModules": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
-    "rootDir": "."
+    "rootDir": ".",
+    "moduleResolution": "node16",
+    "target": "ES2022",
+    "module": "Node16",
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "noEmitOnError": false
   },
   "include": ["src/**/*", "test-multi-asset.ts"],
   "exclude": ["__tests__/**/*", "node_modules"]

@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx ../../scripts/seedAll.ts"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -16,7 +16,8 @@
     "build": "rm -rf dist && tsc",
     "clean": "find src -name \"*.js\" -type f ! -path \"src/bots/hypertrades/*\" ! -path \"src/db.js\" -delete && echo 'Removed JS duplicates!'",
     "start": "node dist/src/index.js",
-    "start:docker": "prisma migrate deploy && node dist/src/index.js",
+    "start:docker": "pnpm exec prisma migrate deploy --schema=./prisma/schema.prisma && pnpm exec prisma db seed --schema=./prisma/schema.prisma && node dist/src/index.js",
+    "start:nodb": "node dist/src/index.js",
     "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
     "run:multi-asset": "node scripts/run-multi-asset.js"
@@ -28,7 +29,7 @@
     "fastify": "^4.26.0",
     "ioredis": "^5.4.1",
     "node-fetch": "^3.3.2",
-    "onnxruntime-node": "1.22.0",
+    "onnxruntime-node": "1.21.0",
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
     "tsx": "^4.7.0",
@@ -41,9 +42,10 @@
     "@babel/preset-typescript": "^7.22.5",
     "@types/ioredis-mock": "^8.2.6",
     "@types/jest": "^29.5.3",
-    "@types/node": "^22.15.21",
+    "@types/node": "^22.15.29",
     "@types/node-fetch": "^3.0.3",
     "@types/pino": "^7.0.5",
+    "@types/winston": "^2.4.4",
     "@types/ws": "^8.18.1",
     "concurrently": "^8.2.0",
     "dotenv": "^16.5.0",

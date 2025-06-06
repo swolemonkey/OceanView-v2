@@ -11,13 +11,17 @@ primary_region = 'syd'
 
 [env]
   PORT = '3334'
+  DATABASE_URL = "file:/data/dev.db"
 
-[processes]
-  app = "pnpm --filter server run start:docker"
+# [processes] block removed to let Dockerfile CMD take precedence
+
+[deploy]
+  # Add release command to run migrations and seed
+  release_command = "pnpm exec prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma && pnpm exec prisma db seed --schema=/app/packages/server/prisma/schema.prisma"
 
 [[mounts]]
   source = 'ovbackend_data'
-  destination = '/app/packages/server/prisma'
+  destination = '/data'
 
 [http_service]
   internal_port = 3334

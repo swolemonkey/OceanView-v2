@@ -50,4 +50,4 @@ packages/server/*.log
 
 # Legacy Dockerfiles
 Dockerfile
-Dockerfile.dev 
+Dockerfile.dev packages/server/prisma/dev.db
