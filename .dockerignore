@@ -57,4 +57,4 @@ Thumbs.db
 !package.json
 !pnpm-lock.yaml
 !packages/**/package.json
-!packages/server/prisma/schema.prisma 
+!packages/server/prisma/schema.prisma

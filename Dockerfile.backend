@@ -14,8 +14,8 @@ RUN apt-get update && \
 ## 2. Copy all workspace manifests BEFORE install
 COPY pnpm-workspace.yaml ./
 COPY package.json pnpm-lock.yaml ./
-COPY .npmrc ./
-COPY patches ./patches/
+COPY .npmrc ./ 
+# COPY patches ./patches/
 COPY packages/server/package.json packages/server/
 COPY packages/ui/package.json packages/ui/
 COPY packages/server/prisma/schema.prisma packages/server/prisma/
@@ -23,6 +23,9 @@ COPY packages/server/prisma/schema.prisma packages/server/prisma/
 ## 3. Install dependencies with CI=true to skip prepare scripts
 ENV CI=true
 RUN pnpm install --frozen-lockfile
+
+# TEMP: stay on last good release until 1.22.1 is published
+RUN pnpm add -w onnxruntime-node@1.21.0
 
 ## 4. Copy full source *after* deps to keep cache efficient
 COPY . .
@@ -64,11 +67,11 @@ COPY --from=build /app/packages/server/ml ./packages/server/ml
 COPY docker-entrypoint.js ./docker-entrypoint.js
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
-COPY patches ./patches/
+# COPY patches ./patches/
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
 
 ## 6. Entrypoint - Use the docker-entrypoint.js to ensure migrations and seeding happen
 ENTRYPOINT ["node", "docker-entrypoint.js"]
-CMD ["pnpm", "--dir=packages/server", "start:docker"] 
+CMD ["pnpm", "--dir=packages/server", "start:docker"]
