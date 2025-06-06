@@ -6,17 +6,6 @@
 **/.next
 **/dist
 **/build
-<<<<<<< HEAD
-docker-compose.yml
-ml/**
-data/**
-*.onnx
-*.csv 
-
-# caches & test artifacts
-**/.cache
-**/coverage
-=======
 **/.turbo
 
 # Git & local config
@@ -55,17 +44,10 @@ ml/venv/
 **/.cache
 **/coverage
 **/__tests__/
->>>>>>> 7910663e6a3585d062d25f7b838420ece8a6aac0
 **/cypress
 **/tests/fixtures
 *.log
 
-<<<<<<< HEAD
-# design assets / large binaries
-assets/**/*.{png,jpg,jpeg,gif,psd,ai,svg,mp4,webm}
-*.db
-*.sqlite 
-=======
 # OS cruft
 .DS_Store
 Thumbs.db
@@ -75,5 +57,4 @@ Thumbs.db
 !package.json
 !pnpm-lock.yaml
 !packages/**/package.json
-!packages/server/prisma/schema.prisma 
->>>>>>> 7910663e6a3585d062d25f7b838420ece8a6aac0
+!packages/server/prisma/schema.prisma
