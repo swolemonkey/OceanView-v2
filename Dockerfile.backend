@@ -15,7 +15,7 @@ RUN apt-get update && \
 COPY pnpm-workspace.yaml ./
 COPY package.json pnpm-lock.yaml ./
 COPY .npmrc ./
-COPY patches ./patches/
+# COPY patches ./patches/
 COPY packages/server/package.json packages/server/
 COPY packages/ui/package.json packages/ui/
 COPY packages/server/prisma/schema.prisma packages/server/prisma/
@@ -64,7 +64,7 @@ COPY --from=build /app/packages/server/ml ./packages/server/ml
 COPY docker-entrypoint.js ./docker-entrypoint.js
 COPY .npmrc package.json pnpm-workspace.yaml ./
 # Optional: include patch-package diffs so you can inspect them later
-COPY patches ./patches/
+# COPY patches ./patches/
 
 # no npm/pnpm install here – everything's baked in
 EXPOSE 3334
