@@ -1,22 +1,60 @@
+# Docker ignore file
+# Exclude non-essential files to reduce build context size
+
+# Node modules and build artifacts
 **/node_modules
-**/.git
 **/.next
 **/dist
 **/build
-docker-compose.yml
-ml/**
-data/**
-*.onnx
-*.csv 
+**/.turbo
 
-# caches & test artifacts
+# Git & local config
+.git
+.env*
+npm-debug.log
+yarn-debug.log
+pnpm-debug.log
+docker-compose.yml
+
+# Data files
+*.csv
+data/
+tmp/
+local/
+logs/
+
+# Large model files except the ones we need
+ml/raw-exports/
+ml/dev-models/
+ml/.venv/
+ml/py311/
+ml/venv/
+
+# Keep these specific model files
+!ml/gatekeeper_v1.onnx
+!ml/gatekeeper_primary8.onnx
+!packages/server/ml/gatekeeper_v1.onnx
+!packages/server/ml/gatekeeper_primary8.onnx
+
+# Databases
+*.db
+*.sqlite
+
+# Caches & test artifacts
 **/.cache
 **/coverage
+**/__tests__/
 **/cypress
 **/tests/fixtures
 *.log
 
-# design assets / large binaries
-assets/**/*.{png,jpg,jpeg,gif,psd,ai,svg,mp4,webm}
-*.db
-*.sqlite 
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# DO NOT ignore these essential files
+!pnpm-workspace.yaml
+!package.json
+!pnpm-lock.yaml
+!packages/**/package.json
+!packages/server/prisma/schema.prisma 
