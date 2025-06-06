@@ -27,11 +27,6 @@ RUN pnpm install --frozen-lockfile
 ## 4. Copy full source *after* deps to keep cache efficient
 COPY . .
 
-# Create a temporary tsconfig that forces emitting JS even with errors
-RUN cd packages/server && rm -rf dist && \
-    echo '{"extends":"./tsconfig.json","compilerOptions":{"noEmitOnError":false}}' > tsconfig.build.json && \
-    (npx tsc -p tsconfig.build.json || true)
-
 ## 5. Generate Prisma client manually without relying on package.json scripts
 RUN cd packages/server && npx prisma generate --schema=./prisma/schema.prisma
 
@@ -76,4 +71,4 @@ EXPOSE 3334
 
 ## 6. Entrypoint - Use the docker-entrypoint.js to ensure migrations and seeding happen
 ENTRYPOINT ["node", "docker-entrypoint.js"]
-CMD ["pnpm", "--dir=packages/server", "start:docker"]
+CMD ["pnpm", "--dir=packages/server", "start:docker"] 
