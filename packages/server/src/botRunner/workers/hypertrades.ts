@@ -1,11 +1,11 @@
 import { parentPort, workerData } from 'worker_threads';
-import { loadConfig } from '../../bots/hypertrades/config.js';
-import { AssetAgent } from '../../bots/hypertrades/assetAgent.js';
-import { logCompletedTrade } from '../../bots/hypertrades/execution.js';
-import { prisma } from '../../db.js';
-import type { Candle } from '../../bots/hypertrades/perception.js';
-import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
-import { RLGatekeeper, FeatureVector } from '../../rl/gatekeeper.js';
+import { loadConfig } from '../../bots/hypertrades/config';
+import { AssetAgent } from '../../bots/hypertrades/assetAgent';
+import { logCompletedTrade } from '../../bots/hypertrades/execution';
+import { prisma } from '../../db';
+import type { Candle } from '../../bots/hypertrades/perception';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk';
+import { RLGatekeeper, FeatureVector } from '../../rl/gatekeeper';
 
 const log = (...a:any[]) => console.log(`[hypertrades]`, ...a);
 

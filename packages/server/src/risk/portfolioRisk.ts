@@ -1,7 +1,7 @@
-import { AssetAgent } from '../bots/hypertrades/assetAgent.js';
-import { prisma } from '../db.js';
-import { createLogger } from '../utils/logger.js';
-import { notify } from '../ops/alertService.js';
+import { AssetAgent } from '../bots/hypertrades/assetAgent';
+import { prisma } from '../db';
+import { createLogger } from '../utils/logger';
+import { notify } from '../ops/alertService';
 
 // Create logger
 const logger = createLogger('portfolioRisk');

@@ -1,6 +1,10 @@
-import fetch from 'node-fetch';
-import { defaultConfig, execCfg } from './config.js';
-import { prisma } from '../../db.js';
+// Use dynamic import to avoid ESM issues in tests
+const fetch = async (...args: any[]) => {
+  const mod = await import('node-fetch');
+  return (mod.default as any)(...args);
+};
+import { defaultConfig, execCfg } from './config';
+import { prisma } from '../../db';
 
 // Use values from config
 const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %

@@ -1,7 +1,11 @@
 import { DataFeed, Tick } from './interface.js';
 import * as pino from 'pino';
 import WebSocket from 'ws';
-import fetch from 'node-fetch';
+// Dynamic import to avoid ESM issues during tests
+const fetchFn = async (...args: any[]) => {
+  const mod = await import('node-fetch');
+  return (mod.default as any)(...args);
+};
 
 // Initialize logger
 const logger = pino.pino({
@@ -235,7 +239,7 @@ export class AlpacaFeed implements DataFeed {
       const tradesUrl = `${this.dataUrl}/v2/stocks/trades/latest?symbols=${symbols.join(',')}`;
       
       logger.info(`Fetching from Alpaca REST API: ${tradesUrl}`);
-      const res = await fetch(tradesUrl, {
+      const res = await fetchFn(tradesUrl, {
         headers: {
           'APCA-API-KEY-ID': this.apiKey,
           'APCA-API-SECRET-KEY': this.apiSecret

@@ -1,5 +1,5 @@
-import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import { Candle } from '../perception.js';
+import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy';
+import { Candle } from '../perception';
 
 export class TrendFollowMA extends BaseStrategy {
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea|null {

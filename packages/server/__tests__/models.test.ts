@@ -1,4 +1,4 @@
-import { prisma } from '../src/db.js';
+import { prisma } from '../src/db';
 
 describe('Required Prisma Models', () => {
   test('weeklyEvaluate required models exist', async () => {

@@ -1,8 +1,8 @@
 // This file tests the new strategies added in sprint 6
-import { TrendFollowMA } from '../src/bots/hypertrades/strategies/trendFollow.js';
-import { RangeBounce } from '../src/bots/hypertrades/strategies/rangeBounce.js';
-import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache.js';
-import { Perception, Candle } from '../src/bots/hypertrades/perception.js';
+import { TrendFollowMA } from '../src/bots/hypertrades/strategies/trendFollow';
+import { RangeBounce } from '../src/bots/hypertrades/strategies/rangeBounce';
+import { IndicatorCache } from '../src/bots/hypertrades/indicators/cache';
+import { Perception, Candle } from '../src/bots/hypertrades/perception';
 
 describe('Strategy Tests', () => {
   let perception: Perception;
@@ -105,9 +105,10 @@ describe('Strategy Tests', () => {
       // Manually override RSI to oversold condition
       indCache.rsi14 = 28;
       
-      // Set the lowest candle in perception
-      const lowCandle = perception.last(10)[0];
-      lowCandle.l = 31400;
+      // Set all recent candle lows above 31400 to create a clear range
+      for (const candle of perception.last(20)) {
+        candle.l = Math.max(candle.l, 31400);
+      }
       
       // Set current price near the low (support)
       mockCandle.c = 31420; // Within 2% of low
@@ -190,4 +191,4 @@ describe('Strategy Tests', () => {
       expect(partialAgent.strategies[0]).toBeInstanceOf(RangeBounce);
     });
   });
-}); 
+});

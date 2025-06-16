@@ -36,10 +36,6 @@ process.env.COINCAP_URL = process.env.COINCAP_URL || "https://api.coincap.io/v2/
 process.env.REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 process.env.PORT = process.env.PORT || "3334"; // Use port 3334 instead of 3333
 
-// Log configured symbols
-const configuredSymbols = process.env.HYPER_SYMBOLS || 'bitcoin';
-logger.info(`HyperTrades configured with symbols: ${configuredSymbols}`);
-
 // Add a function to resolve absolute paths
 function resolveProjectPath(relativePath: string): string {
   // Go up two directories from current file (__dirname) to reach project root

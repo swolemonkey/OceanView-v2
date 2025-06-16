@@ -1,8 +1,8 @@
-import { defaultConfig } from './config.js';
-import { prisma } from '../../db.js';
-import type { Config } from './config.js';
-import type { Perception } from './perception.js';
-import { IndicatorCache } from './indicators/cache.js';
+import { defaultConfig } from './config';
+import { prisma } from '../../db';
+import type { Config } from './config';
+import type { Perception } from './perception';
+import { IndicatorCache } from './indicators/cache';
 
 // Logger interface
 interface Logger {
@@ -60,11 +60,15 @@ export class RiskManager {
     }
   }
 
-  sizeTrade(stop: number, price: number) {
-    const risk$ = this.equity * (this.config.riskPct/100);
-    const priceDiff = Math.abs(price - stop);
-    const qty = risk$ / priceDiff;
-    return qty;
+  sizeTrade(stop: number, entry: number) {
+    const indicators = this.perception as unknown as { indicators?: IndicatorCache };
+    const atr = indicators?.indicators?.atr?.(14) ?? entry * 0.005;
+    const atrPct = atr / entry;
+    const targetVol = 0.005;
+    const volFactor = Math.min(2, Math.max(0.5, targetVol / atrPct));
+    const riskDollar = (this.config.riskPct / 100) * this.equity * volFactor;
+    const qty = riskDollar / Math.abs(entry - stop);
+    return +qty.toFixed(6);
   }
 
   updateStops(position: Position): number | null {

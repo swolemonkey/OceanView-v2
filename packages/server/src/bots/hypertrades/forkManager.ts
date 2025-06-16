@@ -1,6 +1,6 @@
-import { prisma } from '../../db.js';
+import { prisma } from '../../db';
 import IoRedisMock from 'ioredis-mock';
-import { forkCfg } from './config.js';
+import { forkCfg } from './config';
 
 // Use Redis mock for development
 // @ts-ignore - Working around type issues with ioredis-mock

@@ -14,8 +14,7 @@ const candles = [
 async function runTest() {
   console.log('Starting HyperTrades test with new strategy architecture...');
   
-  // Set environment variable for symbols
-  process.env.HYPER_SYMBOLS = 'bitcoin,ethereum,solana';
+
   
   try {
     // Load config

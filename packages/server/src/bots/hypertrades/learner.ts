@@ -1,4 +1,4 @@
-import { prisma } from '../../db.js';
+import { prisma } from '../../db';
 
 export async function nightlyUpdate(){
   const exps = await prisma.experience.findMany({
