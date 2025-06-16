@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { placeSimOrder } from '../src/execution/sim.js';
+import { placeSimOrder } from '../src/execution/sim';
 
 describe('Simulation Execution Engine', () => {
   it('should place a simulated order and create a trade', async () => {

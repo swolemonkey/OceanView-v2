@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../db.js';
+import fs from 'fs';
+import path from 'path';
 
 interface MetricsResponse {
   equity: number;
@@ -109,4 +111,15 @@ export async function registerMetricsRoute(fastify: FastifyInstance) {
       return { error: 'Failed to fetch metrics' };
     }
   });
-} 
+
+  fastify.get('/metrics/backtest-real', async (_req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const file = path.join(process.cwd(), 'backtest-output', 'summary.json');
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      return data;
+    } catch (err) {
+      reply.code(500);
+      return { error: 'Failed to load backtest summary' };
+    }
+  });
+}

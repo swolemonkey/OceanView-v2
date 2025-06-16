@@ -1,4 +1,4 @@
-import { executeIdea } from '../src/bots/hypertrades/execution.js';
+import { executeIdea } from '../src/bots/hypertrades/execution';
 import { jest, describe, it, expect } from '@jest/globals';
 
 // Setup mock

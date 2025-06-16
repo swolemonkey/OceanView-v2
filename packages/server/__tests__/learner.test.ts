@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { nightlyUpdate } from '../src/bots/hypertrades/learner.js';
+import { nightlyUpdate } from '../src/bots/hypertrades/learner';
 
 describe('Reinforcement Learning', () => {
   it('learner decreases thresholds on positive reward', async () => {

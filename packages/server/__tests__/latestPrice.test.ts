@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { registerLatestPriceRoute } from '../src/routes/latestPrice.js';
+import { registerLatestPriceRoute } from '../src/routes/latestPrice';
 import { describe, it, expect } from '@jest/globals';
 
 describe('Latest Price API', () => {

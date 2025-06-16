@@ -1,9 +1,9 @@
-import { placeSimOrder } from '../src/execution/sim.js';
+import { placeSimOrder } from '../src/execution/sim';
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { prisma } from '../src/db.js';
+import { prisma } from '../src/db';
 
 // Mock the prisma client
-jest.mock('../src/db.js', () => ({
+jest.mock('../src/db', () => ({
   prisma: {
     bot: {
       findUnique: jest.fn().mockResolvedValue({ equity: 10000 })

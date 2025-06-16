@@ -26,5 +26,6 @@ export interface Fill {
 }
 
 export interface ExecutionEngine {
+  supportsOCO?: boolean;
   place(order: Order, ctx?: OrderContext): Promise<Fill>;
-} 
+}

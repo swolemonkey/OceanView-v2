@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { registerOrderRoute } from '../src/routes/order.js';
+import { registerOrderRoute } from '../src/routes/order';
 import { describe, it, expect } from '@jest/globals';
 
 describe('/api/order', () => {

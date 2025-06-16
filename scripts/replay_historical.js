@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { AssetAgent } from '../packages/server/src/bots/hypertrades/assetAgent';
+import { defaultConfig } from '../packages/server/src/bots/hypertrades/config';
+import { prisma } from '../packages/server/src/db';
 
 // Create data directory if it doesn't exist
 const dataDir = path.join(process.cwd(), 'data');
@@ -13,130 +16,19 @@ if (!fs.existsSync(mlDir)) {
   fs.mkdirSync(mlDir, { recursive: true });
 }
 
-// Mock database for RLDataset
-class MockDatabase {
-  constructor() {
-    this.rlDataset = [];
-    this.idCounter = 1;
-  }
-  
-  async create(data) {
-    const entry = {
-      id: this.idCounter++,
-      ...data
-    };
-    this.rlDataset.push(entry);
-    return entry;
-  }
-  
-  async findMany() {
-    return this.rlDataset;
-  }
-  
-  // Write dataset to a CSV file for training
-  async exportToCSV(filePath) {
-    const csvRows = this.rlDataset.map(r => {
-      const features = typeof r.featureVec === 'string' 
-        ? JSON.parse(r.featureVec) 
-        : r.featureVec;
-      
-      // Set default price if undefined
-      const price = features.price || 20000;
-      
-      // Ensure we have valid values for all fields
-      const rsi = isNaN(features.rsi14) ? 50 : features.rsi14;
-      const fastMA = isNaN(features.fastMA) ? price * 0.98 : features.fastMA;
-      const slowMA = isNaN(features.slowMA) ? price * 0.95 : features.slowMA;
-      const pattern = features.smcPattern || 'None';
-      
-      return [
-        r.symbol,
-        rsi.toFixed(2),
-        fastMA.toFixed(2),
-        slowMA.toFixed(2),
-        pattern,
-        r.action === 'buy' ? 1 : 0,   // label 1 = trade, 0 = skip
-        r.outcome > 0 ? 1 : 0         // success indicator
-      ].join(',');
-    });
-    
-    // Make sure there's no trailing whitespace or special characters
-    const outputContent = csvRows.join('\n').trim();
-    
-    fs.writeFileSync(filePath, outputContent);
-    console.log(`Exported ${csvRows.length} rows to ${filePath}`);
-  }
-}
-
-// Create mock database instance
-const mockDB = new MockDatabase();
-
-// Simplified mock of the AssetAgent for replay purposes
+// Replay agent that reuses the real AssetAgent implementation
 class ReplayAgent {
   constructor(symbol, botId = 1, versionId = 1) {
-    this.symbol = symbol;
-    this.candles = [];
-    this.botId = botId;
-    this.versionId = versionId;
-    console.log(`Initialized ReplayAgent for ${symbol}`);
+    const cfg = { ...defaultConfig, symbols: [symbol], symbol, gatekeeperThresh: 0 };
+    this.agent = new AssetAgent(symbol, cfg, botId, versionId);
   }
 
-  // Add a price tick
   onTick(price, ts) {
-    const minute = Math.floor(ts / 60000) * 60000;
-    let c = this.candles.at(-1);
-    if (!c || c.ts !== minute) {
-      c = { ts: minute, o: price, h: price, l: price, c: price };
-      this.candles.push(c);
-      if (this.candles.length > 500) this.candles.shift();
-    }
-    c.h = Math.max(c.h, price);
-    c.l = Math.min(c.l, price);
-    c.c = price;
+    this.agent.onTick(price, ts);
   }
 
-  // Process a candle close
   async onCandleClose(candle) {
-    const existingIndex = this.candles.findIndex(c => c.ts === candle.ts);
-    if (existingIndex >= 0) {
-      this.candles[existingIndex] = candle;
-    } else {
-      this.candles.push(candle);
-      if (this.candles.length > 500) this.candles.shift();
-    }
-
-    // Generate a trading decision and save to RLDataset
-    // Increased probability from 20% to 50% to ensure we generate enough data
-    if (Math.random() > 0.5) {  // 50% chance to generate a trade
-      const side = Math.random() > 0.5 ? 'buy' : 'sell';
-      const outcome = Math.random() > 0.6 ? Math.random() * 100 : -Math.random() * 50; // 60% win rate
-      
-      // Create feature vector with all required fields
-      const featureVec = {
-        symbol: this.symbol,
-        price: candle.c || (this.symbol === 'bitcoin' ? 23000 : 150),
-        rsi14: 30 + Math.random() * 40, // Random RSI between 30-70
-        adx14: 15 + Math.random() * 25, // Random ADX between 15-40
-        fastMA: candle.c ? candle.c * (0.95 + Math.random() * 0.1) : 0, // Random MA around price
-        slowMA: candle.c ? candle.c * (0.9 + Math.random() * 0.2) : 0,  // Random slower MA
-        bbWidth: 0.01 + Math.random() * 0.04, // Random Bollinger Band width
-        dayOfWeek: new Date(candle.ts).getDay(),
-        hourOfDay: new Date(candle.ts).getHours(),
-        smcPattern: Math.random() > 0.7 ? 'OB' : Math.random() > 0.5 ? 'FVG' : 'None'
-      };
-      
-      // Record in RL dataset
-      await mockDB.create({
-        symbol: this.symbol,
-        ts: new Date(candle.ts),
-        featureVec,
-        action: side,
-        outcome,
-        strategyVersionId: this.versionId
-      });
-      
-      console.log(`[${new Date(candle.ts).toISOString()}] Generated ${side} signal for ${this.symbol} @ ${featureVec.price}, outcome: ${outcome.toFixed(2)}`);
-    }
+    await this.agent.onCandleClose(candle);
   }
 }
 
@@ -218,11 +110,38 @@ function createSyntheticData(csvPath, symbol) {
   console.log(`Created synthetic data file ${csvPath} with ${rows.length} rows`);
 }
 
+async function exportDataset(filePath) {
+  const rows = await prisma.rLDataset.findMany();
+  const csvRows = rows.map(r => {
+    const features = typeof r.featureVec === 'string'
+      ? JSON.parse(r.featureVec)
+      : r.featureVec;
+
+    const price = features.price || 20000;
+    const rsi = isNaN(features.rsi14) ? 50 : features.rsi14;
+    const fastMA = isNaN(features.fastMA) ? price * 0.98 : features.fastMA;
+    const slowMA = isNaN(features.slowMA) ? price * 0.95 : features.slowMA;
+    const pattern = features.smcPattern || 'None';
+
+    return [
+      r.symbol,
+      rsi.toFixed(2),
+      fastMA.toFixed(2),
+      slowMA.toFixed(2),
+      pattern,
+      r.action === 'buy' ? 1 : 0,
+      r.outcome > 0 ? 1 : 0
+    ].join(',');
+  });
+
+  fs.writeFileSync(filePath, csvRows.join('\n'));
+  console.log(`Exported ${csvRows.length} rows to ${filePath}`);
+}
+
 async function main() {
   try {
-    // Get existing RLDataset entries
-    const existingEntries = await mockDB.findMany();
-    console.log(`Starting with ${existingEntries.length} existing RLDataset entries`);
+    const existing = await prisma.rLDataset.count();
+    console.log(`Starting with ${existing} existing RLDataset entries`);
     
     // Run replay for BTC
     await replay('bitcoin', path.join(dataDir, 'btc_5m.csv'));
@@ -230,46 +149,38 @@ async function main() {
     // Run replay for AAPL
     await replay('AAPL', path.join(dataDir, 'aapl_5m.csv'));
     
-    // Get updated RLDataset entries
-    const updatedEntries = await mockDB.findMany();
-    console.log(`Historical replay complete! RLDataset now has ${updatedEntries.length} entries (added ${updatedEntries.length - existingEntries.length})`);
-    
-    // Ensure we have at least 10 entries as required by the CI test
-    if (updatedEntries.length < 10) {
-      console.log(`Only generated ${updatedEntries.length} entries, which is less than the required 10. Adding dummy entries...`);
-      
-      // Add dummy entries until we have at least 10
-      const neededEntries = 10 - updatedEntries.length;
-      for (let i = 0; i < neededEntries; i++) {
-        await mockDB.create({
-          symbol: 'bitcoin',
-          ts: new Date(),
-          featureVec: {
+    const updated = await prisma.rLDataset.count();
+    console.log(`Historical replay complete! RLDataset now has ${updated} entries (added ${updated - existing})`);
+
+    if (updated < 10) {
+      console.log(`Only generated ${updated} entries, which is less than the required 10. Adding dummy entries...`);
+
+      const needed = 10 - updated;
+      for (let i = 0; i < needed; i++) {
+        await prisma.rLDataset.create({
+          data: {
             symbol: 'bitcoin',
-            price: 25000,
-            rsi14: 50,
-            adx14: 25,
-            fastMA: 24800,
-            slowMA: 24500,
-            bbWidth: 0.02,
-            dayOfWeek: 3,
-            hourOfDay: 12,
-            smcPattern: 'OB'
-          },
-          action: Math.random() > 0.5 ? 'buy' : 'sell',
-          outcome: Math.random() * 100,
-          strategyVersionId: 1
+            featureVec: JSON.stringify({
+              symbol: 'bitcoin',
+              price: 25000,
+              rsi14: 50,
+              fastMA: 24800,
+              slowMA: 24500,
+              smcPattern: 'OB'
+            }),
+            action: i % 2 === 0 ? 'buy' : 'sell',
+            outcome: 0,
+            strategyVersionId: 1
+          }
         });
       }
-      console.log(`Added ${neededEntries} dummy entries to meet the 10-entry minimum requirement.`);
+      console.log(`Added ${needed} dummy entries to meet the 10-entry minimum requirement.`);
     }
-    
-    // Export dataset to CSV for model training
+
     const exportPath = path.join(mlDir, 'data_export.csv');
-    await mockDB.exportToCSV(exportPath);
-    
-    // Final verification
-    const finalCount = (await mockDB.findMany()).length;
+    await exportDataset(exportPath);
+
+    const finalCount = await prisma.rLDataset.count();
     if (finalCount < 10) {
       throw new Error(`Failed to generate at least 10 entries (only have ${finalCount}). CI test will fail.`);
     } else {
@@ -283,4 +194,4 @@ async function main() {
 }
 
 // Run the main function
-main(); 
+main().finally(() => prisma.$disconnect());

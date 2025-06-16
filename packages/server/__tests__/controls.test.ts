@@ -1,7 +1,7 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 // Mock Prisma client - using a more direct approach with @ts-ignore
-jest.mock('../src/db.js', () => ({
+jest.mock('../src/db', () => ({
   prisma: {
     accountState: {
       // @ts-ignore - suppressing the TypeScript error about the mock return type
@@ -12,7 +12,7 @@ jest.mock('../src/db.js', () => ({
 
 // Import after mocking
 import { FastifyInstance } from 'fastify';
-import { registerControlsRoute } from '../src/routes/controls.js';
+import { registerControlsRoute } from '../src/routes/controls';
 
 describe('Controls Controller', () => {
   let app: any; // Using any type to avoid TypeScript errors

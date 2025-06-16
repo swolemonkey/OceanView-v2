@@ -1,6 +1,28 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
+export async function seedTradableAssets() {
+  const rows: [string, 'future' | 'equity'][] = [
+    // ——— crypto futures (Binance Test-net) ———
+    ['BTC','future'], ['ETH','future'], ['SOL','future'], ['AVAX','future'],
+    ['LINK','future'], ['MATIC','future'], ['ARB','future'], ['DOGE','future'],
+    ['APT','future'], ['OP','future'],
+    // ——— equities (Alpaca Paper) ———
+    ['AAPL','equity'], ['TSLA','equity'], ['AMD','equity'], ['NVDA','equity'],
+    ['AMZN','equity'], ['META','equity'], ['COIN','equity'], ['SHOP','equity'],
+    ['SQ','equity'], ['GME','equity']
+  ];
+
+  await Promise.all(rows.map(([symbol, assetClass]) =>
+    prisma.tradableAsset.upsert({
+      where: { symbol },
+      update: { assetClass, active: true },
+      create: { symbol, assetClass, active: true }
+    })
+  ));
+  console.log('✅  TradableAsset seeded:', rows.length);
+}
+
 async function main() {
   // Get yesterday's date
   const yesterday = new Date();
@@ -140,10 +162,12 @@ async function main() {
     ]);
 
     // Update ATR parameters with direct query
-    await prisma.$executeRaw`UPDATE "HyperSettings" SET 
-      "atrMultiple" = 1.5, 
+    await prisma.$executeRaw`UPDATE "HyperSettings" SET
+      "atrMultiple" = 1.5,
       "atrPeriod" = 14
       WHERE id = 1`;
+
+    await seedTradableAssets();
 
     console.log("Database seeding completed successfully!");
   } catch (error) {
