@@ -73,7 +73,7 @@ if [[ -n "$POLYGON_API_KEY" ]]; then
   touch data/btc_5m.csv
   
   # Direct CSV extraction for BTC
-  if curl -s "https://api.polygon.io/v2/aggs/ticker/X:BTCUSD/range/5/minute/$START_DATE/$END_DATE?apiKey=${POLYGON_API_KEY}&limit=5000" | jq -r '.results[]? | [.t, .c] | @csv' >> data/btc_5m.csv; then
+  if curl -s "https://api.polygon.io/v2/aggs/ticker/X:BTCUSD/range/5/minute/$START_DATE/$END_DATE?apiKey=${POLYGON_API_KEY}&limit=5000" | jq -r '.results[]? | [.t, .o, .h, .l, .c] | @csv' >> data/btc_5m.csv; then
     # Check if we got any data rows
     if [[ -s data/btc_5m.csv ]] && [[ $(wc -l < data/btc_5m.csv) -gt 0 ]]; then
       echo "Created $(wc -l < data/btc_5m.csv) BTC/USD bars from Polygon.io"
@@ -150,13 +150,17 @@ fi
 # Create sample BTC data if all APIs failed
 if [[ "$POLYGON_BTC_SUCCESS" != "true" && "$COINGECKO_SUCCESS" != "true" || ! -f data/btc_5m.csv ]]; then
   echo "All API attempts failed, falling back to sample data for BTC..."
-  # Generate 1000 rows of sample data as fallback
+  # Generate 1000 rows of sample data as fallback with proper OHLC
   CURRENT_TIME=$(date +%s000)
   rm -f data/btc_5m.csv
   for i in {0..999}; do
     TIMESTAMP=$((CURRENT_TIME - i * 300000))
-    PRICE=$((95000 + RANDOM % 5000))
-    echo "$TIMESTAMP,$PRICE" >> data/btc_5m.csv
+    BASE_PRICE=$((95000 + RANDOM % 5000))
+    OPEN=$BASE_PRICE
+    HIGH=$((BASE_PRICE + RANDOM % 500))
+    LOW=$((BASE_PRICE - RANDOM % 500))
+    CLOSE=$((BASE_PRICE + RANDOM % 200 - 100))
+    echo "$TIMESTAMP,$OPEN,$HIGH,$LOW,$CLOSE" >> data/btc_5m.csv
   done
   echo "Created $(wc -l < data/btc_5m.csv) BTC/USD sample bars as fallback"
 fi

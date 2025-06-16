@@ -108,7 +108,7 @@ await registerControlsRoute(app);
 
 // Add startup event handler to run the bot using the requested pattern
 app.addHook('onReady', async () => {
-  logger.info(`Starting Multi-Asset HyperTrades bot with symbols: ${configuredSymbols}`);
+  logger.info('Starting Multi-Asset HyperTrades bot...');
   
   // Initialize RLModel before starting the bot
   await initializeRLModel();
