@@ -1,23 +1,24 @@
-import { Perception, Candle } from './perception.js';
-import { RiskManager } from './risk.js';
-import { executeIdea } from './execution.js';
-import type { Config } from './config.js';
-import * as Indicators from './indicators/index.js';
-import { BaseStrategy } from './strategies/baseStrategy.js';
-import { SMCReversal } from './strategies/smcReversal.js';
-import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow.js';
-import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce.js';
-import { TrendFollowMA } from './strategies/trendFollowMA.js';
-import { RangeBounce } from './strategies/rangeBounce.js';
-import { passRR } from './utils/riskReward.js';
-import type { DataFeed, Tick } from '../../feeds/interface.js';
-import type { ExecutionEngine, Order } from '../../execution/interface.js';
-import { SimEngine } from '../../execution/sim.js';
-import { gate } from '../../rl/gatekeeper.js';
-import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
-import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
-import { createLogger } from '../../utils/logger.js';
-import { prisma } from '../../db.js';
+import { Perception, Candle } from './perception';
+import { RiskManager } from './risk';
+import { executeIdea } from './execution';
+import type { Config } from './config';
+import * as Indicators from './indicators/index';
+import { BaseStrategy } from './strategies/baseStrategy';
+import { SMCReversal } from './strategies/smcReversal';
+import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow';
+import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce';
+import { TrendFollowMA } from './strategies/trendFollowMA';
+import { RangeBounce } from './strategies/rangeBounce';
+import { passRR } from './utils/riskReward';
+import type { DataFeed, Tick } from '../../feeds/interface';
+import type { ExecutionEngine, Order } from '../../execution/interface';
+import { SimEngine } from '../../execution/sim';
+import { placeWithOCO } from '../../execution/ocoWrapper';
+import { gate } from '../../rl/gatekeeper';
+import { storeRLEntryId } from '../../botRunner/workers/hypertrades';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk';
+import { createLogger } from '../../utils/logger';
+import { prisma } from '../../db';
 
 // Create logger
 const logger = createLogger('assetAgent');
@@ -28,12 +29,14 @@ let portfolioRisk: PortfolioRiskManager | null = null;
 const allAgents = new Map<string, AssetAgent>();
 
 // Define TradeIdea type to match what executeIdea expects
-type TradeIdea = { 
-  symbol: string; 
-  side: 'buy' | 'sell'; 
-  qty: number; 
+type TradeIdea = {
+  symbol: string;
+  side: 'buy' | 'sell';
+  qty: number;
   price: number;
   reason?: string;
+  stop?: number;
+  target?: number;
 };
 
 // Type for decision output that can include a 'hold' action
@@ -244,20 +247,28 @@ export class AssetAgent {
       logger.error('Error scoring trade idea with gatekeeper:', { error });
     }
     
-    // Calculate position size
-    const stopPrice = candle.c * 0.98; // Calculate a stop price 2% below current price
+    // Calculate stop and target levels from last candle
+    const prev = this.perception.last(2)[0];
+    const stopPrice = tradeIdea.side === 'buy'
+      ? prev.l * 0.99
+      : prev.h * 1.01;
+    const targetPrice = tradeIdea.side === 'buy'
+      ? prev.h
+      : prev.l;
     const qty = this.risk.sizeTrade(stopPrice, candle.c);
     
     // Prepare full trade idea
-    const fullIdea: TradeIdea = {
+    const fullIdea: TradeIdea & { stop: number; target: number } = {
       symbol: this.symbol,
       side: tradeIdea.side,
       price: candle.c,
-      qty
+      qty,
+      stop: stopPrice,
+      target: targetPrice
     };
     
     // Check risk-reward ratio
-    if (!passRR(fullIdea.side, candle.c, candle.c * 0.98, candle.c * 1.02, 2.0)) {
+    if (!passRR(fullIdea.side, candle.c, stopPrice, targetPrice, 2.0)) {
       logger.info(`BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
       
       // Persist the blocked trade to the database
@@ -296,22 +307,20 @@ export class AssetAgent {
         price: candle.c
       };
       
-      // Execute order with retry
-      const orderResult = await this.executeWithRetry(order);
-      
-      // Process the order result
-      if (orderResult && orderResult.status === 'filled') {
-        // Get the fill price from the order result
-        const fill = orderResult.trades[0];
-        
-        // Update risk manager with new position
-        this.risk.registerOrder(fill.side, fill.qty, fill.price, fill.price * 0.98);
-        
-        // Update the RL dataset with the PnL outcome
+      let fill;
+      if ((this.executionEngine as any).supportsOCO) {
+        fill = await placeWithOCO(this.executionEngine, order, stopPrice, targetPrice);
+      } else {
+        fill = await this.executionEngine.place(order);
+      }
+
+      if (fill) {
+        this.risk.registerOrder(fill.side, fill.qty, fill.price, stopPrice);
+
         if (rlEntryId) {
-          await gate.updateOutcome(rlEntryId, 0); // Placeholder PnL, will be updated later
+          await gate.updateOutcome(rlEntryId, 0);
         }
-        
+
         logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);
       }
     } catch (error) {

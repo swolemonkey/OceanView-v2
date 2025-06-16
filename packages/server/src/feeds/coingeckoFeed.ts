@@ -1,5 +1,9 @@
 import { DataFeed, Tick } from './interface.js';
-import fetch from 'node-fetch';
+// Dynamic import to avoid ESM issues during tests
+const fetchFn = async (...args: any[]) => {
+  const mod = await import('node-fetch');
+  return (mod.default as any)(...args);
+};
 import * as pino from 'pino';
 
 // Initialize logger
@@ -112,7 +116,7 @@ export class CoinGeckoFeed implements DataFeed {
       const fullUrl = `${this.url}?${qs}`;
       
       logger.info(`Fetching from CoinGecko: ${fullUrl}`);
-      const res = await fetch(fullUrl);
+      const res = await fetchFn(fullUrl);
       
       // Check for rate limiting
       if (res.status === 429) {

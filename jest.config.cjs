@@ -19,4 +19,4 @@ module.exports = {
   // Add these settings for CI compatibility
   testPathIgnorePatterns: ['/node_modules/'],
   transformIgnorePatterns: ['/node_modules/']
-}; 
+};

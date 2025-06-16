@@ -1,7 +1,7 @@
-import { loadConfig } from './config.js';
-import { smcSignal } from './smc.js';
-import { taSignal  } from './ta.js';
-import { Perception } from './perception.js';
+import { loadConfig } from './config';
+import { smcSignal } from './smc';
+import { taSignal  } from './ta';
+import { Perception } from './perception';
 
 interface Config {
   smc: { thresh: number };
@@ -39,13 +39,17 @@ export async function decide(perception: Perception, cfg?: Config){
 
   if(s && s.type==='stop-hunt-long' && t && t.type==='ta-long'){
     const last = perception.last(1)[0].c;
-    return {
+    const idea: any = {
       symbol: cfg.symbol,
       side: 'buy',
       qty: 0.001,
       price: last,
       reason: `Buy signal: ${reason}`
     };
+    const prev = perception.last(2)[0];
+    idea.stop = prev.l * 0.99;
+    idea.target = prev.h;
+    return idea;
   }
   
   // Return null with reason property for logging

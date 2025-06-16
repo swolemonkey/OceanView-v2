@@ -1,7 +1,7 @@
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
-import { prisma } from '../db.js';
-import { createLogger } from '../utils/logger.js';
+import { prisma } from '../db';
+import { createLogger } from '../utils/logger';
 import { registerOnnxModel, promoteOnnxModel, getActiveModel } from './modelPromotion.js';
 import path from 'path';
 import fs from 'fs';

@@ -27,7 +27,7 @@ jest.mock('ioredis', () => {
 });
 
 // Mock the database to avoid actual DB interactions in tests
-jest.mock('../src/db.js', () => ({
+jest.mock('../src/db', () => ({
   prisma: {
     evolutionMetric: {
       create: jest.fn(),

@@ -1,5 +1,5 @@
-import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
-import type { Candle } from '../perception.js';
+import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy';
+import type { Candle } from '../perception';
 
 export class RangeBounce extends BaseStrategy {
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {

@@ -21,6 +21,8 @@
     "evolution:run": "tsx scripts/evolution.ts",
     "bot:metrics": "pnpm --filter @oceanview/server run tsx scripts/bot-metrics.ts",
     "bot:set-equity": "pnpm --filter @oceanview/server run tsx scripts/bot-set-equity.ts",
+    "backtest:polygon": "ts-node scripts/backtest_polygon.ts",
+    "backtest:real": "ts-node cli/backtest:polygon-all.ts",
     "seed:all": "tsx scripts/seedAll.ts",
     "test": "jest --config jest.config.cjs",
     "test:e2e": "jest tests/e2e --config jest.config.cjs --runInBand"

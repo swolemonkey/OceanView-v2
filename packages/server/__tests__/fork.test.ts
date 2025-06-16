@@ -1,5 +1,5 @@
-import { weeklyFork, weeklyEvaluate } from '../src/bots/hypertrades/forkManager.js';
-import { prisma } from '../src/db.js';
+import { weeklyFork, weeklyEvaluate } from '../src/bots/hypertrades/forkManager';
+import { prisma } from '../src/db';
 import { jest } from '@jest/globals';
 
 // Type definition to help TypeScript understand our mock
@@ -21,7 +21,7 @@ type MockClient = {
 };
 
 // Mock the Prisma client
-jest.mock('../src/db.js', () => ({
+jest.mock('../src/db', () => ({
   prisma: {
     bot: {
       findFirst: jest.fn(),
