@@ -163,9 +163,9 @@ export const prisma = {
       // Return a properly typed model with required properties
       return [{ 
         id: 1, 
-        version: 'gatekeeper_v1', 
-        path: './ml/gatekeeper_v1.onnx', 
-        description: 'Mock model',
+        version: 'gatekeeper_active', 
+        path: 'ml/gatekeeper_active.onnx', 
+        description: 'Mock active model',
         createdAt: new Date()
       }];
     },
@@ -173,11 +173,15 @@ export const prisma = {
       if (process.env.NODE_ENV === 'test') console.log('Mock RLModel findFirst called');
       return { 
         id: 1, 
-        version: 'gatekeeper_v1', 
-        path: './ml/gatekeeper_v1.onnx', 
-        description: 'Mock model',
+        version: 'gatekeeper_active', 
+        path: 'ml/gatekeeper_active.onnx', 
+        description: 'Mock active model',
         createdAt: new Date()
       };
+    },
+    update: async (args) => {
+      if (process.env.NODE_ENV === 'test') console.log('Mock RLModel update called:', args);
+      return { id: args?.where?.id, ...args?.data };
     }
   },
   rLDataset: {

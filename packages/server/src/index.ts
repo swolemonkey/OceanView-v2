@@ -22,7 +22,7 @@ import { initHealthCheck } from './cron/health-check.js';
 import cron from 'node-cron';
 import { createLogger } from './utils/logger.js';
 import { gate } from './rl/gatekeeper.js';
-import { getActiveModel, registerOnnxModel, promoteOnnxModel } from './rl/modelPromotion.js';
+import { getActiveModel, initializeActiveModel, getActiveModelPath } from './rl/modelPromotion.js';
 import { retrainGatekeeper } from './rl/retrainJob.js';
 import fs from 'fs';
 import path from 'path';
@@ -49,73 +49,21 @@ function resolveProjectPath(relativePath: string): string {
 // Initialize RLModel in the database
 async function initializeRLModel() {
   try {
-    // Get the active model (the one with primary status)
-    const activeModel = await getActiveModel();
+    // Initialize the active model system
+    const defaultModelPath = 'ml/gatekeeper_primary8.onnx';
+    await initializeActiveModel(defaultModelPath);
     
-    // If no active model exists, initialize with the default model
-    if (!activeModel) {
-      // Check if default model file exists - use absolute path
-      const defaultModelPath = resolveProjectPath('ml/gatekeeper_v1.onnx');
-      if (!fs.existsSync(defaultModelPath)) {
-        logger.error(`Default model file ${defaultModelPath} not found`);
-        throw new Error(`Default model file ${defaultModelPath} not found`);
-      }
+    // Get the active model
+    const activeModel = await getActiveModel();
+    if (activeModel) {
+      logger.info(`Gatekeeper using active model: ${activeModel.version}`);
+      logger.info(`Active model path: ${activeModel.path}`);
       
-      // Create initial model entry
-      const newModel = await registerOnnxModel(
-        defaultModelPath,
-        'Initial baseline gatekeeper model'
-      );
-      
-      // Promote it to be the active model
-      await promoteOnnxModel(newModel.id);
-      
-      logger.info(`Gatekeeper initialized with default model ${newModel.path}`);
-      
-      // Initialize the model
-      await gate.init(newModel.path);
+      // Initialize the gatekeeper with the active model
+      await gate.init();
     } else {
-      // Get the absolute path for the model
-      const absoluteModelPath = resolveProjectPath(activeModel.path);
-      logger.info(`Gatekeeper using existing model ${absoluteModelPath}`);
-      
-      // Check if the model file exists
-      if (!fs.existsSync(absoluteModelPath)) {
-        logger.error(`Model file ${absoluteModelPath} not found, looking for fallbacks`);
-        
-        // Look for fallback files in the ml directory
-        const fallbacks = [
-          resolveProjectPath('ml/gatekeeper_v1.onnx'),
-          resolveProjectPath(`ml/gatekeeper_${activeModel.id}.onnx`),
-          resolveProjectPath('ml/gatekeeper_v2.onnx')
-        ];
-        
-        let fallbackFound = false;
-        for (const fallback of fallbacks) {
-          if (fs.existsSync(fallback)) {
-            logger.info(`Using fallback model file: ${fallback}`);
-            
-            // Update the database entry to point to the found file
-            await prisma.rLModel.update({
-              where: { id: activeModel.id },
-              data: { path: fallback }
-            });
-            
-            // Initialize with the fallback file
-            await gate.init(fallback);
-            fallbackFound = true;
-            break;
-          }
-        }
-        
-        if (!fallbackFound) {
-          logger.error('No fallback model files found, cannot continue');
-          throw new Error('No valid model files found');
-        }
-      } else {
-        // Initialize the model with the absolute path
-        await gate.init(absoluteModelPath);
-      }
+      logger.error('No active model found after initialization');
+      throw new Error('Failed to initialize active model');
     }
 
     // Load gatekeeper threshold from database

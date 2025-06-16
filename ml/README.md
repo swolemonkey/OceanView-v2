@@ -58,7 +58,7 @@ Either method will:
 - Load the dataset
 - Train a logistic regression model
 - Evaluate performance (target ROC-AUC ≥ 0.6)
-- Export the model to ONNX format as `gatekeeper_v1.onnx`
+- Export the model to ONNX format as `gatekeeper_active.onnx`
 
 ### 4. Register Model
 
@@ -85,6 +85,30 @@ The system will now:
 - Veto trades with scores below 0.55
 - Log all trade decisions with gatekeeper scores
 - Bootstrap equity from the database
+
+## Model Management
+
+The system uses a **stable active model approach**:
+
+- **Active Model**: Always located at `ml/gatekeeper_active.onnx`
+- **Versioned Models**: Historical models stored as `ml/gatekeeper_v{timestamp}.onnx`
+- **Database Tracking**: The `RLModel` table tracks all models with the active one having version `gatekeeper_active`
+
+### Model Promotion
+
+When a new model is trained and performs better:
+
+1. The old active model is backed up to `ml/gatekeeper_active_backup.onnx`
+2. The new model is copied to `ml/gatekeeper_active.onnx`
+3. Database records are updated to reflect the promotion
+4. No code changes or hardcoded paths need updating
+
+### Benefits
+
+- **No hardcoded references**: All code uses the stable `gatekeeper_active.onnx` path
+- **Seamless updates**: New models can be promoted without code changes
+- **Version history**: All previous models are preserved with timestamps
+- **Rollback capability**: Easy to revert to previous models if needed
 
 ## Validation
 
@@ -113,6 +137,7 @@ After running this script, you only need to restart the service to activate the 
 ## Troubleshooting
 
 If the gatekeeper fails to load:
-- Check that the ONNX file exists at the path specified in the RLModel table
+- Check that the ONNX file exists at `ml/gatekeeper_active.onnx`
 - Verify the onnxruntime-node dependency is installed
-- Check logs for any model loading errors 
+- Check logs for any model loading errors
+- Ensure the database has a record with version `gatekeeper_active` 

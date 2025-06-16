@@ -3,9 +3,11 @@
  */
 
 import { InferenceSession } from 'onnxruntime-node';
+import { getActiveModelPath } from '../packages/server/src/rl/modelPromotion.js';
 import path from 'path';
 
-const MODEL_PATH = path.resolve('packages/server/models/gatekeeper_v1.onnx');
+// Use the stable active model path
+const MODEL_PATH = path.resolve(getActiveModelPath());
 
 async function main() {
   console.log(`Attempting to load model from: ${MODEL_PATH}`);

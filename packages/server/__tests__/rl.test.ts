@@ -29,8 +29,8 @@ jest.mock('../src/db', () => ({
     rLModel: {
       findFirst: jest.fn().mockResolvedValue({
         id: 1,
-        version: 'gatekeeper_v1',
-        path: 'ml/gatekeeper_v1.onnx',
+        version: 'gatekeeper_active',
+        path: 'ml/gatekeeper_active.onnx',
         description: 'Test model'
       })
     },

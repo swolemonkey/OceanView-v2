@@ -30,11 +30,14 @@ ml/.venv/
 ml/py311/
 ml/venv/
 
-# Keep these specific model files
-!ml/gatekeeper_v1.onnx
-!ml/gatekeeper_primary8.onnx
-!packages/server/ml/gatekeeper_v1.onnx
-!packages/server/ml/gatekeeper_primary8.onnx
+# Exclude old naming convention model files
+ml/gatekeeper_primary*.onnx
+ml/gatekeeper_v1.onnx
+ml/gatekeeper_v2.onnx
+
+# Keep the stable active model and recent versions
+!ml/gatekeeper_active.onnx
+!ml/gatekeeper_v*.onnx
 
 # Databases
 *.db

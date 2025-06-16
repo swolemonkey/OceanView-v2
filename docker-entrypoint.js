@@ -8,26 +8,10 @@ const env = { ...process.env }
 
 // If running the web server then migrate existing database
 if (process.argv.slice(-3).join(' ') === 'pnpm run start' || 
-    process.argv.slice(-3).join(' ') === 'pnpm --dir=packages/server start:docker') {
+    process.argv.slice(-3).join(' ') === 'pnpm --dir=packages/server start:docker' ||
+    process.argv.slice(-3).join(' ') === 'pnpm --dir=packages/server dev') {
   console.log("Starting database setup...")
   
-  // place Sqlite3 database on volume
-  const dbDir = '/data'
-  const dbFile = path.join(dbDir, 'dev.db')
-  
-  // Create data directory if it doesn't exist
-  if (!fs.existsSync(dbDir)) {
-    console.log(`Creating data directory: ${dbDir}`)
-    fs.mkdirSync(dbDir, { recursive: true })
-  }
-  
-  // Check if we need to restore from backup
-  let newDb = !fs.existsSync(dbFile)
-  if (newDb && process.env.BUCKET_NAME) {
-    await exec(`litestream restore -config litestream.yml -if-replica-exists ${dbFile}`)
-    newDb = !fs.existsSync(dbFile)
-  }
-
   // prepare database
   console.log("Running database migrations...")
   await exec('npx prisma migrate deploy --schema=/app/packages/server/prisma/schema.prisma')
@@ -35,11 +19,6 @@ if (process.argv.slice(-3).join(' ') === 'pnpm run start' ||
   // Run the seedAll script to ensure all mandatory rows exist
   console.log("Running database seeding...")
   await exec('pnpm tsx scripts/seedAll.ts')
-  
-  // Set correct permission on database file
-  if (fs.existsSync(dbFile)) {
-    fs.chmodSync(dbFile, 0o666)
-  }
   
   console.log("Database setup completed.")
 }

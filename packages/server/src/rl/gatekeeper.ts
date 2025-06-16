@@ -3,6 +3,7 @@ import { InferenceSession, Tensor } from 'onnxruntime-node';
 import path from 'path';
 import { createLogger } from '../utils/logger.js';
 import fs from 'fs';
+import { getActiveModelPath } from './modelPromotion.js';
 
 // Create logger
 const logger = createLogger('gatekeeper');
@@ -65,14 +66,17 @@ export class RLGatekeeper {
   }
 
   /**
-   * Initialize the ONNX model
-   * @param modelPath Path to the ONNX model file (defaults to ml/gatekeeper_v1.onnx)
+   * Initialize the gatekeeper with a trained ONNX model
+   * @param modelPath Path to the ONNX model file (defaults to the stable active model path)
    * @returns Promise that resolves when the model is loaded
    */
-  async init(modelPath: string = 'ml/gatekeeper_v1.onnx'): Promise<void> {
+  async init(modelPath?: string): Promise<void> {
     try {
+      // Use the stable active model path if no specific path is provided
+      const pathToUse = modelPath || getActiveModelPath();
+      
       // Resolve the model path to an absolute path
-      const resolvedPath = resolveModelPath(modelPath);
+      const resolvedPath = resolveModelPath(pathToUse);
       this.modelPath = resolvedPath;
       
       logger.info(`Loading RL model from ${resolvedPath}`);

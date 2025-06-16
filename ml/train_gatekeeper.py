@@ -91,23 +91,23 @@ def train_gatekeeper_model(out_path):
         cursor = conn.cursor()
 
         # Check if model already exists
-        cursor.execute("SELECT * FROM RLModel WHERE version = 'gatekeeper_v1'")
+        cursor.execute("SELECT * FROM RLModel WHERE version = 'gatekeeper_active'")
         existing_model = cursor.fetchone()
 
         if existing_model:
             cursor.execute(
-                "UPDATE RLModel SET path = ?, description = ? WHERE version = 'gatekeeper_v1'",
+                "UPDATE RLModel SET path = ?, description = ? WHERE version = 'gatekeeper_active'",
                 (out_path, f'LR baseline AUC {auc:.2f}')
             )
             conn.commit()
-            print(f"Updated model 'gatekeeper_v1' in database with new path: {out_path}")
+            print(f"Updated active model in database with new path: {out_path}")
         else:
             cursor.execute(
                 "INSERT INTO RLModel (version, path, description) VALUES (?, ?, ?)",
-                ('gatekeeper_v1', out_path, f'LR baseline AUC {auc:.2f}')
+                ('gatekeeper_active', out_path, f'LR baseline AUC {auc:.2f}')
             )
             conn.commit()
-            print("Inserted model into database")
+            print("Inserted active model into database")
 
         conn.close()
     except Exception as e:
@@ -118,7 +118,7 @@ def train_gatekeeper_model(out_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", default="packages/server/models/gatekeeper_v1.onnx")
+    parser.add_argument("--out", default="ml/gatekeeper_active.onnx")
     args = parser.parse_args()
     OUT_PATH = args.out
     
