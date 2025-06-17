@@ -1,4 +1,4 @@
-import { prisma } from '../../db';
+import { prisma } from '../../db.js';
 
 export type Config = {
   symbols: string[];
@@ -109,22 +109,22 @@ export async function loadConfig(){
 export const defaultConfig = {
   symbols: ['bitcoin'],    // support multiple symbols
   symbol: 'bitcoin',        // start narrow
-  riskPct: 1,               // % equity per trade
+  riskPct: 1.2,            // % equity per trade - increased from 1%
   smc:  { 
-    thresh: 0.002,          // 0.2 % stop-hunt detection
-    minRetrace: 0.5         // 50% minimum price retracement
+    thresh: 0.003,         // 0.3% stop-hunt detection - increased from 0.2%
+    minRetrace: 0.5        // 50% minimum price retracement
   },
   ta:   { 
     rsiPeriod: 14, 
-    overSold: 35, 
-    overBought: 65 
+    overSold: 30,          // More extreme oversold level
+    overBought: 70         // More extreme overbought level
   },
   strategyToggle: {        // Default strategy toggle configuration
     TrendFollowMA: true,
     RangeBounce: true,
     SMCReversal: true
   },
-  gatekeeperThresh: 0.55,  // Default gatekeeper threshold
+  gatekeeperThresh: 0.62,  // Increased from 0.55 for higher quality signals
   execution: {
     slippageLimit: 0.003,   // 0.3% max slippage tolerance
     valueSplit: 2000,       // USD threshold for splitting orders

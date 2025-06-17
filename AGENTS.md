@@ -82,6 +82,29 @@ The ATR factor scales down size in high volatility environments.
 
 ## 8. Back‑testing and CI
 
+### Minimum Data Requirements
+For valid backtesting results, the following minimum data requirements must be met:
+
+1. Data Points:
+- Minimum 10 entries in RLDataset
+- Indicator calculation requirements:
+  - RSI: 14 candles
+  - ATR: 14 candles
+  - Bollinger Bands: 20 candles
+  - Fast MA: 50 candles
+  - Slow MA: 200 candles
+
+2. Time Period (5-minute candles):
+- Minimum: 24 hours (288 candles)
+- Recommended: 7 days (2016 candles)
+- Maximum: 30 days (8640 candles)
+
+3. Data Quality:
+- Format: timestamp (ms), open, high, low, close
+- Continuous data (no large gaps)
+- Crypto: 1 price point per 5 minutes
+- Stocks: Full OHLC data per 5 minutes
+
 Run `pnpm run backtest BTC ETH AAPL` to replay historical CSVs. The dashboard shows a Back‑Test card using `/metrics/backtest`.
 CI replay tests live in `tests/e2e/replaySmoke.test.ts` and require at least one veto, one long, and one short.
 

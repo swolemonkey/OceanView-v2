@@ -2,6 +2,31 @@
 
 This system replays historical market data through the AssetAgent pipeline to generate training data for the Gatekeeper model.
 
+## Data Requirements
+
+### Minimum Data Requirements
+For valid backtesting results, ensure your data meets these requirements:
+
+1. Data Points:
+- Minimum 10 entries in RLDataset
+- Indicator calculation requirements:
+  - RSI: 14 candles
+  - ATR: 14 candles
+  - Bollinger Bands: 20 candles
+  - Fast MA: 50 candles
+  - Slow MA: 200 candles
+
+2. Time Period (5-minute candles):
+- Minimum: 24 hours (288 candles)
+- Recommended: 7 days (2016 candles)
+- Maximum: 30 days (8640 candles)
+
+3. Data Quality:
+- Format: timestamp (ms), open, high, low, close
+- Continuous data (no large gaps)
+- Crypto: 1 price point per 5 minutes
+- Stocks: Full OHLC data per 5 minutes
+
 ## Automated Data Collection and Replay
 
 The easiest way to collect data and run the replay is to use the provided script:

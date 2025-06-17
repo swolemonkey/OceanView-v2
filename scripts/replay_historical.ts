@@ -26,7 +26,7 @@ class ReplayAgent {
   agent: AssetAgent;
 
   constructor(symbol: string, botId = 1, versionId = 1) {
-    const cfg = { ...defaultConfig, symbols: [symbol], symbol, gatekeeperThresh: 0 } as const;
+    const cfg = { ...defaultConfig, symbols: [symbol], symbol, gatekeeperThresh: 0 };
     this.agent = new AssetAgent(symbol, cfg, botId, versionId);
   }
 
@@ -44,7 +44,7 @@ export async function runReplayViaFeed(
   feed: AsyncGenerator<Candle>,
   execEngine: ExecutionEngine = new SimEngine()
 ) {
-  const cfg = { ...defaultConfig, symbols: [symbol], symbol, gatekeeperThresh: 0 } as const;
+  const cfg = { ...defaultConfig, symbols: [symbol], symbol, gatekeeperThresh: 0 };
   const dummyFeed: any = { subscribe() {}, close() {} };
   const agent = new AssetAgent(symbol, cfg, 1, 1, dummyFeed, execEngine);
   for await (const c of feed) {
@@ -193,4 +193,16 @@ async function main() {
 }
 
 // Run the main function
-main().finally(() => prisma.$disconnect());
+main()
+  .then(() => {
+    console.log('Backtest completed successfully');
+    return prisma.$disconnect();
+  })
+  .then(() => {
+    console.log('Database disconnected');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Error during backtest:', error);
+    return prisma.$disconnect().then(() => process.exit(1));
+  });

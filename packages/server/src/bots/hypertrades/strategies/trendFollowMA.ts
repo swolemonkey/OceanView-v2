@@ -1,7 +1,11 @@
-import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy';
-import type { Candle } from '../perception';
+import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
+import type { Candle } from '../perception.js';
 
 export class TrendFollowMA extends BaseStrategy {
+  constructor(symbol: string) {
+    super(symbol);
+  }
+
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {
     const { ind, cfg } = ctx;
     
