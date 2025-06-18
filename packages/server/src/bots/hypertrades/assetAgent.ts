@@ -1,24 +1,24 @@
-import { Perception, Candle } from './perception';
-import { RiskManager } from './risk';
-import { executeIdea } from './execution';
-import type { Config } from './config';
-import * as Indicators from './indicators/index';
-import { BaseStrategy } from './strategies/baseStrategy';
-import { SMCReversal } from './strategies/smcReversal';
-import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow';
-import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce';
-import { TrendFollowMA } from './strategies/trendFollowMA';
-import { RangeBounce } from './strategies/rangeBounce';
-import { passRR } from './utils/riskReward';
-import type { DataFeed, Tick } from '../../feeds/interface';
-import type { ExecutionEngine, Order } from '../../execution/interface';
-import { SimEngine } from '../../execution/sim';
-import { placeWithOCO } from '../../execution/ocoWrapper';
-import { gate } from '../../rl/gatekeeper';
-import { storeRLEntryId } from '../../botRunner/workers/hypertrades';
-import { PortfolioRiskManager } from '../../risk/portfolioRisk';
-import { createLogger } from '../../utils/logger';
-import { prisma } from '../../db';
+import { Perception, Candle } from './perception.js';
+import { RiskManager } from './risk.js';
+import { executeIdea } from './execution.js';
+import type { Config } from './config.js';
+import * as Indicators from './indicators/index.js';
+import { BaseStrategy } from './strategies/baseStrategy.js';
+import { SMCReversal } from './strategies/smcReversal.js';
+import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow.js';
+import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce.js';
+import { TrendFollowMA } from './strategies/trendFollowMA.js';
+import { RangeBounce } from './strategies/rangeBounce.js';
+import { passRR, passRRDynamic } from './utils/riskReward.js';
+import type { DataFeed, Tick } from '../../feeds/interface.js';
+import type { ExecutionEngine, Order } from '../../execution/interface.js';
+import { SimEngine } from '../../execution/sim.js';
+import { placeWithOCO } from '../../execution/ocoWrapper.js';
+import { gate } from '../../rl/gatekeeper.js';
+import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
+import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
+import { createLogger } from '../../utils/logger.js';
+import { prisma } from '../../db.js';
 
 // Create logger
 const logger = createLogger('assetAgent');
@@ -175,17 +175,46 @@ export class AssetAgent {
       cfg: this.cfg
     };
     
-    // Get first non-null trade idea from strategies
-    let tradeIdea = null;
-    for (const strategy of this.strategies) {
-      tradeIdea = strategy.onCandle(candle, ctx);
-      if (tradeIdea) break;
-    }
+        // Get first non-null trade idea from strategies
+    let tradeIdea: any = null;
+    logger.info(`🔍 STRATEGY CHECK: Testing ${this.strategies.length} strategies for ${this.symbol}`);
     
+    for (let i = 0; i < this.strategies.length; i++) {
+      const strategy = this.strategies[i];
+      const idea = strategy.onCandle(candle, ctx);
+      const strategyName = strategy.constructor.name;
+      
+      if (idea) {
+        logger.info(`✅ SIGNAL: ${strategyName} generated ${idea.side.toUpperCase()} signal for ${this.symbol} @ ${candle.c.toFixed(2)} | Reason: ${idea.reason || 'N/A'}`);
+        tradeIdea = idea;
+        break;
+      } else {
+        logger.debug(`⚪ NO SIGNAL: ${strategyName} returned null for ${this.symbol}`);
+      }
+    }
+
     // If no trade idea, return
     if (!tradeIdea) {
-      logger.debug(`DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals`);
+      logger.debug(`DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals from any strategy`);
       return;
+    }
+    
+    logger.info(`🎯 TRADE IDEA: ${tradeIdea.side.toUpperCase()} ${this.symbol} @ ${candle.c.toFixed(2)} | Reason: ${tradeIdea.reason || 'N/A'}`);
+    
+    // Log current market conditions for context
+    logger.info(`📊 MARKET CONDITIONS: RSI=${this.indCache.rsi14?.toFixed(2) || 'N/A'}, ADX=${this.indCache.adx14?.toFixed(2) || 'N/A'}, ATR=${this.indCache.atr14?.toFixed(2) || 'N/A'}`);
+    logger.info(`📈 PRICE ACTION: O=${candle.o.toFixed(2)}, H=${candle.h.toFixed(2)}, L=${candle.l.toFixed(2)}, C=${candle.c.toFixed(2)}`);
+    
+    // Check if this is a reversal (buy after sell or sell after buy)
+    const lastTrades = await prisma.rLDataset.findMany({
+      where: { symbol: this.symbol },
+      orderBy: { ts: 'desc' },
+      take: 3
+    });
+    
+    if (lastTrades.length > 0) {
+      const recentActions = lastTrades.map(t => t.action).join(' -> ');
+      logger.info(`📚 RECENT ACTIONS: ${recentActions}`);
     }
     
     logger.info(`DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
@@ -247,15 +276,42 @@ export class AssetAgent {
       logger.error('Error scoring trade idea with gatekeeper:', { error });
     }
     
-    // Calculate stop and target levels from last candle
-    const prev = this.perception.last(2)[0];
-    const stopPrice = tradeIdea.side === 'buy'
-      ? prev.l * 0.99
-      : prev.h * 1.01;
-    const targetPrice = tradeIdea.side === 'buy'
-      ? prev.h
-      : prev.l;
-    const qty = this.risk.sizeTrade(stopPrice, candle.c);
+    // Calculate ATR-based stop and target levels
+    const R_MULT = 1.0;         // stop = 1.0×ATR (tighter stops for better RR)
+    const side = tradeIdea.side;
+    const entry = candle.c;
+    const atr = this.indCache.atr14;   // Use the 14-period ATR from indicator cache
+
+    // DEBUG: Log ATR calculation details
+    logger.info(`🔍 ATR DEBUG: Symbol=${this.symbol}, ATR14=${atr}, Entry=${entry.toFixed(2)}, Side=${side}, R_MULT=${R_MULT}`);
+
+    let stopPrice: number;
+    let targetPrice: number;
+    let usingATR = false;
+
+    // If ATR is not available (insufficient data), fallback to percentage-based approach
+    if (atr === 0 || atr === null || atr === undefined || isNaN(atr)) {
+      logger.warn(`🚨 ATR FALLBACK: ATR=${atr} for ${this.symbol}, using percentage-based stops`);
+      const prev = this.perception.last(2)[0];
+      stopPrice = side === 'buy' ? prev.l * 0.99 : prev.h * 1.01;
+      targetPrice = side === 'buy' ? prev.h : prev.l;
+      usingATR = false;
+      logger.info(`📊 FALLBACK LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, PrevLow=${prev.l.toFixed(2)}, PrevHigh=${prev.h.toFixed(2)}`);
+    } else {
+      // ATR-based stop and target calculation
+      stopPrice = side === 'buy'
+        ? entry - (atr * R_MULT)
+        : entry + (atr * R_MULT);
+
+      targetPrice = side === 'buy'
+        ? entry + (atr * R_MULT * 2)   // 2× stop distance
+        : entry - (atr * R_MULT * 2);
+
+      usingATR = true;
+      logger.info(`📊 ATR LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, ATR=${atr.toFixed(2)}, StopDist=${(atr * R_MULT).toFixed(2)}, TargetDist=${(atr * R_MULT * 2).toFixed(2)}`);
+    }
+    
+    const qty = this.risk.sizeTrade(stopPrice, entry);
     
     // Prepare full trade idea
     const fullIdea: TradeIdea & { stop: number; target: number } = {
@@ -267,11 +323,28 @@ export class AssetAgent {
       target: targetPrice
     };
     
-    // Check risk-reward ratio
-    if (!passRR(fullIdea.side, candle.c, stopPrice, targetPrice, 2.0)) {
-      logger.info(`BLOCKED: Risk-reward ratio below threshold for ${this.symbol.toUpperCase()}`);
+    // Check dynamic risk-reward ratio based on recent performance
+    logger.info(`🎯 RR CHECK: About to check RR for ${side} ${this.symbol} | Entry=${candle.c.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, UsingATR=${usingATR}`);
+    
+    const rrResult = await passRRDynamic(fullIdea.side, candle.c, stopPrice, targetPrice, this.symbol);
+    
+    // Calculate manual RR for verification
+    const manualRR = Math.abs((targetPrice - candle.c) / (candle.c - stopPrice));
+    const stopDistance = Math.abs(candle.c - stopPrice);
+    const targetDistance = Math.abs(targetPrice - candle.c);
+    
+    // Enhanced logging with detailed breakdown
+    logger.info(`🔍 RR DETAILED: Symbol=${this.symbol}, Side=${side}`);
+    logger.info(`   📈 Prices: Entry=${candle.c.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}`);
+    logger.info(`   📏 Distances: Stop=${stopDistance.toFixed(2)}, Target=${targetDistance.toFixed(2)}`);
+    logger.info(`   🧮 RR Calc: (${targetDistance.toFixed(2)} / ${stopDistance.toFixed(2)}) = ${manualRR.toFixed(3)}`);
+    logger.info(`   📊 Result: WinProb=${(rrResult.winProb * 100).toFixed(1)}%, Threshold=${rrResult.threshold.toFixed(2)}, Actual=${rrResult.rr.toFixed(3)}, Manual=${manualRR.toFixed(3)}`);
+    logger.info(`   ✅ Status: ${rrResult.passed ? 'PASS ✅' : 'FAIL ❌'} (${rrResult.rr.toFixed(3)} ${rrResult.passed ? '>=' : '<'} ${rrResult.threshold.toFixed(2)})`);
+    
+    if (!rrResult.passed) {
+      logger.info(`🚨 BLOCKED: Risk-reward ratio ${rrResult.rr.toFixed(3)} below dynamic threshold ${rrResult.threshold.toFixed(2)} for ${this.symbol.toUpperCase()}`);
       
-      // Persist the blocked trade to the database
+      // Persist the blocked trade to the database with additional RR metrics
       await prisma.rLDataset.create({
         data: {
           symbol: this.symbol,
@@ -284,6 +357,14 @@ export class AssetAgent {
             recentTrend: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
             dayOfWeek: new Date().getDay(),
             hourOfDay: new Date().getHours(),
+            winProb: rrResult.winProb,
+            rrThreshold: rrResult.threshold,
+            actualRR: rrResult.rr,
+            manualRR: manualRR,
+            usingATR: usingATR,
+            atrValue: atr,
+            stopDistance: stopDistance,
+            targetDistance: targetDistance
           }),
           action: 'blocked_rr',
           outcome: 0,

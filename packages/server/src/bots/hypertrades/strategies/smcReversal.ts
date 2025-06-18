@@ -1,19 +1,23 @@
-import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy';
-import type { Candle } from '../perception';
+import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
+import type { Candle } from '../perception.js';
 
 export class SMCReversal extends BaseStrategy {
+  constructor(symbol: string) {
+    super(symbol);
+  }
+
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea|null {
     const { ind, perception, cfg } = ctx;
     
     // Get last 3 candles
     const candles = perception.last(3);
     if (candles.length < 3) {
-      console.log(`[DEBUG SMC] Not enough candles for ${this.symbol}, need 3, got ${candles.length}`);
+      console.log(`[DEBUG SMC] Not enough candles, need 3, got ${candles.length}`);
       return null;
     }
     
     const [prev2, prev1, current] = candles;
-    console.log(`[DEBUG SMC] Processing candle for ${this.symbol}, candles length: ${candles.length}`);
+    console.log(`[DEBUG SMC] Processing candle, candles length: ${candles.length}`);
     console.log(`[DEBUG SMC] Candles: 
       C1: l=${prev2.l}, h=${prev2.h}, c=${prev2.c}
       C2: l=${prev1.l}, h=${prev1.h}, c=${prev1.c}
