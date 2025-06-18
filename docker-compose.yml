@@ -26,6 +26,8 @@ services:
       - "3334:3334"
     volumes:
       - ./data:/data
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=3334

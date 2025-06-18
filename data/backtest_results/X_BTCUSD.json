@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7233",
+    "symbol": "X:BTCUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 105147.64036207693,
+    "fee": 0.42059056144830775,
+    "pnl": -0.42059056144830775,
+    "timestamp": 1750230692120,
+    "strategy": "backtest"
+  },
+  {
+    "id": "7234",
+    "symbol": "X:BTCUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 105044.15713292548,
+    "fee": 0.42017662853170196,
+    "pnl": 0,
+    "timestamp": 1750230692416,
+    "strategy": "backtest"
+  }
+]

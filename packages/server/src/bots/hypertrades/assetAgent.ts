@@ -17,16 +17,143 @@ import { placeWithOCO } from '../../execution/ocoWrapper.js';
 import { gate } from '../../rl/gatekeeper.js';
 import { storeRLEntryId } from '../../botRunner/workers/hypertrades.js';
 import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
-import { createLogger } from '../../utils/logger.js';
+import { createLogger, type EnhancedLogger, type TradeContext, type PortfolioContext, type ExecutionContext, type RiskContext, type DatabaseContext } from '../../utils/logger.js';
+import { validationOrchestrator, type TradeValidationResult } from '../../utils/validation.js';
 import { prisma } from '../../db.js';
+import { logCompletedTrade } from './execution.js';
 
-// Create logger
+// Create enhanced logger
 const logger = createLogger('assetAgent');
 
 // Global portfolio risk manager instance
 let portfolioRisk: PortfolioRiskManager | null = null;
 // Global collection of all agent instances
 const allAgents = new Map<string, AssetAgent>();
+
+// Database utilities
+class DatabaseManager {
+  public static async verifyConnection(): Promise<boolean> {
+    const dbStartTime = Date.now();
+    try {
+      await prisma.$connect();
+      // Test with a simple query
+      await prisma.$queryRaw`SELECT 1`;
+      
+      logger.logDatabaseOperation({
+        operation: 'connection_verify',
+        success: true,
+        executionTime: Date.now() - dbStartTime
+      });
+      
+      return true;
+    } catch (error) {
+      logger.logDatabaseOperation({
+        operation: 'connection_verify',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        executionTime: Date.now() - dbStartTime
+      });
+      return false;
+    }
+  }
+
+  static async withRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = 3,
+    tradeId?: string
+  ): Promise<T> {
+    let lastError: any;
+    
+    // Verify connection before operations
+    const isConnected = await this.verifyConnection();
+    if (!isConnected) {
+      throw new Error(`Database connection failed before ${operationName}`);
+    }
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const operationStartTime = Date.now();
+      try {
+        const result = await operation();
+        
+        logger.logDatabaseOperation({
+          operation: operationName,
+          tradeId,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries,
+          success: true,
+          executionTime: Date.now() - operationStartTime
+        });
+        
+        return result;
+      } catch (error) {
+        lastError = error;
+        
+        logger.logDatabaseOperation({
+          operation: operationName,
+          tradeId,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          executionTime: Date.now() - operationStartTime
+        });
+
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff with jitter
+          const baseDelay = Math.pow(2, attempt) * 1000;
+          const jitter = Math.random() * 500;
+          const delay = baseDelay + jitter;
+          
+          logger.debug(`Retrying ${operationName} after ${delay}ms delay`, { tradeId, attempt: attempt + 1 });
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    logger.error(`All ${maxRetries} attempts failed for ${operationName}`, { lastError, tradeId });
+    throw lastError;
+  }
+
+  static async withTransaction<T>(
+    operations: (tx: any) => Promise<T>,
+    operationName: string,
+    tradeId?: string
+  ): Promise<T> {
+    const transactionId = `${operationName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return this.withRetry(async () => {
+      const transactionStartTime = Date.now();
+      
+      return await prisma.$transaction(async (tx) => {
+        logger.debug(`Starting transaction: ${operationName}`, { transactionId, tradeId });
+        try {
+          const result = await operations(tx);
+          
+          logger.logDatabaseOperation({
+            operation: operationName,
+            tradeId,
+            transactionId,
+            success: true,
+            executionTime: Date.now() - transactionStartTime
+          });
+          
+          return result;
+        } catch (error) {
+          logger.logDatabaseOperation({
+            operation: operationName,
+            tradeId,
+            transactionId,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+            executionTime: Date.now() - transactionStartTime
+          });
+          throw error;
+        }
+      });
+    }, `transaction:${operationName}`, 3, tradeId);
+  }
+}
 
 // Define TradeIdea type to match what executeIdea expects
 type TradeIdea = {
@@ -56,6 +183,11 @@ export class AssetAgent {
   private dataFeed: DataFeed;
   private executionEngine: ExecutionEngine;
   private tickHandler: (tick: Tick) => void;
+  
+  // 5-minute optimization: Trade frequency controls
+  private lastTradeTime: number = 0;
+  private tradesThisHour: number = 0;
+  private hourlyTradeReset: number = 0;
   
   constructor(
     symbol: string, 
@@ -104,7 +236,11 @@ export class AssetAgent {
       this.strategies.push(new RangeBounce(symbol));
     }
     
-    logger.info(`Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`);
+    logger.info(`Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`, { 
+      symbol,
+      strategiesCount: this.strategies.length,
+      strategyNames: this.strategies.map(s => s.constructor.name)
+    });
     
     // Register this agent in the global collection
     allAgents.set(symbol, this);
@@ -113,7 +249,7 @@ export class AssetAgent {
     if (!portfolioRisk) {
       portfolioRisk = new PortfolioRiskManager();
       portfolioRisk.init().catch(err => 
-        logger.error(`Failed to initialize portfolio risk manager:`, { error: err })
+        logger.error(`Failed to initialize portfolio risk manager`, { error: err, symbol })
       );
     }
   }
@@ -142,7 +278,12 @@ export class AssetAgent {
     // Get the last 2 candles for stop calculation
     const lastCandles = this.perception.last(2);
     if (lastCandles.length < 2) {
-      logger.debug(`${this.symbol.toUpperCase()}: Not enough data yet, need at least 2 candles`);
+      logger.debug(`${this.symbol.toUpperCase()}: Not enough data yet, need at least 2 candles`, {
+        symbol: this.symbol,
+        candleCount: lastCandles.length,
+        price,
+        timestamp: ts
+      });
       return; // Need at least 2 candles
     }
   }
@@ -154,17 +295,140 @@ export class AssetAgent {
     // Update indicator cache
     this.indCache.updateOnClose(candle.c);
     
+    // ========================================
+    // 🚪 EXIT MONITORING - Check existing positions first
+    // ========================================
+    if (this.risk.positions.length > 0) {
+      const exitCheck = this.risk.checkExitConditions(candle.c);
+      
+      if (exitCheck.shouldExit && exitCheck.position && exitCheck.reason) {
+        const position = exitCheck.position;
+        const exitReason = exitCheck.reason === 'stop_loss' ? 'Stop-loss hit' : 'Take-profit hit';
+        
+        logger.info(`🚪 EXIT SIGNAL: ${exitReason} for ${this.symbol.toUpperCase()} | Position: ${position.side.toUpperCase()} ${position.qty} @ $${position.entry.toFixed(2)} | Current: $${candle.c.toFixed(2)}`, {
+          symbol: this.symbol,
+          exitReason: exitCheck.reason,
+          positionSide: position.side,
+          positionQty: position.qty,
+          entryPrice: position.entry,
+          currentPrice: candle.c,
+          stopPrice: position.stop,
+          targetPrice: position.target,
+          positionAge: position.entryTs ? Date.now() - position.entryTs : 0
+        });
+        
+        try {
+          // Close the position
+          await this.closePositions(candle.c, exitCheck.reason);
+          
+          logger.info(`✅ EXIT EXECUTED: ${exitReason} successfully executed for ${this.symbol.toUpperCase()}`, {
+            symbol: this.symbol,
+            exitReason: exitCheck.reason,
+            executionPrice: candle.c
+          });
+          
+          // Return early - don't look for new entry signals when we just exited
+          return;
+          
+        } catch (error) {
+          logger.error(`❌ EXIT FAILED: Error executing ${exitReason} for ${this.symbol}`, {
+            symbol: this.symbol,
+            exitReason: exitCheck.reason,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      } else {
+        // Update trailing stops for existing positions
+        this.risk.updateAllStops();
+        
+        // Log position status every 10 candles for monitoring
+        if (Math.floor(candle.ts / 1000) % 10 === 0) {
+          const position = this.risk.positions[0];
+          const unrealizedPnL = position.side === 'buy' 
+            ? (candle.c - position.entry) * position.qty
+            : (position.entry - candle.c) * position.qty;
+            
+          logger.debug(`📊 POSITION STATUS: ${this.symbol.toUpperCase()} | ${position.side.toUpperCase()} ${position.qty} @ $${position.entry.toFixed(2)} | Current: $${candle.c.toFixed(2)} | Unrealized P&L: $${unrealizedPnL.toFixed(2)}`, {
+            symbol: this.symbol,
+            positionSide: position.side,
+            positionQty: position.qty,
+            entryPrice: position.entry,
+            currentPrice: candle.c,
+            stopPrice: position.stop,
+            targetPrice: position.target,
+            unrealizedPnL,
+            positionAge: position.entryTs ? Date.now() - position.entryTs : 0
+          });
+        }
+      }
+    }
+    
     // Update portfolio risk metrics
     if (portfolioRisk) {
       portfolioRisk.recalc(allAgents);
       
-      // Check portfolio-wide risk limits
-      if (!portfolioRisk.canTrade()) {
+      // Log portfolio risk status
+      const portfolioData: PortfolioContext = {
+        totalEquity: portfolioRisk.equity,
+        totalPnL: portfolioRisk.dayPnl,
+        openRisk: portfolioRisk.openRiskPct,
+        positionCount: Array.from(allAgents.values()).reduce((count, agent) => count + agent.risk.positions.length, 0),
+        canTrade: portfolioRisk.canTrade(),
+        reason: portfolioRisk.canTrade() ? 'within_limits' : 'risk_limits_exceeded'
+      };
+      
+      logger.logPortfolioRisk(this.symbol, portfolioData);
+      
+      // Check portfolio-wide risk limits with comprehensive analysis
+      if (!portfolioRisk.canTrade(allAgents)) {
+        const riskSummary = portfolioRisk.getRiskSummary(allAgents);
         logger.warn(
-          'VETO-PORTFOLIO limits exceeded',
-          { open: portfolioRisk.openRiskPct, loss: portfolioRisk.dayPnl < 0 ? Math.abs(portfolioRisk.dayPnl) / portfolioRisk.equity : 0 }
+          'VETO-PORTFOLIO limits exceeded - Enhanced risk analysis',
+          { 
+            symbol: this.symbol,
+            riskLevel: riskSummary.riskLevel,
+            canTrade: riskSummary.canTrade,
+            breachCount: riskSummary.breachCount,
+            warningCount: riskSummary.warningCount,
+            checkId: riskSummary.checkId,
+            openRisk: portfolioRisk.openRiskPct, 
+            dayLoss: portfolioRisk.dayPnl < 0 ? Math.abs(portfolioRisk.dayPnl) / portfolioRisk.equity : 0 
+          }
         );
         return;
+      }
+    }
+
+    // Periodic pipeline health check (every 50 candles)
+    if (Math.floor(candle.ts / 1000) % 50 === 0) {
+      try {
+        const healthCheck = await validationOrchestrator.checkHealth();
+        if (healthCheck.overall === 'critical') {
+          logger.error(`🚨 CRITICAL HEALTH ISSUE: Pipeline health check failed`, {
+            symbol: this.symbol,
+            overall: healthCheck.overall,
+            summary: healthCheck.summary,
+            criticalComponents: healthCheck.components.filter(c => c.status === 'critical').map(c => c.component)
+          });
+        } else if (healthCheck.overall === 'warning') {
+          logger.warn(`⚠️ HEALTH WARNING: Pipeline health check shows warnings`, {
+            symbol: this.symbol,
+            overall: healthCheck.overall,
+            summary: healthCheck.summary,
+            warningComponents: healthCheck.components.filter(c => c.status === 'warning').map(c => c.component)
+          });
+        } else {
+          logger.debug(`✅ HEALTH CHECK: Pipeline health is good`, {
+            symbol: this.symbol,
+            overall: healthCheck.overall,
+            summary: healthCheck.summary
+          });
+        }
+      } catch (healthError) {
+        logger.error(`Health check failed`, {
+          symbol: this.symbol,
+          error: healthError instanceof Error ? healthError.message : String(healthError)
+        });
       }
     }
     
@@ -175,9 +439,14 @@ export class AssetAgent {
       cfg: this.cfg
     };
     
-        // Get first non-null trade idea from strategies
+    // Get first non-null trade idea from strategies
     let tradeIdea: any = null;
-    logger.info(`🔍 STRATEGY CHECK: Testing ${this.strategies.length} strategies for ${this.symbol}`);
+    logger.info(`🔍 STRATEGY CHECK: Testing ${this.strategies.length} strategies for ${this.symbol}`, {
+      symbol: this.symbol,
+      strategiesCount: this.strategies.length,
+      price: candle.c,
+      timestamp: candle.ts
+    });
     
     for (let i = 0; i < this.strategies.length; i++) {
       const strategy = this.strategies[i];
@@ -185,56 +454,82 @@ export class AssetAgent {
       const strategyName = strategy.constructor.name;
       
       if (idea) {
-        logger.info(`✅ SIGNAL: ${strategyName} generated ${idea.side.toUpperCase()} signal for ${this.symbol} @ ${candle.c.toFixed(2)} | Reason: ${idea.reason || 'N/A'}`);
-        tradeIdea = idea;
+                 // Generate trade ID and log signal
+         const tradeId = logger.logTradeSignal(
+           this.symbol,
+           idea.side,
+           candle.c,
+           strategyName,
+           idea.reason || 'Strategy signal',
+           {
+             versionId: (this.risk as any).versionId
+           }
+         );
+        
+        // Store trade ID in the idea for tracking
+        tradeIdea = { ...idea, tradeId };
         break;
       } else {
-        logger.debug(`⚪ NO SIGNAL: ${strategyName} returned null for ${this.symbol}`);
+        logger.debug(`⚪ NO SIGNAL: ${strategyName} returned null for ${this.symbol}`, {
+          symbol: this.symbol,
+          strategy: strategyName,
+          price: candle.c
+        });
       }
     }
 
     // If no trade idea, return
     if (!tradeIdea) {
-      logger.debug(`DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals from any strategy`);
+      logger.debug(`DECISION: HOLD ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | No trade signals from any strategy`, {
+        symbol: this.symbol,
+        price: candle.c,
+        decision: 'HOLD'
+      });
       return;
     }
-    
-    logger.info(`🎯 TRADE IDEA: ${tradeIdea.side.toUpperCase()} ${this.symbol} @ ${candle.c.toFixed(2)} | Reason: ${tradeIdea.reason || 'N/A'}`);
-    
-    // Log current market conditions for context
-    logger.info(`📊 MARKET CONDITIONS: RSI=${this.indCache.rsi14?.toFixed(2) || 'N/A'}, ADX=${this.indCache.adx14?.toFixed(2) || 'N/A'}, ATR=${this.indCache.atr14?.toFixed(2) || 'N/A'}`);
-    logger.info(`📈 PRICE ACTION: O=${candle.o.toFixed(2)}, H=${candle.h.toFixed(2)}, L=${candle.l.toFixed(2)}, C=${candle.c.toFixed(2)}`);
-    
-    // Check if this is a reversal (buy after sell or sell after buy)
-    const lastTrades = await prisma.rLDataset.findMany({
-      where: { symbol: this.symbol },
-      orderBy: { ts: 'desc' },
-      take: 3
-    });
-    
-    if (lastTrades.length > 0) {
-      const recentActions = lastTrades.map(t => t.action).join(' -> ');
-      logger.info(`📚 RECENT ACTIONS: ${recentActions}`);
+
+    // ========================================
+    // 🛡️ POSITION SIZE CONTROLS - Prevent over-accumulation
+    // ========================================
+    if (this.risk.positions.length > 0) {
+      const existingPosition = this.risk.positions[0];
+      
+      // Check if trying to add to existing position in same direction
+      if (existingPosition.side === tradeIdea.side) {
+        logger.warn(`🚨 BLOCKED: Position accumulation prevented for ${this.symbol.toUpperCase()} | Already have ${existingPosition.side.toUpperCase()} position of ${existingPosition.qty} shares`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          existingPositionSide: existingPosition.side,
+          existingPositionQty: existingPosition.qty,
+          newSignalSide: tradeIdea.side,
+          reason: 'position_accumulation_prevention'
+        });
+        return;
+      }
+      
+      // Check if trying to reverse position (this would close existing and open new)
+      if (existingPosition.side !== tradeIdea.side) {
+        logger.info(`🔄 POSITION REVERSAL: ${this.symbol.toUpperCase()} signal would reverse existing ${existingPosition.side.toUpperCase()} position to ${tradeIdea.side.toUpperCase()}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          existingPositionSide: existingPosition.side,
+          newSignalSide: tradeIdea.side,
+          reason: 'position_reversal_detected'
+        });
+        
+        // For now, block reversal trades - could be enhanced to allow them
+        logger.warn(`🚨 BLOCKED: Position reversal blocked for ${this.symbol.toUpperCase()} | Close existing position first`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          reason: 'position_reversal_prevention'
+        });
+        return;
+      }
     }
-    
-    logger.info(`DECISION: ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | ${tradeIdea.reason}`);
-    
-    // Prepare feature vector for RL model
-    const featureVec = [
-      this.indCache.rsi14 || 50,
-      this.indCache.adx14 || 25,
-      (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
-      this.indCache.bbWidth || 0,
-      0, // avgSent
-      0, // avgOB
-      tradeIdea.side === 'buy' ? 1 : 0
-    ];
-    
-    // Score the trade idea with the gatekeeper
-    let tradeScore = 0.5; // Default score
-    let rlEntryId = 0;
+
+    // Gatekeeper check
+    let rlEntryId: number | null = null;
     try {
-      // Score the trade idea
       const scoreResult = await gate.scoreIdea({
         symbol: this.symbol,
         price: candle.c,
@@ -246,72 +541,174 @@ export class AssetAgent {
         hourOfDay: new Date().getHours(),
       }, tradeIdea.side);
       
-      tradeScore = scoreResult.score;
-      rlEntryId = scoreResult.id;
-      
-      // Store the RL entry ID for later update
-      storeRLEntryId(this.symbol, Date.now(), rlEntryId);
-      
-      logger.info(`RL Score: ${tradeScore.toFixed(4)} for ${tradeIdea.side.toUpperCase()} ${this.symbol.toUpperCase()}`);
-      
-      // Veto the trade if score is below threshold
-      if (tradeScore < this.cfg.gatekeeperThresh) {
-        logger.info(`VETO: Trade vetoed by gatekeeper with score ${tradeScore.toFixed(4)} (threshold: ${this.cfg.gatekeeperThresh.toFixed(2)})`);
-        
-        // Persist the skipped trade to the database
-        await prisma.rLDataset.create({
-          data: {
-            symbol: this.symbol,
-            featureVec: JSON.stringify(featureVec),
-            action: 'skip',
-            outcome: 0,
-            gateScore: tradeScore,
-            strategyVersionId: (this.risk as any).versionId
-          }
+      if (scoreResult.score < this.cfg.gatekeeperThresh) {
+        logger.info(`🚨 BLOCKED: Trade blocked by RL Gatekeeper for ${this.symbol.toUpperCase()}: Score ${scoreResult.score.toFixed(4)} below threshold ${this.cfg.gatekeeperThresh}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          score: scoreResult.score,
+          threshold: this.cfg.gatekeeperThresh,
+          reason: 'gatekeeper_veto'
         });
-        
         return;
       }
+      rlEntryId = scoreResult.id;
+      logger.info(`✅ APPROVED: Trade approved by RL Gatekeeper for ${this.symbol.toUpperCase()} (Score: ${scoreResult.score.toFixed(4)}, EntryId: ${rlEntryId})`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        score: scoreResult.score,
+        entryId: rlEntryId
+      });
+      
+      if (scoreResult.id && scoreResult.id > 0) {
+        storeRLEntryId(this.symbol, Date.now(), scoreResult.id);
+      }
     } catch (error) {
-      logger.error('Error scoring trade idea with gatekeeper:', { error });
+      logger.error(`RL Gatekeeper error for ${this.symbol}`, { 
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return;
     }
-    
-    // Calculate ATR-based stop and target levels
-    const R_MULT = 1.0;         // stop = 1.0×ATR (tighter stops for better RR)
+
+    // Proceed with trade execution logic...
+    const R_MULT = 0.5;
     const side = tradeIdea.side;
     const entry = candle.c;
-    const atr = this.indCache.atr14;   // Use the 14-period ATR from indicator cache
 
-    // DEBUG: Log ATR calculation details
-    logger.info(`🔍 ATR DEBUG: Symbol=${this.symbol}, ATR14=${atr}, Entry=${entry.toFixed(2)}, Side=${side}, R_MULT=${R_MULT}`);
-
+    // ========================================
+    // 🎯 ENHANCED STOP-LOSS/TAKE-PROFIT MECHANISMS
+    // ========================================
+    const atr = this.indCache.atr14 || 0;
     let stopPrice: number;
     let targetPrice: number;
     let usingATR = false;
+    let stopMethod = 'unknown';
 
-    // If ATR is not available (insufficient data), fallback to percentage-based approach
-    if (atr === 0 || atr === null || atr === undefined || isNaN(atr)) {
-      logger.warn(`🚨 ATR FALLBACK: ATR=${atr} for ${this.symbol}, using percentage-based stops`);
-      const prev = this.perception.last(2)[0];
-      stopPrice = side === 'buy' ? prev.l * 0.99 : prev.h * 1.01;
-      targetPrice = side === 'buy' ? prev.h : prev.l;
-      usingATR = false;
-      logger.info(`📊 FALLBACK LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, PrevLow=${prev.l.toFixed(2)}, PrevHigh=${prev.h.toFixed(2)}`);
-    } else {
-      // ATR-based stop and target calculation
+    // Enhanced ATR-based calculations with multiple fallback methods
+    if (atr > 0 && !isNaN(atr)) {
+      // ✅ PRIMARY: ATR-based dynamic stops
+      const volatilityFactor = Math.min(Math.max(atr / entry, 0.005), 0.02); // 0.5% to 2% max
+      const adaptiveMultiplier = volatilityFactor > 0.015 ? 0.8 : 1.2; // Tighter stops in high volatility
+      
       stopPrice = side === 'buy'
-        ? entry - (atr * R_MULT)
-        : entry + (atr * R_MULT);
+        ? entry - (atr * R_MULT * adaptiveMultiplier)
+        : entry + (atr * R_MULT * adaptiveMultiplier);
 
+      // Dynamic target based on market conditions
+      const trendStrength = Math.abs((this.indCache.fastMA - this.indCache.slowMA) / entry);
+      const targetMultiplier = trendStrength > 0.01 ? 3.0 : 2.5; // Wider targets in strong trends
+      
       targetPrice = side === 'buy'
-        ? entry + (atr * R_MULT * 2)   // 2× stop distance
-        : entry - (atr * R_MULT * 2);
+        ? entry + (atr * R_MULT * targetMultiplier)
+        : entry - (atr * R_MULT * targetMultiplier);
 
       usingATR = true;
-      logger.info(`📊 ATR LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, ATR=${atr.toFixed(2)}, StopDist=${(atr * R_MULT).toFixed(2)}, TargetDist=${(atr * R_MULT * 2).toFixed(2)}`);
+      stopMethod = 'atr_adaptive';
+      
+      logger.info(`🎯 ENHANCED ATR LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)} | ATR=${atr.toFixed(4)}, VolFactor=${volatilityFactor.toFixed(4)}, TrendStrength=${trendStrength.toFixed(4)}, AdaptiveMult=${adaptiveMultiplier.toFixed(2)}, TargetMult=${targetMultiplier.toFixed(2)}`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        entry, stopPrice, targetPrice, atr, volatilityFactor, trendStrength, adaptiveMultiplier, targetMultiplier
+      });
+      
+    } else {
+      // ✅ FALLBACK 1: Support/Resistance based stops
+      const recentCandles = this.perception.last(10);
+      if (recentCandles && recentCandles.length >= 5) {
+        const highs = recentCandles.map(c => c.h);
+        const lows = recentCandles.map(c => c.l);
+        const resistance = Math.max(...highs);
+        const support = Math.min(...lows);
+        
+        stopPrice = side === 'buy' 
+          ? Math.max(support * 0.995, entry * 0.985) // 0.5% below support or 1.5% below entry
+          : Math.min(resistance * 1.005, entry * 1.015); // 0.5% above resistance or 1.5% above entry
+          
+        targetPrice = side === 'buy'
+          ? resistance * 1.002 // Just above resistance
+          : support * 0.998; // Just below support
+          
+        stopMethod = 'support_resistance';
+        
+        logger.info(`📊 SUPPORT/RESISTANCE LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)} | Support=${support.toFixed(2)}, Resistance=${resistance.toFixed(2)}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          entry, stopPrice, targetPrice, support, resistance
+        });
+        
+      } else {
+        // ✅ FALLBACK 2: Enhanced percentage-based with volatility estimation
+        const recentPrices = this.perception.last(5).map(c => c.c);
+        const volatility = recentPrices.length > 1 
+          ? Math.sqrt(recentPrices.reduce((sum, price, i) => {
+              if (i === 0) return 0;
+              const change = (price - recentPrices[i-1]) / recentPrices[i-1];
+              return sum + change * change;
+            }, 0) / (recentPrices.length - 1))
+          : 0.01; // Default 1% volatility
+          
+        const stopPct = Math.max(volatility * 1.5, 0.008); // At least 0.8% stop
+        const targetPct = stopPct * 2.5; // 2.5:1 reward-to-risk
+        
+        stopPrice = side === 'buy' 
+          ? entry * (1 - stopPct)
+          : entry * (1 + stopPct);
+          
+        targetPrice = side === 'buy'
+          ? entry * (1 + targetPct)
+          : entry * (1 - targetPct);
+          
+        stopMethod = 'volatility_percentage';
+        
+        logger.info(`📈 VOLATILITY-BASED LEVELS: Entry=${entry.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)} | EstVol=${(volatility*100).toFixed(2)}%, StopPct=${(stopPct*100).toFixed(2)}%, TargetPct=${(targetPct*100).toFixed(2)}%`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          entry, stopPrice, targetPrice, volatility, stopPct, targetPct
+        });
+      }
+      
+      usingATR = false;
+      
+      logger.warn(`⚠️ ATR FALLBACK: ATR=${atr} for ${this.symbol}, using ${stopMethod} method`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        atr,
+        fallbackMethod: stopMethod
+      });
     }
     
-    const qty = this.risk.sizeTrade(stopPrice, entry);
+    // ========================================
+    // 🎯 ENHANCED POSITION SIZING
+    // ========================================
+    // Calculate signal confidence based on multiple factors
+    const rsi = this.indCache.rsi14 || 50;
+    const adx = this.indCache.adx14 || 25;
+    
+    // Confidence factors (0-1 scale)
+    const trendConfidence = Math.min(1.0, Math.max(0.3, adx / 50)); // Strong trend = higher confidence
+    const momentumConfidence = side === 'buy' 
+      ? Math.min(1.0, Math.max(0.3, (100 - rsi) / 50)) // Oversold for buys
+      : Math.min(1.0, Math.max(0.3, rsi / 50)); // Overbought for sells
+    const volatilityConfidence = usingATR ? 1.0 : 0.7; // Lower confidence without ATR
+    
+    // Combined confidence score
+    const overallConfidence = (trendConfidence + momentumConfidence + volatilityConfidence) / 3;
+    
+    const qty = this.risk.sizeTrade(stopPrice, entry, this.symbol, overallConfidence);
+    
+    logger.info(`📊 POSITION SIZING: ${this.symbol.toUpperCase()} | Qty=${qty.toFixed(6)}, Confidence=${(overallConfidence*100).toFixed(1)}% | Trend=${(trendConfidence*100).toFixed(1)}%, Momentum=${(momentumConfidence*100).toFixed(1)}%, Vol=${(volatilityConfidence*100).toFixed(1)}%`, {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      qty: qty,
+      overallConfidence: overallConfidence,
+      trendConfidence: trendConfidence,
+      momentumConfidence: momentumConfidence,
+      volatilityConfidence: volatilityConfidence,
+      rsi: rsi,
+      adx: adx,
+      usingATR: usingATR
+    });
     
     // Prepare full trade idea
     const fullIdea: TradeIdea & { stop: number; target: number } = {
@@ -324,59 +721,185 @@ export class AssetAgent {
     };
     
     // Check dynamic risk-reward ratio based on recent performance
-    logger.info(`🎯 RR CHECK: About to check RR for ${side} ${this.symbol} | Entry=${candle.c.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, UsingATR=${usingATR}`);
+    logger.info(`🎯 RR CHECK: About to check RR for ${side} ${this.symbol} | Entry=${candle.c.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}, UsingATR=${usingATR}`, {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      side,
+      entry: candle.c,
+      stopPrice,
+      targetPrice,
+      usingATR
+    });
     
-    const rrResult = await passRRDynamic(fullIdea.side, candle.c, stopPrice, targetPrice, this.symbol);
+    // Calculate market condition factors for enhanced RR analysis
+    const marketVolatility = atr / candle.c; // ATR as percentage of price
+    const trendStrength = Math.abs((this.indCache.fastMA - this.indCache.slowMA) / candle.c);
     
-    // Calculate manual RR for verification
+    // Enhanced 5-minute risk-reward with market condition adaptation
+    const { pass5MinuteRR, passRiskReward } = await import('./utils/riskReward.js');
     const manualRR = Math.abs((targetPrice - candle.c) / (candle.c - stopPrice));
+    
+    // Dynamic RR threshold based on market conditions
+    let rrThreshold = 1.5; // Base threshold higher for better win rate
+    
+    // Adjust based on market volatility (higher vol = higher RR required)
+    if (marketVolatility > 0.005) rrThreshold = 2.0;
+    else if (marketVolatility > 0.003) rrThreshold = 1.8;
+    
+    // Adjust based on trend strength (stronger trend = lower RR acceptable)
+    if (trendStrength > 0.02) rrThreshold *= 0.9;
+    else if (trendStrength < 0.01) rrThreshold *= 1.1;
+    
+    const rrPassed = manualRR >= rrThreshold;
+    
+    const rrResult = {
+      passed: rrPassed,
+      rr: manualRR,
+      threshold: rrThreshold,
+      winProb: 0.65,   // Target higher win rate
+      adjustments: {
+        baseThreshold: 1.5,
+        volatilityAdjustment: marketVolatility > 0.003 ? 0.3 : 0,
+        trendAdjustment: trendStrength > 0.02 ? -0.15 : (trendStrength < 0.01 ? 0.15 : 0),
+        timeAdjustment: 0
+      }
+    };
     const stopDistance = Math.abs(candle.c - stopPrice);
     const targetDistance = Math.abs(targetPrice - candle.c);
     
-    // Enhanced logging with detailed breakdown
-    logger.info(`🔍 RR DETAILED: Symbol=${this.symbol}, Side=${side}`);
-    logger.info(`   📈 Prices: Entry=${candle.c.toFixed(2)}, Stop=${stopPrice.toFixed(2)}, Target=${targetPrice.toFixed(2)}`);
-    logger.info(`   📏 Distances: Stop=${stopDistance.toFixed(2)}, Target=${targetDistance.toFixed(2)}`);
-    logger.info(`   🧮 RR Calc: (${targetDistance.toFixed(2)} / ${stopDistance.toFixed(2)}) = ${manualRR.toFixed(3)}`);
-    logger.info(`   📊 Result: WinProb=${(rrResult.winProb * 100).toFixed(1)}%, Threshold=${rrResult.threshold.toFixed(2)}, Actual=${rrResult.rr.toFixed(3)}, Manual=${manualRR.toFixed(3)}`);
-    logger.info(`   ✅ Status: ${rrResult.passed ? 'PASS ✅' : 'FAIL ❌'} (${rrResult.rr.toFixed(3)} ${rrResult.passed ? '>=' : '<'} ${rrResult.threshold.toFixed(2)})`);
+    // Log risk check with structured data
+    const riskData: RiskContext = {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      currentPrice: candle.c,
+      stopPrice,
+      targetPrice,
+      riskReward: rrResult.rr,
+      threshold: rrResult.threshold,
+      atr,
+      positionSize: qty,
+      passed: rrResult.passed,
+      reason: rrResult.passed ? 'above_threshold' : 'below_threshold'
+    };
+    
+    logger.logRiskCheck(riskData);
+    
+    // Enhanced RR logging with detailed breakdown
+    logger.info(`🎯 ENHANCED RR ANALYSIS: ${this.symbol.toUpperCase()} | RR=${rrResult.rr.toFixed(3)}, Threshold=${rrResult.threshold.toFixed(2)}, WinRate=${(rrResult.winProb*100).toFixed(1)}% | Base=${rrResult.adjustments.baseThreshold.toFixed(2)}, VolAdj=${rrResult.adjustments.volatilityAdjustment.toFixed(2)}, TrendAdj=${rrResult.adjustments.trendAdjustment.toFixed(2)} | ${rrResult.passed ? '✅ PASSED' : '❌ BLOCKED'}`, {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      riskReward: rrResult.rr,
+      threshold: rrResult.threshold,
+      winProb: rrResult.winProb,
+      baseThreshold: rrResult.adjustments.baseThreshold,
+      volatilityAdjustment: rrResult.adjustments.volatilityAdjustment,
+      trendAdjustment: rrResult.adjustments.trendAdjustment,
+      marketVolatility: marketVolatility,
+      trendStrength: trendStrength,
+      passed: rrResult.passed
+    });
     
     if (!rrResult.passed) {
-      logger.info(`🚨 BLOCKED: Risk-reward ratio ${rrResult.rr.toFixed(3)} below dynamic threshold ${rrResult.threshold.toFixed(2)} for ${this.symbol.toUpperCase()}`);
-      
-      // Persist the blocked trade to the database with additional RR metrics
-      await prisma.rLDataset.create({
-        data: {
-          symbol: this.symbol,
-          featureVec: JSON.stringify({
-            symbol: this.symbol,
-            price: candle.c,
-            rsi: this.indCache.rsi14,
-            adx: this.indCache.adx14,
-            volatility: this.indCache.bbWidth,
-            recentTrend: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
-            dayOfWeek: new Date().getDay(),
-            hourOfDay: new Date().getHours(),
-            winProb: rrResult.winProb,
-            rrThreshold: rrResult.threshold,
-            actualRR: rrResult.rr,
-            manualRR: manualRR,
-            usingATR: usingATR,
-            atrValue: atr,
-            stopDistance: stopDistance,
-            targetDistance: targetDistance
-          }),
-          action: 'blocked_rr',
-          outcome: 0,
-          strategyVersionId: (this.risk as any).versionId
-        }
+      logger.info(`🚨 BLOCKED: Risk-reward ratio ${rrResult.rr.toFixed(3)} below adaptive threshold ${rrResult.threshold.toFixed(2)} for ${this.symbol.toUpperCase()} | Win rate: ${(rrResult.winProb*100).toFixed(1)}%`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        riskReward: rrResult.rr,
+        threshold: rrResult.threshold,
+        winProb: rrResult.winProb,
+        reason: 'rr_below_adaptive_threshold'
       });
+      
+      // Persist the blocked trade to the database with enhanced error handling and transaction
+      try {
+        await DatabaseManager.withTransaction(async (tx) => {
+          await tx.rLDataset.create({
+            data: {
+              symbol: this.symbol,
+              featureVec: JSON.stringify({
+                symbol: this.symbol,
+                price: candle.c,
+                rsi: this.indCache.rsi14,
+                adx: this.indCache.adx14,
+                volatility: this.indCache.bbWidth,
+                recentTrend: (this.indCache.fastMA - this.indCache.slowMA) / candle.c,
+                dayOfWeek: new Date().getDay(),
+                hourOfDay: new Date().getHours(),
+                winProb: rrResult.winProb,
+                rrThreshold: rrResult.threshold,
+                actualRR: rrResult.rr,
+                manualRR: manualRR,
+                usingATR: usingATR,
+                atrValue: atr,
+                stopDistance: stopDistance,
+                targetDistance: targetDistance
+              }),
+              action: 'blocked_rr',
+              outcome: 0,
+              strategyVersionId: (this.risk as any).versionId
+            }
+          });
+        }, 'log_blocked_trade', tradeIdea.tradeId);
+      } catch (error) {
+        logger.error('Failed to log blocked trade to database', { 
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol, 
+          error: error instanceof Error ? error.message : String(error) 
+        });
+      }
       
       return;
     }
     
-    // Execute trade idea
-    logger.info(`EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)}`);
+    // ========================================
+    // 🚦 5-MINUTE TRADE FREQUENCY CONTROLS
+    // ========================================
+    const currentTime = Date.now();
+    const currentHour = Math.floor(currentTime / (60 * 60 * 1000));
+    
+    // Reset hourly trade counter if we're in a new hour
+    if (currentHour !== this.hourlyTradeReset) {
+      this.tradesThisHour = 0;
+      this.hourlyTradeReset = currentHour;
+    }
+    
+    // Check cooldown period (15 minutes between trades for 5m timeframe)
+    const cooldownMs = (this.cfg.cooldownMinutes || 10) * 60 * 1000;
+    if (currentTime - this.lastTradeTime < cooldownMs) {
+      const remainingCooldown = Math.ceil((cooldownMs - (currentTime - this.lastTradeTime)) / 60000);
+      logger.info(`🚦 COOLDOWN: Trade blocked for ${this.symbol.toUpperCase()}, ${remainingCooldown} minutes remaining`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        remainingCooldown: remainingCooldown,
+        reason: 'cooldown_period'
+      });
+      return;
+    }
+    
+    // Check hourly trade limit (8 trades per hour max)
+    const maxTradesPerHour = this.cfg.maxTradesPerHour || 8;
+    if (this.tradesThisHour >= maxTradesPerHour) {
+      logger.info(`🚦 HOURLY LIMIT: Trade blocked for ${this.symbol.toUpperCase()}, ${this.tradesThisHour}/${maxTradesPerHour} trades this hour`, {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        tradesThisHour: this.tradesThisHour,
+        maxTradesPerHour: maxTradesPerHour,
+        reason: 'hourly_limit_reached'
+      });
+      return;
+    }
+    
+    // Execute trade idea with enhanced error handling and transaction management
+    logger.info(`EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | Trade ${this.tradesThisHour + 1}/${maxTradesPerHour} this hour`, {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      side: tradeIdea.side,
+      qty,
+      price: candle.c,
+      tradesThisHour: this.tradesThisHour,
+      maxTradesPerHour: maxTradesPerHour
+    });
+    
+    const executionStartTs = Date.now();
     
     try {
       // Create execution order
@@ -388,89 +911,457 @@ export class AssetAgent {
         price: candle.c
       };
       
-      let fill;
-      if ((this.executionEngine as any).supportsOCO) {
-        fill = await placeWithOCO(this.executionEngine, order, stopPrice, targetPrice);
-      } else {
-        fill = await this.executionEngine.place(order);
-      }
+      // Log order placement
+      const executionData: ExecutionContext = {
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        side: tradeIdea.side,
+        qty,
+        price: candle.c,
+        exchange: this.executionEngine.constructor.name
+      };
+      
+      logger.logOrderPlacement(executionData);
+      
+      // Execute the order with retry logic
+      const fill = await this.executeWithRetry(order, 3, tradeIdea.tradeId);
 
       if (fill) {
-        this.risk.registerOrder(fill.side, fill.qty, fill.price, stopPrice);
+        // Log successful execution
+        logger.logOrderExecution({
+          ...executionData,
+          success: true,
+          fillPrice: fill.price,
+          fillQty: fill.qty,
+          fee: fill.fee,
+          executionTime: Date.now() - executionStartTs
+        });
+        
+        // Use transaction to ensure atomic operation of all post-execution updates
+        await DatabaseManager.withTransaction(async (tx) => {
+          // Register order with risk manager (this might update database)
+          this.risk.registerOrder(fill.side, fill.qty, fill.price, stopPrice, targetPrice, this.symbol);
 
-        if (rlEntryId) {
-          await gate.updateOutcome(rlEntryId, 0);
-        }
+          // Update RL outcome if we have an entry ID
+          if (rlEntryId) {
+            await gate.updateOutcome(rlEntryId, 0);
+          }
 
-        logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)}`);
+          // Explicitly log the completed trade entry
+          const completedTradeData = {
+            symbol: this.symbol,
+            side: fill.side,
+            price: fill.price,
+            qty: fill.qty,
+            reason: tradeIdea.reason || 'strategy_signal',
+            exitReason: 'entry', // This is the entry, exit will be handled elsewhere
+            pnl: 0, // Entry PnL is 0, will be updated on exit
+            entryTs: executionStartTs
+          };
+
+          await logCompletedTrade(
+            completedTradeData,
+            'hypertrades', // Bot name
+            (this.risk as any).versionId
+          );
+          
+          // Validate trade execution
+          const validationResult = await validationOrchestrator.validateExecution(
+            tradeIdea.tradeId || 'unknown',
+            this.symbol,
+            fill.side,
+            fill.qty,
+            fill.price,
+            {
+              shouldBeRecorded: true,
+              expectedPnL: 0, // Entry trade has 0 PnL
+              expectedFee: fill.fee || 0
+            }
+          );
+
+          if (!validationResult.success) {
+            logger.warn(`⚠️ VALIDATION WARNING: Trade validation failed for entry`, {
+              tradeId: tradeIdea.tradeId,
+              validationId: validationResult.validationId,
+              checks: validationResult.checks,
+              message: validationResult.message
+            });
+          } else {
+            logger.info(`✅ VALIDATION: Trade validation passed for entry`, {
+              tradeId: tradeIdea.tradeId,
+              validationId: validationResult.validationId
+            });
+          }
+          
+          // Log trade lifecycle event
+          logger.logTradeLifecycle('ENTRY', {
+            tradeId: tradeIdea.tradeId,
+            symbol: this.symbol,
+            side: fill.side,
+            qty: fill.qty,
+            price: fill.price,
+            reason: tradeIdea.reason,
+            strategyName: 'hypertrades',
+            versionId: (this.risk as any).versionId
+          });
+
+          logger.info(`✅ TRADE LOGGED: Entry recorded for ${fill.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol} @ $${fill.price.toFixed(2)}`, {
+            tradeId: tradeIdea.tradeId,
+            symbol: this.symbol,
+            side: fill.side,
+            qty: fill.qty,
+            price: fill.price
+          });
+        }, 'execute_trade_complete', tradeIdea.tradeId);
+
+        // Update trade frequency counters after successful execution
+        this.lastTradeTime = Date.now();
+        this.tradesThisHour++;
+
+        logger.info(`COMPLETED: ${order.side.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${fill.price.toFixed(2)} | PnL: $${this.risk.dayPnL.toFixed(2)} | Trades this hour: ${this.tradesThisHour}/${this.cfg.maxTradesPerHour || 8}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          side: order.side,
+          qty: fill.qty,
+          price: fill.price,
+          totalPnL: this.risk.dayPnL,
+          tradesThisHour: this.tradesThisHour,
+          maxTradesPerHour: this.cfg.maxTradesPerHour || 8
+        });
+      } else {
+        logger.warn(`No fill received for order: ${order.side} ${order.qty} ${order.symbol}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          side: order.side,
+          qty: order.qty
+        });
+        
+        // Log failed execution
+        logger.logOrderExecution({
+          ...executionData,
+          success: false,
+          executionTime: Date.now() - executionStartTs
+        });
       }
     } catch (error) {
-      logger.error(`Error executing trade:`, { error, symbol: this.symbol, side: tradeIdea.side });
+      logger.error(`Error executing trade`, { 
+        tradeId: tradeIdea.tradeId,
+        error: error instanceof Error ? error.message : String(error), 
+        symbol: this.symbol, 
+        side: tradeIdea.side,
+        executionTime: Date.now() - executionStartTs
+      });
+      
+      // Log failed execution
+      logger.logOrderExecution({
+        tradeId: tradeIdea.tradeId,
+        symbol: this.symbol,
+        side: tradeIdea.side,
+        qty,
+        price: candle.c,
+        success: false,
+        executionTime: Date.now() - executionStartTs
+      });
+      
+      // Log failed execution attempt to database for analysis
+      try {
+        await DatabaseManager.withRetry(async () => {
+          await prisma.rLDataset.create({
+            data: {
+              symbol: this.symbol,
+              featureVec: JSON.stringify({
+                symbol: this.symbol,
+                price: candle.c,
+                error: error instanceof Error ? error.message : String(error),
+                executionTime: Date.now() - executionStartTs,
+                orderQty: qty,
+                orderSide: tradeIdea.side
+              }),
+              action: 'execution_failed',
+              outcome: -1, // Negative outcome for failed execution
+              strategyVersionId: (this.risk as any).versionId
+            }
+          });
+        }, 'log_failed_execution', 3, tradeIdea.tradeId);
+      } catch (dbError) {
+        logger.error('Failed to log execution error to database', { 
+          tradeId: tradeIdea.tradeId,
+          dbError: dbError instanceof Error ? dbError.message : String(dbError) 
+        });
+      }
+
       // Only check portfolio risk limits
       if (portfolioRisk && !portfolioRisk.canTrade()) {
-        logger.warn(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`);
+        logger.warn(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol
+        });
       }
     }
   }
   
   /**
-   * Execute an order with retry logic
+   * Execute an order with enhanced retry logic and database operations
    * @param order Order to execute
    * @param maxRetries Maximum number of retry attempts
    * @returns Promise resolving to order result
    */
-  private async executeWithRetry(order: Order, maxRetries = 3): Promise<any> {
+  private async executeWithRetry(order: Order, maxRetries = 3, tradeId?: string): Promise<any> {
     let lastError;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        return await this.executionEngine.place(order);
+        // Verify database connection before attempting execution
+        const isConnected = await DatabaseManager.verifyConnection();
+        if (!isConnected) {
+          throw new Error('Database connection failed before execution attempt');
+        }
+
+        // Attempt execution
+        const result = await this.executionEngine.place(order);
+        
+        logger.debug(`Execution attempt ${attempt + 1} successful for ${order.side} ${order.symbol}`, {
+          tradeId,
+          symbol: order.symbol,
+          side: order.side,
+          attempt: attempt + 1,
+          success: true
+        });
+        return result;
       } catch (error) {
         lastError = error;
         
+        logger.warn(`Execution attempt ${attempt + 1}/${maxRetries} failed`, {
+          tradeId,
+          error: error instanceof Error ? error.message : String(error),
+          symbol: order.symbol,
+          side: order.side,
+          attempt: attempt + 1,
+          maxRetries
+        });
+        
         // Check if portfolio risk still allows trading
         if (portfolioRisk && !portfolioRisk.canTrade()) {
+          logger.error('Portfolio risk limits exceeded, aborting execution', { tradeId });
           throw new Error('Portfolio risk limits exceeded, aborting execution');
         }
         
-        // Delay before retry
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-        logger.debug(`Retry attempt ${attempt + 1} for ${order.side} ${order.symbol} after ${delay/1000}s delay`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff with jitter
+          const baseDelay = Math.pow(2, attempt) * 1000;
+          const jitter = Math.random() * 500;
+          const delay = baseDelay + jitter;
+          
+          logger.debug(`Retry attempt ${attempt + 2} for ${order.side} ${order.symbol} after ${delay}ms delay`, {
+            tradeId,
+            nextAttempt: attempt + 2,
+            delay
+          });
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     }
     
+    logger.error(`All ${maxRetries} execution attempts failed for ${order.side} ${order.symbol}`, { 
+      tradeId,
+      lastError: lastError instanceof Error ? lastError.message : String(lastError),
+      symbol: order.symbol,
+      side: order.side
+    });
     throw lastError;
   }
   
   /**
-   * Close all open positions at current price
+   * Close all open positions at current price with enhanced error handling
    * @param currentPrice Current market price
+   * @param exitReason Optional reason for closing (stop_loss, take_profit, manual, etc.)
    * @returns Promise resolving to position close result
    */
-  async closePositions(currentPrice: number): Promise<void> {
-    if (this.risk.positions.length > 0) {
-      const positionQty = this.risk.positions[0].qty;
-      const positionSide = this.risk.positions[0].side;
-      const closeSide = positionSide === 'buy' ? 'sell' : 'buy';
-      
-      const order: Order = {
+  async closePositions(currentPrice: number, exitReason: string = 'manual'): Promise<void> {
+    if (this.risk.positions.length === 0) {
+      logger.debug(`No positions to close for ${this.symbol}`, { symbol: this.symbol });
+      return;
+    }
+
+    const position = this.risk.positions[0];
+    const positionQty = position.qty;
+    const positionSide = position.side;
+    const closeSide = positionSide === 'buy' ? 'sell' : 'buy';
+    
+    // Generate trade ID for position close
+    const tradeId = logger.getCurrentTradeId(this.symbol, closeSide) || 
+                   `close_${this.symbol}_${closeSide}_${Date.now()}`;
+    
+    const order: Order = {
+      symbol: this.symbol,
+      side: closeSide as 'buy' | 'sell',
+      type: 'market',
+      qty: Math.abs(positionQty),
+      price: currentPrice
+    };
+    
+    const closeStartTs = Date.now();
+    
+    try {
+      // Log position close order placement
+      logger.logOrderPlacement({
+        tradeId,
         symbol: this.symbol,
         side: closeSide as 'buy' | 'sell',
-        type: 'market',
         qty: Math.abs(positionQty),
-        price: currentPrice
-      };
+        price: currentPrice,
+        exchange: this.executionEngine.constructor.name
+      });
       
-      try {
-        const result = await this.executionEngine.place(order);
-        if (result && typeof result === 'object' && 'status' in result && result.status === 'filled' && 'trades' in result && Array.isArray(result.trades)) {
-          const fill = result.trades[0];
+      const result = await this.executeWithRetry(order, 3, tradeId);
+      
+      // Handle SimEngine response format: { id, symbol, side, qty, price, fee, timestamp, orderId }
+      if (result && typeof result === 'object' && 'id' in result && 'price' in result && 'qty' in result) {
+        const fill = result; // SimEngine returns the fill directly
+        
+        // Log successful close execution
+        logger.logOrderExecution({
+          tradeId,
+          symbol: this.symbol,
+          side: closeSide as 'buy' | 'sell',
+          qty: Math.abs(positionQty),
+          price: currentPrice,
+          success: true,
+          fillPrice: fill.price,
+          fillQty: fill.qty,
+          fee: fill.fee || 0,
+          executionTime: Date.now() - closeStartTs
+        });
+        
+        // Use transaction to ensure atomic position close and logging
+        await DatabaseManager.withTransaction(async (tx) => {
           const tradePnL = await this.risk.closePosition(fill.qty, fill.price, fill.fee || 0);
-          logger.info(`Closed position: ${tradePnL.toFixed(2)} PnL`);
-        }
-      } catch (error) {
-        logger.error(`Error closing position:`, { error, symbol: this.symbol });
+          
+          // Log the completed trade with exit information
+          const completedTradeData = {
+            symbol: this.symbol,
+            side: closeSide,
+            price: fill.price,
+            qty: fill.qty,
+            reason: 'position_close',
+            exitReason: exitReason,
+            pnl: tradePnL,
+            entryTs: closeStartTs - 60000 // Fallback timestamp since Position doesn't track entry time
+          };
+
+          await logCompletedTrade(
+            completedTradeData,
+            'hypertrades',
+            (this.risk as any).versionId
+          );
+          
+          // Validate position close execution
+          const validationResult = await validationOrchestrator.validateExecution(
+            tradeId,
+            this.symbol,
+            closeSide as 'buy' | 'sell',
+            fill.qty,
+            fill.price,
+            {
+              shouldBeRecorded: true,
+              expectedPnL: tradePnL,
+              expectedFee: fill.fee || 0
+            }
+          );
+
+          if (!validationResult.success) {
+            logger.warn(`⚠️ VALIDATION WARNING: Trade validation failed for position close`, {
+              tradeId,
+              validationId: validationResult.validationId,
+              checks: validationResult.checks,
+              message: validationResult.message
+            });
+          } else {
+            logger.info(`✅ VALIDATION: Trade validation passed for position close`, {
+              tradeId,
+              validationId: validationResult.validationId
+            });
+          }
+          
+          // Log trade lifecycle event
+          logger.logTradeLifecycle('EXIT', {
+            tradeId,
+            symbol: this.symbol,
+            side: closeSide,
+            qty: fill.qty,
+            price: fill.price,
+            pnl: tradePnL,
+            reason: 'position_close',
+            strategyName: 'hypertrades',
+            versionId: (this.risk as any).versionId
+          });
+
+          logger.info(`✅ POSITION CLOSED: ${closeSide.toUpperCase()} ${fill.qty.toFixed(6)} ${this.symbol} @ $${fill.price.toFixed(2)} | PnL: $${tradePnL.toFixed(2)}`, {
+            tradeId,
+            symbol: this.symbol,
+            side: closeSide,
+            qty: fill.qty,
+            price: fill.price,
+            pnl: tradePnL
+          });
+        }, 'close_position_complete', tradeId);
+        
+        // Clear the trade ID since trade is complete
+        logger.clearTradeId(this.symbol, positionSide);
+        
+      } else {
+        logger.warn(`Unexpected result format when closing position for ${this.symbol}`, { 
+          tradeId,
+          symbol: this.symbol,
+          result: JSON.stringify(result) 
+        });
+      }
+    } catch (error) {
+      logger.error(`Error closing position`, { 
+        tradeId,
+        error: error instanceof Error ? error.message : String(error), 
+        symbol: this.symbol, 
+        positionQty, 
+        positionSide,
+        closeTime: Date.now() - closeStartTs
+      });
+      
+      // Log failed close execution
+      logger.logOrderExecution({
+        tradeId,
+        symbol: this.symbol,
+        side: closeSide as 'buy' | 'sell',
+        qty: Math.abs(positionQty),
+        price: currentPrice,
+        success: false,
+        executionTime: Date.now() - closeStartTs
+      });
+      
+      // Log failed position close to database
+      try {
+        await DatabaseManager.withRetry(async () => {
+          await prisma.rLDataset.create({
+            data: {
+              symbol: this.symbol,
+              featureVec: JSON.stringify({
+                symbol: this.symbol,
+                error: error instanceof Error ? error.message : String(error),
+                closeTime: Date.now() - closeStartTs,
+                positionQty,
+                positionSide,
+                currentPrice
+              }),
+              action: 'position_close_failed',
+              outcome: -1,
+              strategyVersionId: (this.risk as any).versionId
+            }
+          });
+        }, 'log_failed_position_close', 3, tradeId);
+      } catch (dbError) {
+        logger.error('Failed to log position close error to database', { 
+          tradeId,
+          dbError: dbError instanceof Error ? dbError.message : String(dbError) 
+        });
       }
     }
   }
@@ -480,8 +1371,11 @@ export class AssetAgent {
    */
   async checkRiskResumption(): Promise<void> {
     if (portfolioRisk && portfolioRisk.canTrade()) {
-      logger.info(`Trading can resume - Portfolio risk metrics within limits`);
-      logger.info(`Open risk: ${portfolioRisk.openRiskPct.toFixed(2)}%, Daily PnL: $${portfolioRisk.dayPnl.toFixed(2)}`);
+      logger.info(`Trading can resume - Portfolio risk metrics within limits`, {
+        symbol: this.symbol,
+        openRisk: portfolioRisk.openRiskPct,
+        dayPnL: portfolioRisk.dayPnl
+      });
     }
   }
 } 

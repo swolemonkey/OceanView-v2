@@ -1,12 +1,13 @@
-import type { Candle } from '../perception';
-import type { Perception } from '../perception';
-import type { IndicatorCache } from '../indicators/cache';
-import type { Config } from '../config';
+import type { Candle } from '../perception.js';
+import type { Perception } from '../perception.js';
+import type { IndicatorCache } from '../indicators/cache.js';
+import type { Config } from '../config.js';
 
 export interface TradeIdea {
   side: 'buy' | 'sell';
   price: number;
   reason: string;
+  confidence?: number; // Optional confidence score (0-1)
 }
 
 export interface StrategyCtx {

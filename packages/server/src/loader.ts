@@ -1,13 +1,13 @@
 import { PrismaClient } from '@prisma/client';
-import { AssetAgent } from './bots/hypertrades/assetAgent';
-import { loadConfig } from './bots/hypertrades/config';
-import { CoinGeckoFeed } from './feeds/coingeckoFeed';
-import { AlpacaFeed } from './feeds/alpacaFeed';
-import { BinanceTestnetEngine } from './execution/binanceTestnet';
-import { AlpacaPaperEngine } from './execution/alpacaPaper';
-import { BinanceFuturesEngine } from './execution/binanceFutures';
-import type { DataFeed } from './feeds/interface';
-import type { ExecutionEngine } from './execution/interface';
+import { AssetAgent } from './bots/hypertrades/assetAgent.js';
+import { loadConfig } from './bots/hypertrades/config.js';
+import { CoinGeckoFeed } from './feeds/coingeckoFeed.js';
+import { AlpacaFeed } from './feeds/alpacaFeed.js';
+import { BinanceTestnetEngine } from './execution/binanceTestnet.js';
+import { AlpacaPaperEngine } from './execution/alpacaPaper.js';
+import { BinanceFuturesEngine } from './execution/binanceFutures.js';
+import type { DataFeed } from './feeds/interface.js';
+import type { ExecutionEngine } from './execution/interface.js';
 
 const prisma = new PrismaClient();
 

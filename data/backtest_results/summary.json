@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "X:BTCUSD",
+    "trades": 2,
+    "pnl": -0.42,
+    "winRate": 0
+  },
+  {
+    "symbol": "AAPL",
+    "trades": 2,
+    "pnl": 0,
+    "winRate": 0
+  }
+]

@@ -1,5 +1,5 @@
-import { Perception } from './perception';
-import { loadConfig } from './config';
+import { Perception } from './perception.js';
+import { loadConfig } from './config.js';
 
 interface SMCConfig {
   thresh: number;

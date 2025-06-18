@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7221",
+    "symbol": "AMZN",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 206.3449840533038,
+    "fee": 0.0008253799362132154,
+    "pnl": 0,
+    "timestamp": 1750230062737,
+    "strategy": "backtest"
+  },
+  {
+    "id": "7222",
+    "symbol": "AMZN",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 205.88501587567626,
+    "fee": 0.000823540063502705,
+    "pnl": -0.000823540063502705,
+    "timestamp": 1750230062921,
+    "strategy": "backtest"
+  }
+]

@@ -18,7 +18,7 @@ const logger = pino.pino({
 // @ts-ignore - Working around type issues with ioredis-mock
 const redis = new IoRedisMock();
 
-export async function registerLatestPriceRoute(app: FastifyInstance) {
+export async function registerLatestPriceRoute(app: any) {
   app.get('/api/prices/latest', async (req, reply) => {
     const symbol = (req.query as any).symbol as string;
     logger.info(`Price request received for symbol: ${symbol}`);

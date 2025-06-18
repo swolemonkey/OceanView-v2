@@ -21,6 +21,9 @@ export async function seedTradableAssets() {
     })
   ));
   console.log('✅  TradableAsset seeded:', rows.length);
+  
+  // Return the crypto symbols for use in HyperSettings
+  return rows.filter(([, assetClass]) => assetClass === 'future').map(([symbol]) => symbol.toLowerCase());
 }
 
 async function main() {
@@ -32,6 +35,12 @@ async function main() {
   console.log("Starting database seeding...");
 
   try {
+    // Seed TradableAssets first and get crypto symbols
+    const cryptoSymbols = await seedTradableAssets();
+    const cryptoSymbolsString = cryptoSymbols.join(',');
+    
+    console.log(`Using crypto symbols: ${cryptoSymbolsString}`);
+
     // Bot - hypertrades
     // First check if bot exists
     const existingBot = await prisma.bot.findFirst({
@@ -78,11 +87,11 @@ async function main() {
 
     // Run remaining operations in a transaction
     await prisma.$transaction([
-      // HyperSettings with strategyToggle JSON
+      // HyperSettings with all crypto symbols
       prisma.hyperSettings.upsert({
         where: { id: 1 },
         update: {
-          symbols: "bitcoin,ethereum",
+          symbols: cryptoSymbolsString,
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
           maxOpenRisk: 0.05
@@ -91,7 +100,7 @@ async function main() {
           id: 1,
           smcThresh: 0.002,
           rsiOS: 35,
-          symbols: "bitcoin,ethereum",
+          symbols: cryptoSymbolsString,
           riskPct: 1,
           gatekeeperThresh: 0.55,
           maxDailyLoss: 0.03,
@@ -166,8 +175,6 @@ async function main() {
       "atrMultiple" = 1.5,
       "atrPeriod" = 14
       WHERE id = 1`;
-
-    await seedTradableAssets();
 
     console.log("Database seeding completed successfully!");
   } catch (error) {

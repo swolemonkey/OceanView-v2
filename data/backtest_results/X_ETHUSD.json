@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7207",
+    "symbol": "X:ETHUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 2639.0326083857435,
+    "fee": 0.010556130433542974,
+    "pnl": -0.010556130433542974,
+    "timestamp": 1750230010420,
+    "strategy": "backtest"
+  },
+  {
+    "id": "7208",
+    "symbol": "X:ETHUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 2640.487388727365,
+    "fee": 0.010561949554909461,
+    "pnl": 0,
+    "timestamp": 1750230010835,
+    "strategy": "backtest"
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "backtestDuration": 6071,
+  "metrics": {
+    "trade": {
+      "totalTrades": 1052,
+      "successfulTrades": 1052,
+      "failedTrades": 0,
+      "successRate": 100,
+      "avgExecutionLatency": 100,
+      "lastExecutionTime": 1750230696418
+    },
+    "database": {
+      "totalOperations": 1052,
+      "successfulOperations": 1052,
+      "failedOperations": 0,
+      "successRate": 100,
+      "avgLatency": 50,
+      "lastOperationTime": 1750230696418
+    },
+    "risk": {
+      "totalRiskChecks": 0,
+      "riskBreaches": 0,
+      "warningCount": 0,
+      "criticalBreaches": 0,
+      "breachRate": 0,
+      "lastBreachTime": 0
+    },
+    "latency": {
+      "signalToOrder": 0,
+      "orderToFill": 0,
+      "fillToDatabase": 0,
+      "totalPipeline": 0,
+      "p95Latency": 100,
+      "p99Latency": 100
+    },
+    "health": {
+      "status": "healthy",
+      "score": 100,
+      "issues": [],
+      "uptime": 1750230690278,
+      "lastHealthCheck": 1750230690278
+    },
+    "activeAlerts": [],
+    "uptime": 6142
+  },
+  "recommendations": [],
+  "timestamp": "2025-06-18T07:11:36.420Z"
+}

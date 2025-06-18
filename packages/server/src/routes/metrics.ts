@@ -19,7 +19,7 @@ interface MetricsResponse {
   };
 }
 
-export async function registerMetricsRoute(fastify: FastifyInstance) {
+export async function registerMetricsRoute(fastify: any) {
   fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply): Promise<MetricsResponse | { error: string }> => {
     try {
       // Get account state for equity

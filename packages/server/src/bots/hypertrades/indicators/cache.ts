@@ -1,7 +1,7 @@
 export class IndicatorCache {
-  private closes:number[]=[];
-  private highs:number[]=[];
-  private lows:number[]=[];
+  private closes: number[] = [];
+  private highs: number[] = [];
+  private lows: number[] = [];
   rsi14=50; fastMA=0; slowMA=0;
   adx14=25; bbWidth=0; atr14=0;
   avgSent=0; avgOB=0; // sentiment and order book pressure
@@ -78,7 +78,7 @@ export class IndicatorCache {
     // Calculate Average True Range (ATR-14)
     if(this.closes.length >= 2 && this.highs.length >= 14 && this.lows.length >= 14) {
       // Calculate True Range series for the last 14 periods
-      const trValues = [];
+      const trValues: number[] = [];
       for(let i = 1; i < 15; i++) {
         const idx = this.closes.length - i;
         const prevIdx = idx - 1;
@@ -103,9 +103,9 @@ export class IndicatorCache {
     // Calculate Average Directional Index (ADX-14)
     if(this.closes.length >= 15 && this.highs.length >= 15 && this.lows.length >= 15) {
       // Arrays to store +DM, -DM, and TR values
-      const plusDM = [];
-      const minusDM = [];
-      const trValues = [];
+      const plusDM: number[] = [];
+      const minusDM: number[] = [];
+      const trValues: number[] = [];
       
       // Calculate +DM, -DM, and TR for each period
       for(let i = 1; i < 15; i++) {

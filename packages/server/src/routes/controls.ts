@@ -5,7 +5,7 @@ interface ControlsBody {
   equity?: number;
 }
 
-export async function registerControlsRoute(fastify: FastifyInstance) {
+export async function registerControlsRoute(fastify: any) {
   fastify.post('/controls', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = request.body as ControlsBody;

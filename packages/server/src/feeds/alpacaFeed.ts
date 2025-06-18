@@ -95,8 +95,13 @@ export class AlpacaFeed implements DataFeed {
     const wsUrl = this.baseUrl.replace('https://', 'wss://') + '/stream';
     
     logger.info(`Connecting to Alpaca WebSocket: ${wsUrl}`);
-    this.websocket = new WebSocket(wsUrl);
+    this.websocket = new (WebSocket as any)(wsUrl);
     
+    if (!this.websocket) {
+      logger.error('Failed to create WebSocket connection');
+      return;
+    }
+
     this.websocket.on('open', () => {
       logger.info('Alpaca WebSocket connected');
       this.connected = true;
@@ -114,7 +119,7 @@ export class AlpacaFeed implements DataFeed {
       }
     });
     
-    this.websocket.on('message', (data: WebSocket.Data) => {
+    this.websocket.on('message', (data: Buffer | string) => {
       try {
         const messages = JSON.parse(data.toString()) as AlpacaMessage | AlpacaMessage[];
         
@@ -204,7 +209,7 @@ export class AlpacaFeed implements DataFeed {
   }
   
   private subscribeToSymbol(symbol: string): void {
-    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+    if (!this.websocket || this.websocket.readyState !== 1) {
       this.subscribedSymbols.add(symbol);
       return;
     }

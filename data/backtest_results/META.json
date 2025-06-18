@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7223",
+    "symbol": "META",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 645.4298439797184,
+    "fee": 0.002581719375918874,
+    "pnl": 0,
+    "timestamp": 1750230068264,
+    "strategy": "backtest"
+  },
+  {
+    "id": "7224",
+    "symbol": "META",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 644.86665574797,
+    "fee": 0.00257946662299188,
+    "pnl": -0.00257946662299188,
+    "timestamp": 1750230068636,
+    "strategy": "backtest"
+  }
+]

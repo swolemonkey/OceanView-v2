@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { placeSimOrder } from '../execution/sim.js';
 
-export async function registerOrderRoute(app:FastifyInstance){
+export async function registerOrderRoute(app: any) {
   app.post('/api/order', async (req, reply)=>{
     const { symbol, side, qty, price } = req.body as any;
     if(!symbol || !side || !qty || !price)

@@ -1,7 +1,7 @@
-import { loadConfig } from './config';
-import { smcSignal } from './smc';
-import { taSignal  } from './ta';
-import { Perception } from './perception';
+import { loadConfig } from './config.js';
+import { smcSignal } from './smc.js';
+import { taSignal  } from './ta.js';
+import { Perception } from './perception.js';
 
 interface Config {
   smc: { thresh: number };

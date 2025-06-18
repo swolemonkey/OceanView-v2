@@ -1,5 +1,5 @@
-import { prisma } from '../db';
-import { createLogger } from '../utils/logger';
+import { prisma } from '../db.js';
+import { createLogger } from '../utils/logger.js';
 import fs from 'fs';
 import path from 'path';
 

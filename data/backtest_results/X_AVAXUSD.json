@@ -1,0 +1,24 @@
+[
+  {
+    "id": "7211",
+    "symbol": "X:AVAXUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 23.49000020665644,
+    "fee": 0.00009396000082662576,
+    "pnl": -0.00009396000082662576,
+    "timestamp": 1750230030584,
+    "strategy": "backtest"
+  },
+  {
+    "id": "7212",
+    "symbol": "X:AVAXUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 23.349999795799555,
+    "fee": 0.00009339999918319822,
+    "pnl": 0,
+    "timestamp": 1750230030811,
+    "strategy": "backtest"
+  }
+]

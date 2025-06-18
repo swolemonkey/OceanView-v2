@@ -1,8 +1,8 @@
-import { defaultConfig } from './config';
-import { prisma } from '../../db';
-import type { Config } from './config';
-import type { Perception } from './perception';
-import { IndicatorCache } from './indicators/cache';
+import { defaultConfig } from './config.js';
+import { prisma } from '../../db.js';
+import type { Config } from './config.js';
+import type { Perception } from './perception.js';
+import { IndicatorCache } from './indicators/cache.js';
 
 // Logger interface
 interface Logger {
@@ -22,7 +22,9 @@ type Position = {
   side: 'buy'|'sell'; 
   stop?: number; 
   stopLoss?: number;
+  target?: number; // Take-profit target price
   symbol?: string; // Optional symbol reference for logging
+  entryTs?: number; // Entry timestamp for tracking
 };
 
 export class RiskManager {
@@ -60,15 +62,71 @@ export class RiskManager {
     }
   }
 
-  sizeTrade(stop: number, entry: number) {
+  /**
+   * Enhanced position sizing with multiple risk factors
+   * @param stop Stop loss price
+   * @param entry Entry price
+   * @param symbol Trading symbol for performance-based adjustments
+   * @param confidence Signal confidence (0-1, default 1)
+   * @returns Position size
+   */
+  sizeTrade(stop: number, entry: number, symbol?: string, confidence: number = 1.0): number {
+    // Base risk calculation
+    const baseRiskPct = this.config.riskPct / 100; // Convert to decimal
+    const riskDistance = Math.abs(entry - stop);
+    
+    // ========================================
+    // 🎯 ENHANCED POSITION SIZING FACTORS
+    // ========================================
+    
+    // 1. Volatility-based adjustment
     const indicators = this.perception as unknown as { indicators?: IndicatorCache };
     const atr = indicators?.indicators?.atr?.(14) ?? entry * 0.005;
     const atrPct = atr / entry;
-    const targetVol = 0.005;
-    const volFactor = Math.min(2, Math.max(0.5, targetVol / atrPct));
-    const riskDollar = (this.config.riskPct / 100) * this.equity * volFactor;
-    const qty = riskDollar / Math.abs(entry - stop);
-    return +qty.toFixed(6);
+    const targetVol = 0.008; // Target 0.8% volatility
+    const volFactor = Math.min(1.5, Math.max(0.6, targetVol / atrPct));
+    
+    // 2. Confidence-based adjustment (reduce size for low-confidence signals)
+    const confidenceFactor = Math.max(0.5, confidence);
+    
+    // 3. Portfolio heat adjustment (reduce size if already exposed)
+    const portfolioHeatFactor = this.openRisk > 15 ? 0.7 : 1.0;
+    
+    // 4. Equity curve adjustment (reduce size after losses)
+    const equityCurveFactor = this.dayPnL < -this.equity * 0.02 ? 0.8 : 1.0; // Reduce after 2% daily loss
+    
+    // 5. Risk distance adjustment (smaller size for wider stops)
+    const riskDistancePct = riskDistance / entry;
+    const riskDistanceFactor = riskDistancePct > 0.02 ? 0.8 : 1.0; // Reduce for stops >2%
+    
+    // Calculate final risk amount
+    const adjustedRiskPct = baseRiskPct * volFactor * confidenceFactor * portfolioHeatFactor * equityCurveFactor * riskDistanceFactor;
+    const riskDollar = adjustedRiskPct * this.equity;
+    const qty = riskDollar / riskDistance;
+    
+    // Log the sizing calculation
+    if (typeof global.logger !== 'undefined') {
+      global.logger.info({
+        symbol: symbol || 'unknown',
+        baseRiskPct: (baseRiskPct * 100).toFixed(2) + '%',
+        adjustedRiskPct: (adjustedRiskPct * 100).toFixed(2) + '%',
+        volFactor: volFactor.toFixed(2),
+        confidenceFactor: confidenceFactor.toFixed(2),
+        portfolioHeatFactor: portfolioHeatFactor.toFixed(2),
+        equityCurveFactor: equityCurveFactor.toFixed(2),
+        riskDistanceFactor: riskDistanceFactor.toFixed(2),
+        riskDollar: riskDollar.toFixed(2),
+        qty: qty.toFixed(6),
+        entry: entry.toFixed(2),
+        stop: stop.toFixed(2),
+        riskDistance: riskDistance.toFixed(4),
+        atrPct: (atrPct * 100).toFixed(3) + '%',
+        openRisk: this.openRisk.toFixed(1) + '%',
+        dayPnL: this.dayPnL.toFixed(2)
+      }, "Enhanced position sizing calculation");
+    }
+    
+    return Math.max(0.01, +qty.toFixed(6)); // Minimum position size
   }
 
   updateStops(position: Position): number | null {
@@ -121,7 +179,7 @@ export class RiskManager {
     return true;  // Always return true, portfolio risk manager will handle risk checks
   }
 
-  registerOrder(side:'buy'|'sell', qty:number, price:number, stop?: number) {
+  registerOrder(side:'buy'|'sell', qty:number, price:number, stop?: number, target?: number, symbol?: string) {
     const effectiveStop = stop || price * 0.01;  // 1% default if not provided
     const riskPct = (qty * Math.abs(price - effectiveStop)) / this.equity * 100;
     this.openRisk += riskPct;
@@ -130,7 +188,10 @@ export class RiskManager {
       entry: price, 
       side, 
       stop: effectiveStop,
-      stopLoss: effectiveStop // Initialize stopLoss with the same value as stop
+      stopLoss: effectiveStop, // Initialize stopLoss with the same value as stop
+      target, // Store take-profit target
+      symbol, // Store symbol for logging
+      entryTs: Date.now() // Store entry timestamp
     });
     
     // Apply trailing stop immediately if perception is available
@@ -184,6 +245,53 @@ export class RiskManager {
 
     // Return the individual trade PnL
     return pnl;
+  }
+
+  /**
+   * Check if any positions should be closed based on stop-loss or take-profit levels
+   * @param currentPrice Current market price
+   * @returns Object with exit signals and reasons
+   */
+  checkExitConditions(currentPrice: number): {
+    shouldExit: boolean;
+    reason: 'stop_loss' | 'take_profit' | null;
+    position?: Position;
+  } {
+    if (this.positions.length === 0) {
+      return { shouldExit: false, reason: null };
+    }
+
+    const position = this.positions[0]; // Check first position (FIFO)
+    
+    // Check stop-loss conditions
+    if (position.stop) {
+      const stopHit = (position.side === 'buy' && currentPrice <= position.stop) ||
+                      (position.side === 'sell' && currentPrice >= position.stop);
+      
+      if (stopHit) {
+        return { 
+          shouldExit: true, 
+          reason: 'stop_loss', 
+          position 
+        };
+      }
+    }
+    
+    // Check take-profit conditions
+    if (position.target) {
+      const targetHit = (position.side === 'buy' && currentPrice >= position.target) ||
+                        (position.side === 'sell' && currentPrice <= position.target);
+      
+      if (targetHit) {
+        return { 
+          shouldExit: true, 
+          reason: 'take_profit', 
+          position 
+        };
+      }
+    }
+    
+    return { shouldExit: false, reason: null };
   }
 
   /**

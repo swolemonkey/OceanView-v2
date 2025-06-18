@@ -1,7 +1,7 @@
-import { prisma } from '../db';
+import { prisma } from '../db.js';
 import { InferenceSession, Tensor } from 'onnxruntime-node';
 import path from 'path';
-import { createLogger } from '../utils/logger';
+import { createLogger } from '../utils/logger.js';
 import fs from 'fs';
 import { getActiveModelPath } from './modelPromotion.js';
 

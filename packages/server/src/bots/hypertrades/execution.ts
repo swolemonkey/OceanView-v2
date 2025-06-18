@@ -3,13 +3,13 @@ const fetch = async (...args: any[]) => {
   const mod = await import('node-fetch');
   return (mod.default as any)(...args);
 };
-import { defaultConfig, execCfg } from './config';
-import { prisma } from '../../db';
+import { defaultConfig, execCfg } from './config.js';
+import { prisma } from '../../db.js';
 
-// Use values from config
-const SLIPPAGE_LIMIT = defaultConfig.execution.slippageLimit;  // 0.3 %
-const VALUE_SPLIT = defaultConfig.execution.valueSplit;        // USD
-const TIMEOUT_MS = defaultConfig.execution.timeoutMs;
+// Use values from config with fallbacks
+const SLIPPAGE_LIMIT = defaultConfig.execution?.slippageLimit || 0.002;  // 0.2% default
+const VALUE_SPLIT = defaultConfig.execution?.valueSplit || 2000;         // $2000 default
+const TIMEOUT_MS = defaultConfig.execution?.timeoutMs || 3000;           // 3s default
 
 type TradeIdea = { symbol:string; side:'buy'|'sell'; qty:number; price:number };
 
