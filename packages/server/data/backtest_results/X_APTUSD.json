@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8588",
+    "symbol": "X:APTUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 4.979996704140648,
+    "fee": 0.000019919986816562595,
+    "pnl": -0.000019919986816562595,
+    "timestamp": 1750288477969,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8589",
+    "symbol": "X:APTUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 4.990003309109026,
+    "fee": 0.000019960013236436106,
+    "pnl": 0.00006018604963078371,
+    "timestamp": 1750288478052,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 4.979996704140648,
+    "duration": 83
+  }
+]

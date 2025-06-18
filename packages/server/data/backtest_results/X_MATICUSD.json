@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8580",
+    "symbol": "X:MATICUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 0.21769999370146922,
+    "fee": 8.707999748058769e-7,
+    "pnl": -8.707999748058769e-7,
+    "timestamp": 1750288452725,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8581",
+    "symbol": "X:MATICUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 0.21720000626963185,
+    "fee": 8.688000250785274e-7,
+    "pnl": -0.000006739474318258191,
+    "timestamp": 1750288453042,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 0.21769999370146922,
+    "duration": 317
+  }
+]

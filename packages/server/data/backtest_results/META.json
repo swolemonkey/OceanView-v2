@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8590",
+    "symbol": "META",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 684.2177731257129,
+    "fee": 0.0027368710925028523,
+    "pnl": -0.0027368710925028523,
+    "timestamp": 1750288488319,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8591",
+    "symbol": "META",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 681.3916914981653,
+    "fee": 0.0027255667659926612,
+    "pnl": -0.03372325413397188,
+    "timestamp": 1750288490997,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 684.2177731257129,
+    "duration": 2678
+  }
+]

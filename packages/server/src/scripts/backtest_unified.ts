@@ -41,28 +41,78 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
   // Track all executed trades
   const executedTrades: any[] = [];
   
+  // Track round-trip trades for proper PnL calculation
+  const openPositions = new Map<string, any>(); // symbol -> position info
+  
   // Hook into the agent's execution to capture trade results
   const originalExecute = simEngine.place.bind(simEngine);
   simEngine.place = async (order: any, ctx?: any) => {
     const fill = await originalExecute(order, ctx);
     
-    // Calculate PnL for this trade (simplified)
-    const pnl = order.side === 'sell' ? 
-      (fill.price - (order.entryPrice || fill.price)) * order.qty - fill.fee :
-      0; // For buy orders, PnL is calculated on sell
+    // Track round-trip trades properly
+    const positionKey = `${fill.symbol}`;
+    const existingPosition = openPositions.get(positionKey);
     
-    // Store trade result
-    executedTrades.push({
-      id: fill.id,
-      symbol: fill.symbol,
-      side: fill.side,
-      qty: fill.qty,
-      price: fill.price,
-      fee: fill.fee,
-      pnl: pnl,
-      timestamp: fill.timestamp,
-      strategy: ctx?.strategyName || 'backtest'
-    });
+    if (!existingPosition) {
+      // Opening a new position - store entry details
+      openPositions.set(positionKey, {
+        entryPrice: fill.price,
+        entryFee: fill.fee,
+        qty: fill.qty,
+        side: fill.side,
+        entryTime: fill.timestamp,
+        entryId: fill.id
+      });
+      
+      // Record entry trade with negative fee as PnL
+      executedTrades.push({
+        id: fill.id,
+        symbol: fill.symbol,
+        side: fill.side,
+        qty: fill.qty,
+        price: fill.price,
+        fee: fill.fee,
+        pnl: -fill.fee, // Entry fee is a cost
+        timestamp: fill.timestamp,
+        strategy: ctx?.strategyName || 'backtest',
+        tradeType: 'entry'
+      });
+    } else {
+      // Closing position - calculate round-trip PnL
+      const entry = existingPosition;
+      let roundTripPnL = 0;
+      
+      if (entry.side === 'buy') {
+        // Long position: profit when exit price > entry price
+        roundTripPnL = (fill.price - entry.entryPrice) * fill.qty;
+      } else {
+        // Short position: profit when exit price < entry price  
+        roundTripPnL = (entry.entryPrice - fill.price) * fill.qty;
+      }
+      
+      // Subtract total fees (entry + exit)
+      const totalFees = entry.entryFee + fill.fee;
+      roundTripPnL -= totalFees;
+      
+      // Record completed round-trip trade
+      executedTrades.push({
+        id: fill.id,
+        symbol: fill.symbol,
+        side: fill.side,
+        qty: fill.qty,
+        price: fill.price,
+        fee: fill.fee,
+        pnl: roundTripPnL, // This is the actual profit/loss for the complete trade
+        timestamp: fill.timestamp,
+        strategy: ctx?.strategyName || 'backtest',
+        tradeType: 'exit',
+        entryPrice: entry.entryPrice,
+        duration: fill.timestamp - entry.entryTime
+      });
+      
+      // Remove closed position
+      openPositions.delete(positionKey);
+    }
     
     return fill;
   };
@@ -231,8 +281,23 @@ async function runBacktest(options: {
   if (options.allAssets) {
     console.log('📊 Loading all active tradable assets...');
     const assets = await prisma.tradableAsset.findMany({ where: { active: true } });
-    symbols = assets.map(a => a.symbol);
-    console.log(`Found ${symbols.length} active assets: ${symbols.join(', ')}`);
+    
+    // Convert database symbols to Polygon format
+    const convertToPolygonSymbol = (symbol: string, assetClass: string): string => {
+      if (assetClass === 'future') {
+        // Crypto futures: BTC -> X:BTCUSD, ETH -> X:ETHUSD, etc.
+        return `X:${symbol}USD`;
+      } else if (assetClass === 'equity') {
+        // Equities: AAPL stays AAPL, TSLA stays TSLA, etc.
+        return symbol;
+      }
+      return symbol; // fallback
+    };
+    
+    symbols = assets.map(a => convertToPolygonSymbol(a.symbol, a.assetClass));
+    console.log(`Found ${assets.length} active assets, converted to Polygon format:`);
+    console.log(`  Raw symbols: ${assets.map(a => a.symbol).join(', ')}`);
+    console.log(`  Polygon symbols: ${symbols.join(', ')}`);
   } else if (options.symbols) {
     symbols = options.symbols;
   } else if (options.symbol) {
@@ -271,14 +336,15 @@ async function runBacktest(options: {
       const feed = new PolygonDataFeed(symbol);
       const executedTrades = await runReplayViaFeed(symbol, feed.iterate(startDate, endDate));
       
-      // Generate results
-      const pnl = executedTrades.reduce((total, trade: any) => total + (Number(trade.pnl) || 0), 0);
-      const winRate = executedTrades.length > 0 ? 
-        (executedTrades.filter((t: any) => (Number(t.pnl) || 0) > 0).length / executedTrades.length * 100) : 0;
+      // Generate results - only count completed round-trip trades for win rate
+      const completedTrades = executedTrades.filter((t: any) => t.tradeType === 'exit');
+      const pnl = completedTrades.reduce((total, trade: any) => total + (Number(trade.pnl) || 0), 0);
+      const winRate = completedTrades.length > 0 ? 
+        (completedTrades.filter((t: any) => (Number(t.pnl) || 0) > 0).length / completedTrades.length * 100) : 0;
       
       summary.push({ 
         symbol, 
-        trades: executedTrades.length, 
+        trades: completedTrades.length, // Count only completed round-trip trades
         pnl: Number(pnl.toFixed(2)),
         winRate: Number(winRate.toFixed(1))
       });
@@ -289,7 +355,7 @@ async function runBacktest(options: {
         JSON.stringify(executedTrades, null, 2)
       );
       
-      console.log(`✓ ${symbol}: ${executedTrades.length} trades, PnL: $${pnl.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%`);
+      console.log(`✓ ${symbol}: ${completedTrades.length} completed trades, PnL: $${pnl.toFixed(2)}, Win Rate: ${winRate.toFixed(1)}%`);
       
     } catch (error) {
       console.error(`❌ Error backtesting ${symbol}:`, error);

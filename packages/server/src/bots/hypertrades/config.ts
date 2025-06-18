@@ -132,13 +132,14 @@ export const defaultConfig = {
   },
   ta: { 
     rsiPeriod: 14, 
-    overSold: 20,          // More extreme for higher quality bounces
-    overBought: 80         // More extreme for higher quality bounces
+    overSold: 30,          // Less extreme for more trade opportunities (was 20)
+    overBought: 70         // Less extreme for more trade opportunities (was 80)
   },
   strategyToggle: {        // All strategies performing well
     TrendFollowMA: true,   // Best performer: 75% win rate
     RangeBounce: true,     // Good: 61.5% win rate  
-    SMCReversal: true      // Good: 69.2% win rate
+    SMCReversal: true,     // Good: 69.2% win rate
+    MomentumScalp: true    // New high-frequency momentum scalping strategy
   },
   gatekeeperThresh: 0.05,  // Very low threshold - allow most trades through for 5-minute
   
@@ -162,9 +163,9 @@ export const defaultConfig = {
   adxPeriod: 14,           // Standard ADX for 5m
   
   // === CONFIDENCE THRESHOLDS ===
-  minConfidence: 0.65,     // Increased from 0.6 - only high confidence trades
-  maxTradesPerHour: 12,    // Balanced frequency for quality over quantity
-  cooldownMinutes: 15      // Longer cooldown for better setups
+  minConfidence: 0.45,     // Reduced from 0.65 - allow more trade opportunities
+  maxTradesPerHour: 20,    // Increased from 12 - allow more frequent trading
+  cooldownMinutes: 1       // Minimal cooldown for backtest - allow rapid fire trading
 };
 
 export const execCfg = { slippage:0.002, splitUSD:2000 }; // Optimized for 5m - higher split for longer timeframe

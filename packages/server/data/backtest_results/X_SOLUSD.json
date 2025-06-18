@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8568",
+    "symbol": "X:SOLUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 156.3767496573078,
+    "fee": 0.0006255069986292312,
+    "pnl": -0.0006255069986292312,
+    "timestamp": 1750288412763,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8569",
+    "symbol": "X:SOLUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 156.17324161889556,
+    "fee": 0.0006246929664755823,
+    "pnl": -0.003285280349227336,
+    "timestamp": 1750288412992,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 156.3767496573078,
+    "duration": 229
+  }
+]

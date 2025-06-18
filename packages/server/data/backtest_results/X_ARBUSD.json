@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8562",
+    "symbol": "X:ARBUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 0.3696999818338962,
+    "fee": 0.000001478799927335585,
+    "pnl": -0.000001478799927335585,
+    "timestamp": 1750288390710,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8563",
+    "symbol": "X:ARBUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 0.36850001804836535,
+    "fee": 0.0000014740000721934615,
+    "pnl": -0.000014952437854837377,
+    "timestamp": 1750288390907,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 0.3696999818338962,
+    "duration": 197
+  }
+]

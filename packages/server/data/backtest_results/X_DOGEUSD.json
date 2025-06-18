@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8592",
+    "symbol": "X:DOGEUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 0.1953899949278073,
+    "fee": 7.815599797112293e-7,
+    "pnl": -7.815599797112293e-7,
+    "timestamp": 1750288496498,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8593",
+    "symbol": "X:DOGEUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 0.19601000510443337,
+    "fee": 7.840400204177336e-7,
+    "pnl": 0.000004634501766131828,
+    "timestamp": 1750288496664,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 0.1953899949278073,
+    "duration": 166
+  }
+]

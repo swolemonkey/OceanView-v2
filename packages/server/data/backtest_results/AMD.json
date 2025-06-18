@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8586",
+    "symbol": "AMD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 118.69812752599148,
+    "fee": 0.000474792510103966,
+    "pnl": -0.000474792510103966,
+    "timestamp": 1750288474121,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8587",
+    "symbol": "AMD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 118.63187026618151,
+    "fee": 0.00047452748106472606,
+    "pnl": -0.0016118925892684207,
+    "timestamp": 1750288474306,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 118.69812752599148,
+    "duration": 185
+  }
+]

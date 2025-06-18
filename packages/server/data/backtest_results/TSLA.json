@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8570",
+    "symbol": "TSLA",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 338.1851994073477,
+    "fee": 0.001352740797629391,
+    "pnl": -0.001352740797629391,
+    "timestamp": 1750288422513,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8571",
+    "symbol": "TSLA",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 338.77474480845393,
+    "fee": 0.0013550989792338159,
+    "pnl": -0.008603293787925705,
+    "timestamp": 1750288422586,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 338.1851994073477,
+    "duration": 73
+  }
+]

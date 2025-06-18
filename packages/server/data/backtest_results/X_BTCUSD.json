@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8558",
+    "symbol": "X:BTCUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 103813.07077907081,
+    "fee": 0.41525228311628326,
+    "pnl": -0.41525228311628326,
+    "timestamp": 1750288376939,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8559",
+    "symbol": "X:BTCUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 106380.11786620769,
+    "fee": 0.42552047146483074,
+    "pnl": 24.82969811678763,
+    "timestamp": 1750288377339,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 103813.07077907081,
+    "duration": 400
+  }
+]

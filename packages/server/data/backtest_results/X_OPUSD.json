@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8594",
+    "symbol": "X:OPUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 0.6599999421266031,
+    "fee": 0.0000026399997685064128,
+    "pnl": -0.0000026399997685064128,
+    "timestamp": 1750288506216,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8595",
+    "symbol": "X:OPUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 0.6580000575231805,
+    "fee": 0.000002632000230092722,
+    "pnl": -0.000025270846032825103,
+    "timestamp": 1750288506290,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 0.6599999421266031,
+    "duration": 74
+  }
+]

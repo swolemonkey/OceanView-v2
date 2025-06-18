@@ -9,6 +9,7 @@ import { TrendFollowMA as TrendFollowMAOld } from './strategies/trendFollow.js';
 import { RangeBounce as RangeBounceOld } from './strategies/rangeBounce.js';
 import { TrendFollowMA } from './strategies/trendFollowMA.js';
 import { RangeBounce } from './strategies/rangeBounce.js';
+import { MomentumScalp } from './strategies/momentumScalp.js';
 import { passRR, passRRDynamic } from './utils/riskReward.js';
 import type { DataFeed, Tick } from '../../feeds/interface.js';
 import type { ExecutionEngine, Order } from '../../execution/interface.js';
@@ -234,6 +235,10 @@ export class AssetAgent {
     
     if (cfg.strategyToggle.RangeBounce === true) {
       this.strategies.push(new RangeBounce(symbol));
+    }
+    
+    if (cfg.strategyToggle.MomentumScalp === true) {
+      this.strategies.push(new MomentumScalp(symbol));
     }
     
     logger.info(`Initialized strategies for ${symbol}: ${this.strategies.map(s => s.constructor.name).join(', ')}`, { 
@@ -466,8 +471,8 @@ export class AssetAgent {
            }
          );
         
-        // Store trade ID in the idea for tracking
-        tradeIdea = { ...idea, tradeId };
+        // Store trade ID and strategy name in the idea for tracking
+        tradeIdea = { ...idea, tradeId, strategyName };
         break;
       } else {
         logger.debug(`⚪ NO SIGNAL: ${strategyName} returned null for ${this.symbol}`, {
@@ -695,7 +700,12 @@ export class AssetAgent {
     // Combined confidence score
     const overallConfidence = (trendConfidence + momentumConfidence + volatilityConfidence) / 3;
     
-    const qty = this.risk.sizeTrade(stopPrice, entry, this.symbol, overallConfidence);
+    // Get base position size from risk manager
+    const baseQty = this.risk.sizeTrade(stopPrice, entry, this.symbol, overallConfidence);
+    
+    // Apply dynamic position sizing after RR check (will be updated later with regime info)
+    // For now, use base quantity - dynamic sizing will be applied after RR check
+    const qty = baseQty;
     
     logger.info(`📊 POSITION SIZING: ${this.symbol.toUpperCase()} | Qty=${qty.toFixed(6)}, Confidence=${(overallConfidence*100).toFixed(1)}% | Trend=${(trendConfidence*100).toFixed(1)}%, Momentum=${(momentumConfidence*100).toFixed(1)}%, Vol=${(volatilityConfidence*100).toFixed(1)}%`, {
       tradeId: tradeIdea.tradeId,
@@ -735,35 +745,20 @@ export class AssetAgent {
     const marketVolatility = atr / candle.c; // ATR as percentage of price
     const trendStrength = Math.abs((this.indCache.fastMA - this.indCache.slowMA) / candle.c);
     
-    // Enhanced 5-minute risk-reward with market condition adaptation
-    const { pass5MinuteRR, passRiskReward } = await import('./utils/riskReward.js');
-    const manualRR = Math.abs((targetPrice - candle.c) / (candle.c - stopPrice));
+    // Enhanced strategy-specific risk-reward with market condition adaptation
+    const { passRRDynamic, getDynamicPositionSize } = await import('./utils/riskReward.js');
     
-    // Dynamic RR threshold based on market conditions
-    let rrThreshold = 1.5; // Base threshold higher for better win rate
-    
-    // Adjust based on market volatility (higher vol = higher RR required)
-    if (marketVolatility > 0.005) rrThreshold = 2.0;
-    else if (marketVolatility > 0.003) rrThreshold = 1.8;
-    
-    // Adjust based on trend strength (stronger trend = lower RR acceptable)
-    if (trendStrength > 0.02) rrThreshold *= 0.9;
-    else if (trendStrength < 0.01) rrThreshold *= 1.1;
-    
-    const rrPassed = manualRR >= rrThreshold;
-    
-    const rrResult = {
-      passed: rrPassed,
-      rr: manualRR,
-      threshold: rrThreshold,
-      winProb: 0.65,   // Target higher win rate
-      adjustments: {
-        baseThreshold: 1.5,
-        volatilityAdjustment: marketVolatility > 0.003 ? 0.3 : 0,
-        trendAdjustment: trendStrength > 0.02 ? -0.15 : (trendStrength < 0.01 ? 0.15 : 0),
-        timeAdjustment: 0
-      }
-    };
+    // Use strategy-specific RR check with market conditions
+    const rrResult = await passRRDynamic(
+      side,
+      candle.c,
+      stopPrice,
+      targetPrice,
+      this.symbol,
+      marketVolatility,
+      trendStrength,
+      tradeIdea.strategyName || 'default'
+    );
     const stopDistance = Math.abs(candle.c - stopPrice);
     const targetDistance = Math.abs(targetPrice - candle.c);
     
@@ -784,8 +779,8 @@ export class AssetAgent {
     
     logger.logRiskCheck(riskData);
     
-    // Enhanced RR logging with detailed breakdown
-    logger.info(`🎯 ENHANCED RR ANALYSIS: ${this.symbol.toUpperCase()} | RR=${rrResult.rr.toFixed(3)}, Threshold=${rrResult.threshold.toFixed(2)}, WinRate=${(rrResult.winProb*100).toFixed(1)}% | Base=${rrResult.adjustments.baseThreshold.toFixed(2)}, VolAdj=${rrResult.adjustments.volatilityAdjustment.toFixed(2)}, TrendAdj=${rrResult.adjustments.trendAdjustment.toFixed(2)} | ${rrResult.passed ? '✅ PASSED' : '❌ BLOCKED'}`, {
+    // Enhanced RR logging with detailed breakdown including market regime
+    logger.info(`🎯 REGIME-AWARE RR: ${this.symbol.toUpperCase()} [${rrResult.adjustments.strategyName}] [${rrResult.adjustments.regime.toUpperCase()}:${(rrResult.adjustments.regimeConfidence*100).toFixed(0)}%] | RR=${rrResult.rr.toFixed(3)}, Threshold=${rrResult.threshold.toFixed(2)}, WinRate=${(rrResult.winProb*100).toFixed(1)}% | Base=${rrResult.adjustments.baseThreshold.toFixed(2)}, RegimeMult=${rrResult.adjustments.regimeMultiplier.toFixed(2)}, VolAdj=${rrResult.adjustments.volatilityAdjustment.toFixed(2)} | ${rrResult.passed ? '✅ PASSED' : '❌ BLOCKED'}`, {
       tradeId: tradeIdea.tradeId,
       symbol: this.symbol,
       riskReward: rrResult.rr,
@@ -827,7 +822,7 @@ export class AssetAgent {
                 winProb: rrResult.winProb,
                 rrThreshold: rrResult.threshold,
                 actualRR: rrResult.rr,
-                manualRR: manualRR,
+                manualRR: rrResult.rr,
                 usingATR: usingATR,
                 atrValue: atr,
                 stopDistance: stopDistance,
@@ -851,6 +846,36 @@ export class AssetAgent {
     }
     
     // ========================================
+    // 🎯 DYNAMIC POSITION SIZING AFTER RR APPROVAL
+    // ========================================
+    
+    // Apply dynamic position sizing based on market regime and strategy confidence
+    const dynamicQty = getDynamicPositionSize(
+      baseQty,
+      tradeIdea.strategyName || 'default',
+      rrResult.adjustments.regime,
+      rrResult.adjustments.regimeConfidence,
+      rrResult.winProb,
+      rrResult.rr,
+      marketVolatility
+    );
+    
+    // Update the trade idea with dynamic quantity
+    fullIdea.qty = dynamicQty;
+    
+    logger.info(`📊 DYNAMIC SIZING: ${this.symbol.toUpperCase()} [${rrResult.adjustments.regime.toUpperCase()}] | Base=${baseQty.toFixed(6)} → Dynamic=${dynamicQty.toFixed(6)} (${((dynamicQty/baseQty)*100).toFixed(1)}%) | Strategy=${tradeIdea.strategyName}, WinRate=${(rrResult.winProb*100).toFixed(1)}%, RR=${rrResult.rr.toFixed(2)}`, {
+      tradeId: tradeIdea.tradeId,
+      symbol: this.symbol,
+      baseQty,
+      dynamicQty,
+      sizeMultiplier: dynamicQty / baseQty,
+      regime: rrResult.adjustments.regime,
+      strategyName: tradeIdea.strategyName,
+      winProb: rrResult.winProb,
+      rrRatio: rrResult.rr
+    });
+    
+    // ========================================
     // 🚦 5-MINUTE TRADE FREQUENCY CONTROLS
     // ========================================
     const currentTime = Date.now();
@@ -862,38 +887,47 @@ export class AssetAgent {
       this.hourlyTradeReset = currentHour;
     }
     
-    // Check cooldown period (15 minutes between trades for 5m timeframe)
-    const cooldownMs = (this.cfg.cooldownMinutes || 10) * 60 * 1000;
+    // Check cooldown period - shorter cooldown for backtests to prevent rapid losses
+    const cooldownMinutes = (process.env.MODE === 'backtest' || process.env.NODE_ENV === 'test') ? 
+      5 : // 5 minutes for backtests - prevents rapid cascade failures
+      (this.cfg.cooldownMinutes || 15); // 15 minutes for live trading
+      
+    const cooldownMs = cooldownMinutes * 60 * 1000;
     if (currentTime - this.lastTradeTime < cooldownMs) {
       const remainingCooldown = Math.ceil((cooldownMs - (currentTime - this.lastTradeTime)) / 60000);
       logger.info(`🚦 COOLDOWN: Trade blocked for ${this.symbol.toUpperCase()}, ${remainingCooldown} minutes remaining`, {
         tradeId: tradeIdea.tradeId,
         symbol: this.symbol,
         remainingCooldown: remainingCooldown,
-        reason: 'cooldown_period'
+        reason: 'cooldown_period',
+        mode: process.env.MODE || 'live'
       });
       return;
     }
     
-    // Check hourly trade limit (8 trades per hour max)
-    const maxTradesPerHour = this.cfg.maxTradesPerHour || 8;
+    // Check hourly trade limit - higher limit for backtests but still enforce some control
+    const maxTradesPerHour = (process.env.MODE === 'backtest' || process.env.NODE_ENV === 'test') ?
+      15 : // 15 trades/hour for backtests - allows decent volume but prevents bursts
+      (this.cfg.maxTradesPerHour || 8); // 8 trades/hour for live trading
+      
     if (this.tradesThisHour >= maxTradesPerHour) {
       logger.info(`🚦 HOURLY LIMIT: Trade blocked for ${this.symbol.toUpperCase()}, ${this.tradesThisHour}/${maxTradesPerHour} trades this hour`, {
         tradeId: tradeIdea.tradeId,
         symbol: this.symbol,
         tradesThisHour: this.tradesThisHour,
         maxTradesPerHour: maxTradesPerHour,
-        reason: 'hourly_limit_reached'
+        reason: 'hourly_limit_reached',
+        mode: process.env.MODE || 'live'
       });
       return;
     }
     
     // Execute trade idea with enhanced error handling and transaction management
-    logger.info(`EXECUTING: ${tradeIdea.side.toUpperCase()} ${qty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | Trade ${this.tradesThisHour + 1}/${maxTradesPerHour} this hour`, {
+    logger.info(`EXECUTING: ${tradeIdea.side.toUpperCase()} ${dynamicQty.toFixed(6)} ${this.symbol.toUpperCase()} @ $${candle.c.toFixed(2)} | Trade ${this.tradesThisHour + 1}/${maxTradesPerHour} this hour`, {
       tradeId: tradeIdea.tradeId,
       symbol: this.symbol,
       side: tradeIdea.side,
-      qty,
+      qty: dynamicQty,
       price: candle.c,
       tradesThisHour: this.tradesThisHour,
       maxTradesPerHour: maxTradesPerHour

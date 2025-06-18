@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8560",
+    "symbol": "NVDA",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 141.48233930151275,
+    "fee": 0.000565929357206051,
+    "pnl": -0.000565929357206051,
+    "timestamp": 1750288385988,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8561",
+    "symbol": "NVDA",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 141.22765092860382,
+    "fee": 0.0005649106037144153,
+    "pnl": -0.0036777236900097684,
+    "timestamp": 1750288386201,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 141.48233930151275,
+    "duration": 213
+  }
+]

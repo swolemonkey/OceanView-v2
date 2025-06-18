@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8574",
+    "symbol": "COIN",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 258.20885835956585,
+    "fee": 0.0010328354334382635,
+    "pnl": -0.0010328354334382635,
+    "timestamp": 1750288438419,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8575",
+    "symbol": "COIN",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 256.79123744276893,
+    "fee": 0.001027164949771076,
+    "pnl": 0.012116208784759865,
+    "timestamp": 1750288438794,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 258.20885835956585,
+    "duration": 375
+  }
+]

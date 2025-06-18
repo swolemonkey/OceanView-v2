@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8566",
+    "symbol": "AAPL",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 202.9245266175811,
+    "fee": 0.0008116981064703244,
+    "pnl": -0.0008116981064703244,
+    "timestamp": 1750288407831,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8567",
+    "symbol": "AAPL",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 203.09548201678962,
+    "fee": 0.0008123819280671585,
+    "pnl": 0.00008547395754760802,
+    "timestamp": 1750288407938,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 202.9245266175811,
+    "duration": 107
+  }
+]

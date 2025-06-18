@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8582",
+    "symbol": "X:LINKUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 14.35497261398965,
+    "fee": 0.0000574198904559586,
+    "pnl": -0.0000574198904559586,
+    "timestamp": 1750288461151,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8583",
+    "symbol": "X:LINKUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 14.314027229796773,
+    "fee": 0.0000572561089191871,
+    "pnl": -0.0005241298413039187,
+    "timestamp": 1750288461480,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 14.35497261398965,
+    "duration": 329
+  }
+]

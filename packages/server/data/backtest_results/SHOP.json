@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8576",
+    "symbol": "SHOP",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 103.85643333015398,
+    "fee": 0.0004154257333206159,
+    "pnl": -0.0004154257333206159,
+    "timestamp": 1750288442718,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8577",
+    "symbol": "SHOP",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 103.01858962530095,
+    "fee": 0.00041207435850120383,
+    "pnl": 0.007550936956708469,
+    "timestamp": 1750288443083,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 103.85643333015398,
+    "duration": 365
+  }
+]

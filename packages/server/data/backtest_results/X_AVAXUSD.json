@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8564",
+    "symbol": "X:AVAXUSD",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 21.409939074911005,
+    "fee": 0.00008563975629964403,
+    "pnl": -0.00008563975629964403,
+    "timestamp": 1750288399292,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8565",
+    "symbol": "X:AVAXUSD",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 21.430061038967644,
+    "fee": 0.00008572024415587058,
+    "pnl": 0.000029859640110871155,
+    "timestamp": 1750288399505,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 21.409939074911005,
+    "duration": 213
+  }
+]

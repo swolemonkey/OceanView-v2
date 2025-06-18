@@ -1,0 +1,28 @@
+[
+  {
+    "id": "8584",
+    "symbol": "GME",
+    "side": "sell",
+    "qty": 0.01,
+    "price": 29.450115263333814,
+    "fee": 0.00011780046105333527,
+    "pnl": -0.00011780046105333527,
+    "timestamp": 1750288469231,
+    "strategy": "backtest",
+    "tradeType": "entry"
+  },
+  {
+    "id": "8585",
+    "symbol": "GME",
+    "side": "buy",
+    "qty": 0.01,
+    "price": 29.59988355951637,
+    "fee": 0.00011839953423806549,
+    "pnl": -0.0017338829571169757,
+    "timestamp": 1750288469598,
+    "strategy": "backtest",
+    "tradeType": "exit",
+    "entryPrice": 29.450115263333814,
+    "duration": 367
+  }
+]

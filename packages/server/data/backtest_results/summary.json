@@ -1,0 +1,123 @@
+[
+  {
+    "symbol": "X:BTCUSD",
+    "trades": 1,
+    "pnl": 24.83,
+    "winRate": 100
+  },
+  {
+    "symbol": "NVDA",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:ARBUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:AVAXUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 100
+  },
+  {
+    "symbol": "AAPL",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 100
+  },
+  {
+    "symbol": "X:SOLUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "TSLA",
+    "trades": 1,
+    "pnl": -0.01,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:ETHUSD",
+    "trades": 1,
+    "pnl": -0.03,
+    "winRate": 0
+  },
+  {
+    "symbol": "COIN",
+    "trades": 1,
+    "pnl": 0.01,
+    "winRate": 100
+  },
+  {
+    "symbol": "SHOP",
+    "trades": 1,
+    "pnl": 0.01,
+    "winRate": 100
+  },
+  {
+    "symbol": "AMZN",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:MATICUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:LINKUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "GME",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "AMD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:APTUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 100
+  },
+  {
+    "symbol": "META",
+    "trades": 1,
+    "pnl": -0.03,
+    "winRate": 0
+  },
+  {
+    "symbol": "X:DOGEUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 100
+  },
+  {
+    "symbol": "SQ",
+    "trades": 0,
+    "pnl": 0,
+    "winRate": 0,
+    "error": "results is not iterable"
+  },
+  {
+    "symbol": "X:OPUSD",
+    "trades": 1,
+    "pnl": 0,
+    "winRate": 0
+  }
+]
