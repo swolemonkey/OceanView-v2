@@ -1,21 +1,21 @@
 {
-  "backtestDuration": 137734,
+  "backtestDuration": 1320,
   "metrics": {
     "trade": {
-      "totalTrades": 32282,
-      "successfulTrades": 32282,
+      "totalTrades": 19,
+      "successfulTrades": 19,
       "failedTrades": 0,
       "successRate": 100,
       "avgExecutionLatency": 100,
-      "lastExecutionTime": 1750288512737
+      "lastExecutionTime": 1750310703931
     },
     "database": {
-      "totalOperations": 32282,
-      "successfulOperations": 32282,
+      "totalOperations": 19,
+      "successfulOperations": 19,
       "failedOperations": 0,
       "successRate": 100,
       "avgLatency": 50,
-      "lastOperationTime": 1750288512737
+      "lastOperationTime": 1750310703931
     },
     "risk": {
       "totalRiskChecks": 0,
@@ -37,12 +37,12 @@
       "status": "healthy",
       "score": 100,
       "issues": [],
-      "uptime": 120008,
-      "lastHealthCheck": 1750288494965
+      "uptime": 1750310702541,
+      "lastHealthCheck": 1750310702541
     },
     "activeAlerts": [],
-    "uptime": 137783
+    "uptime": 1395
   },
   "recommendations": [],
-  "timestamp": "2025-06-18T23:15:12.740Z"
+  "timestamp": "2025-06-19T05:25:03.936Z"
 }

@@ -15,6 +15,24 @@ export type Config = {
   symbol: string;
   strategyToggle: Record<string, boolean>;
   gatekeeperThresh: number;
+  // Asset-class specific risk multipliers
+  assetClassRisk?: {
+    crypto?: number;
+    equity?: number;
+    future?: number;
+  };
+  // Minimum hold times by asset class (in milliseconds)
+  minHoldTimes?: {
+    crypto?: number;
+    equity?: number;
+    future?: number;
+  };
+  // Profit thresholds before trailing stop activation
+  trailingStopThresholds?: {
+    crypto?: number;
+    equity?: number; 
+    future?: number;
+  };
   execution?: {
     slippageLimit: number;
     valueSplit: number;
@@ -126,6 +144,24 @@ export const defaultConfig = {
   symbols: ['bitcoin'],    // support multiple symbols
   symbol: 'bitcoin',        // start narrow
   riskPct: 0.4,            // Further reduced from 0.5% - more conservative for higher win rate
+  // Asset-class specific risk multipliers
+  assetClassRisk: {
+    crypto: 1.0,           // BTC performed well, keep current sizing
+    equity: 0.5,           // Reduce equity sizing (NVDA, TSLA, etc. were struggling)
+    future: 0.7            // Moderate sizing for futures
+  },
+  // Minimum hold times by asset class (in milliseconds)
+  minHoldTimes: {
+    crypto: 30000,         // 30 seconds for crypto (fast-moving)
+    equity: 300000,        // 5 minutes for equity (prevent microsecond churn)
+    future: 60000          // 1 minute for futures
+  },
+  // Profit thresholds before trailing stop activation (percentage)
+  trailingStopThresholds: {
+    crypto: 0.015,         // 1.5% profit before trailing stops activate for crypto (let BTC run)
+    equity: 0.005,         // 0.5% profit for equities (quicker activation due to lower volatility)
+    future: 0.010          // 1.0% profit for futures (moderate threshold)
+  },
   smc: { 
     thresh: 0.0015,        // Tighter threshold for higher quality setups
     minRetrace: 0.5        // Higher retrace requirement for better R:R

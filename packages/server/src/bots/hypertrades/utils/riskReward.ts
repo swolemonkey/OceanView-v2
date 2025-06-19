@@ -205,6 +205,124 @@ export function passRR(side:'buy'|'sell', entry:number, stop:number, target:numb
   return rr>=minRR;
 }
 
+/**
+ * Fee-aware risk/reward check - accounts for trading fees in the calculation
+ * @param side Trade side (buy/sell)
+ * @param entry Entry price
+ * @param stop Stop loss price  
+ * @param target Target price
+ * @param minRR Minimum risk/reward ratio required
+ * @param feeRate Fee rate per trade side (default: 0.0004 = 0.04%)
+ * @returns Object with pass/fail result, net R:R ratio, and fee impact
+ */
+export function passRRFeeAware(
+  side: 'buy' | 'sell', 
+  entry: number, 
+  stop: number, 
+  target: number, 
+  minRR: number = 1.3,
+  feeRate: number = 0.0004
+): {
+  passed: boolean;
+  netRR: number;
+  grossRR: number;
+  feeImpact: number;
+  netReward: number;
+  netRisk: number;
+} {
+  // Calculate gross risk and reward
+  const grossRisk = Math.abs(entry - stop);
+  const grossReward = Math.abs(target - entry);
+  const grossRR = grossReward / grossRisk;
+  
+  // Calculate fee costs
+  const entryFee = entry * feeRate;  // Fee on entry
+  const exitFee = entry * feeRate;   // Estimated fee on exit (using entry price as approximation)
+  const totalFees = entryFee + exitFee;
+  
+  // Calculate net risk and reward after fees
+  const netRisk = grossRisk + entryFee;      // Add entry fee to risk (we pay this immediately)
+  const netReward = grossReward - exitFee;   // Subtract exit fee from reward (we'll pay this on exit)
+  
+  // Calculate net risk/reward ratio
+  const netRR = netReward / netRisk;
+  
+  // Calculate fee impact as percentage reduction
+  const feeImpact = ((grossRR - netRR) / grossRR) * 100;
+  
+  // Check if net R:R meets minimum threshold
+  const passed = netRR >= minRR;
+  
+  return {
+    passed,
+    netRR,
+    grossRR,
+    feeImpact,
+    netReward,
+    netRisk
+  };
+}
+
+/**
+ * Enhanced fee-aware R:R check with minimum profit threshold
+ * @param side Trade side
+ * @param entry Entry price
+ * @param stop Stop loss price
+ * @param target Target price
+ * @param minRR Minimum risk/reward ratio
+ * @param feeRate Fee rate per side
+ * @param minProfitPct Minimum profit percentage to justify trade (default: 0.2%)
+ * @returns Enhanced analysis including profit adequacy check
+ */
+export function passRRFeeAwareEnhanced(
+  side: 'buy' | 'sell',
+  entry: number,
+  stop: number, 
+  target: number,
+  minRR: number = 1.3,
+  feeRate: number = 0.0004,
+  minProfitPct: number = 0.002  // 0.2% minimum profit
+): {
+  passed: boolean;
+  netRR: number;
+  grossRR: number;
+  feeImpact: number;
+  profitPct: number;
+  profitAdequate: boolean;
+  reason: string;
+} {
+  // Get basic fee-aware analysis
+  const basic = passRRFeeAware(side, entry, stop, target, minRR, feeRate);
+  
+  // Calculate profit percentage
+  const profitPct = basic.netReward / entry;
+  const profitAdequate = profitPct >= minProfitPct;
+  
+  // Determine overall pass/fail and reason
+  let passed = basic.passed && profitAdequate;
+  let reason = '';
+  
+  if (!basic.passed && !profitAdequate) {
+    reason = 'R:R too low AND profit too small';
+  } else if (!basic.passed) {
+    reason = 'R:R too low after fees';
+  } else if (!profitAdequate) {
+    reason = 'Profit too small to justify fees';
+  } else {
+    reason = 'Passed all checks';
+  }
+  
+  return {
+    passed,
+    netRR: basic.netRR,
+    grossRR: basic.grossRR,
+    feeImpact: basic.feeImpact,
+    profitPct: profitPct * 100, // Convert to percentage
+    profitAdequate,
+    reason
+  };
+}
+
 // ========================================
 // 🎯 5-MINUTE TIMEFRAME RISK-REWARD OPTIMIZATION
 // ========================================

@@ -239,10 +239,50 @@ model Experience {
   rsiOS     Float
   reward    Float
   ts        DateTime @default(now())
-} 
+}
+
 model TradableAsset {
   id         Int     @id @default(autoincrement())
   symbol     String  @unique
   assetClass String
   active     Boolean @default(true)
+}
+
+// 🎯 NEW: Individual Asset Strategy Optimization
+model AssetOptimization {
+  id                    Int      @id @default(autoincrement())
+  symbol                String   @unique
+  // Strategy-specific parameters
+  smcThreshold          Float?   // Override SMC threshold for this symbol
+  rsiOversold           Int?     // Override RSI oversold level
+  rsiOverbought         Int?     // Override RSI overbought level
+  atrMultiplier         Float?   // Override ATR multiplier
+  riskMultiplier        Float?   // Override risk sizing multiplier
+  minHoldTimeMs         Int?     // Override minimum hold time
+  trailingStopThreshold Float?   // Override trailing stop threshold
+  maxTradesPerHour      Int?     // Override trade frequency limit
+  cooldownMinutes       Int?     // Override cooldown period
+  
+  // Strategy toggles (override global settings)
+  enableSMCReversal     Boolean? // null = use global, true/false = override
+  enableTrendFollowMA   Boolean?
+  enableRangeBounce     Boolean?
+  enableMomentumScalp   Boolean?
+  
+  // Performance-based auto-tuning
+  lastOptimized         DateTime?
+  optimizationScore     Float?   // Combined performance score
+  winRate               Float?   // Recent win rate for this symbol
+  avgRR                 Float?   // Average risk-reward ratio
+  expectancy            Float?   // Expected value per trade
+  
+  // Market condition adaptations
+  volatilityAdjustment  Float?   // Volatility-based parameter scaling
+  trendStrengthFilter   Float?   // Minimum trend strength required
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([symbol])
+  @@index([lastOptimized])
 }

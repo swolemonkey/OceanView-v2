@@ -22,6 +22,9 @@ import { createLogger, type EnhancedLogger, type TradeContext, type PortfolioCon
 import { validationOrchestrator, type TradeValidationResult } from '../../utils/validation.js';
 import { prisma } from '../../db.js';
 import { logCompletedTrade } from './execution.js';
+import { expectancyManager, TradeOutcome } from './expectancyManager.js';
+import { MarketRegimeDetector } from './marketRegimeDetector.js';
+import { assetOptimizer } from './assetOptimizer.js';
 
 // Create enhanced logger
 const logger = createLogger('assetAgent');
@@ -190,6 +193,11 @@ export class AssetAgent {
   private tradesThisHour: number = 0;
   private hourlyTradeReset: number = 0;
   
+  private regimeDetector: MarketRegimeDetector;
+  private currentRegime: any = null;
+  private regimeUpdateInterval = 5; // Update regime every 5 candles
+  private candleCount = 0;
+  
   constructor(
     symbol: string, 
     cfg: Config, 
@@ -199,9 +207,14 @@ export class AssetAgent {
     executionEngine?: ExecutionEngine
   ) {
     this.symbol = symbol;
-    this.cfg = cfg;
+    this.cfg = cfg; // Initialize temporarily
     this.perception = new Perception();
     this.risk = new RiskManager(botId, cfg);
+    
+    // Apply asset-specific optimizations to config after initialization
+    this.initializeOptimizedConfig(cfg).catch(err => 
+      logger.error(`Failed to initialize optimized config for ${symbol}`, { error: err })
+    );
     this.indCache = new Indicators.Default();
     
     // store versionId inside risk for trade logging
@@ -257,6 +270,9 @@ export class AssetAgent {
         logger.error(`Failed to initialize portfolio risk manager`, { error: err, symbol })
       );
     }
+
+    this.regimeDetector = new MarketRegimeDetector();
+    this.loadStrategies();
   }
 
   // Method to set data feed after construction
@@ -299,6 +315,12 @@ export class AssetAgent {
     
     // Update indicator cache
     this.indCache.updateOnClose(candle.c);
+    
+    // Update market regime detection periodically
+    this.candleCount++;
+    if (this.candleCount % this.regimeUpdateInterval === 0) {
+      this.updateMarketRegime();
+    }
     
     // ========================================
     // 🚪 EXIT MONITORING - Check existing positions first
@@ -441,7 +463,8 @@ export class AssetAgent {
     const ctx = {
       perception: this.perception,
       ind: this.indCache,
-      cfg: this.cfg
+      cfg: this.cfg,
+      regime: this.currentRegime
     };
     
     // Get first non-null trade idea from strategies
@@ -741,6 +764,40 @@ export class AssetAgent {
       usingATR
     });
     
+    // ========================================
+    // 🎯 EXPECTANCY-BASED TRADE FILTERING
+    // ========================================
+    
+    // Check if strategy has positive expectancy before proceeding
+    const expectancyCheck = expectancyManager.shouldAllowTrade(
+      tradeIdea.strategyName || 'unknown',
+      this.symbol
+    );
+    
+    if (!expectancyCheck.allowed) {
+      logger.info("🚫 EXPECTANCY FILTER: Trade blocked due to negative expectancy", {
+        strategy: tradeIdea.strategyName,
+        symbol: this.symbol,
+        reason: expectancyCheck.reason,
+        expectancy: expectancyCheck.expectancy?.toFixed(4),
+        confidence: expectancyCheck.confidence?.toFixed(2),
+        sampleSize: expectancyCheck.sampleSize
+      });
+      return null;
+    }
+    
+    // Log expectancy approval for monitoring
+    if (expectancyCheck.expectancy !== undefined) {
+      logger.debug("✅ EXPECTANCY FILTER: Trade approved", {
+        strategy: tradeIdea.strategyName,
+        symbol: this.symbol,
+        expectancy: expectancyCheck.expectancy.toFixed(4),
+        confidence: expectancyCheck.confidence?.toFixed(2),
+        sampleSize: expectancyCheck.sampleSize,
+        reason: expectancyCheck.reason
+      });
+    }
+
     // Calculate market condition factors for enhanced RR analysis
     const marketVolatility = atr / candle.c; // ATR as percentage of price
     const trendStrength = Math.abs((this.indCache.fastMA - this.indCache.slowMA) / candle.c);
@@ -748,14 +805,24 @@ export class AssetAgent {
     // Enhanced strategy-specific risk-reward with market condition adaptation
     const { passRRDynamic, getDynamicPositionSize } = await import('./utils/riskReward.js');
     
-    // Use strategy-specific RR check with market conditions
+    // Get regime-adjusted parameters
+    let regimeAdjustments = { rrMultiplier: 1.0, positionSizeMultiplier: 1.0 };
+    if (this.currentRegime) {
+      regimeAdjustments = this.regimeDetector.getRegimeAdjustments(
+        this.currentRegime.regime,
+        this.currentRegime.confidence,
+        tradeIdea.strategyName || 'default'
+      );
+    }
+    
+    // Use strategy-specific RR check with market conditions and regime adjustments
     const rrResult = await passRRDynamic(
       side,
       candle.c,
       stopPrice,
       targetPrice,
       this.symbol,
-      marketVolatility,
+      marketVolatility * regimeAdjustments.rrMultiplier, // Apply regime adjustment
       trendStrength,
       tradeIdea.strategyName || 'default'
     );
@@ -1338,6 +1405,23 @@ export class AssetAgent {
             price: fill.price,
             pnl: tradePnL
           });
+          
+          // Update asset-specific performance and trigger auto-optimization
+          try {
+            const position = this.risk.positions.find(p => Math.abs(p.qty) === Math.abs(fill.qty));
+            const riskReward = position ? Math.abs(fill.price - position.entry) / Math.abs(position.entry * 0.02) : 1.0;
+            
+            await assetOptimizer.updatePerformanceAndOptimize(this.symbol, {
+              pnl: tradePnL,
+              rr: riskReward,
+              duration: Date.now() - closeStartTs
+            });
+          } catch (optimizationError) {
+            logger.warn(`Failed to update asset optimization for ${this.symbol}`, {
+              symbol: this.symbol,
+              error: optimizationError instanceof Error ? optimizationError.message : String(optimizationError)
+            });
+          }
         }, 'close_position_complete', tradeId);
         
         // Clear the trade ID since trade is complete
@@ -1410,6 +1494,84 @@ export class AssetAgent {
         openRisk: portfolioRisk.openRiskPct,
         dayPnL: portfolioRisk.dayPnl
       });
+    }
+  }
+
+  private updateMarketRegime(): void {
+    if (this.perception.last(20).length < 20) return; // Need sufficient data
+
+    // Get required indicators for regime detection
+    const atr = this.indCache.atr(14) || 0;
+    const adx = this.indCache.adx14 || 25;
+    const rsi = this.indCache.rsi14 || 50;
+    const currentPrice = this.perception.last(1)[0]?.c || 0;
+    
+    // Calculate Bollinger Band width proxy
+    const recentPrices = this.perception.last(20).map(c => c.c);
+    const sma = recentPrices.reduce((sum, price) => sum + price, 0) / recentPrices.length;
+    const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - sma, 2), 0) / recentPrices.length;
+    const stdDev = Math.sqrt(variance);
+    const bbWidth = (stdDev * 2) / sma; // Normalized BB width
+    
+    // Calculate recent trend strength
+    const fastMA = this.indCache.fastMA;
+    const slowMA = this.indCache.slowMA;
+    const recentTrend = fastMA && slowMA ? (fastMA - slowMA) / currentPrice : 0;
+    
+    // Detect current market regime
+    this.currentRegime = this.regimeDetector.detectRegime({
+      atr: atr / currentPrice, // Normalize ATR
+      adx,
+      rsi,
+      bbWidth,
+      recentTrend,
+      currentPrice,
+      symbol: this.symbol
+    });
+
+    logger.info(`🎯 MARKET REGIME UPDATE: ${this.symbol} | Regime: ${this.currentRegime.regime.toUpperCase()} (${(this.currentRegime.confidence * 100).toFixed(1)}% confidence) | Trend: ${(this.currentRegime.trendStrength * 100).toFixed(1)}%, Vol: ${(this.currentRegime.volatility * 100).toFixed(1)}%`, {
+      service: 'oceanview',
+      symbol: this.symbol,
+      regime: this.currentRegime.regime,
+      confidence: this.currentRegime.confidence,
+      trendStrength: this.currentRegime.trendStrength,
+      volatility: this.currentRegime.volatility,
+      momentum: this.currentRegime.momentum,
+      rangeStrength: this.currentRegime.rangeStrength,
+      atr: atr.toFixed(6),
+      adx: adx.toFixed(2),
+      rsi: rsi.toFixed(2),
+      bbWidth: (bbWidth * 100).toFixed(3) + '%',
+      recentTrend: (recentTrend * 100).toFixed(3) + '%'
+    });
+  }
+
+  private loadStrategies(): void {
+    // Implementation of loadStrategies method
+  }
+
+  /**
+   * Initialize asset-specific optimized configuration
+   */
+  private async initializeOptimizedConfig(baseConfig: Config): Promise<void> {
+    try {
+      const optimizedConfig = await assetOptimizer.getOptimizedConfig(this.symbol, baseConfig);
+      this.cfg = optimizedConfig;
+      
+      logger.info(`🎯 ASSET CONFIG: Loaded optimized configuration for ${this.symbol}`, {
+        symbol: this.symbol,
+        hasOptimizations: optimizedConfig !== baseConfig,
+        riskPct: optimizedConfig.riskPct,
+        strategiesEnabled: Object.entries(optimizedConfig.strategyToggle)
+          .filter(([_, enabled]) => enabled)
+          .map(([name, _]) => name)
+      });
+    } catch (error) {
+      logger.error(`Failed to load optimized config for ${this.symbol}, using base config`, {
+        symbol: this.symbol,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      this.cfg = baseConfig; // Fallback to base config
     }
   }
 } 

@@ -35,7 +35,7 @@ interface RiskCheckResult {
 }
 
 interface RiskBreach {
-  type: 'day_loss' | 'open_risk' | 'equity_threshold' | 'position_count';
+  type: 'day_loss' | 'open_risk' | 'equity_threshold' | 'position_count' | 'correlation_breach';
   current: number;
   limit: number;
   severity: 'warning' | 'critical';
@@ -43,7 +43,7 @@ interface RiskBreach {
 }
 
 interface RiskWarning {
-  type: 'approaching_limit' | 'rapid_loss' | 'high_concentration' | 'unusual_volatility';
+  type: 'approaching_limit' | 'rapid_loss' | 'high_concentration' | 'unusual_volatility' | 'correlation_risk';
   current: number;
   threshold: number;
   message: string;
@@ -62,6 +62,25 @@ interface RiskMetrics {
   utilizationRatio: number; // How close we are to limits (0-1)
 }
 
+/**
+ * Asset correlation groups for risk management
+ */
+interface CorrelationGroup {
+  name: string;
+  assets: string[];
+  maxConcurrentPositions: number;
+  maxGroupRisk: number; // Maximum percentage of portfolio risk for this group
+}
+
+/**
+ * Correlation risk configuration
+ */
+interface CorrelationConfig {
+  enabled: boolean;
+  groups: CorrelationGroup[];
+  maxCorrelatedRisk: number; // Maximum total risk from correlated assets
+}
+
 export class PortfolioRiskManager {
   equity = 10000; // Default value if DB lookup fails
   dayPnl = 0;
@@ -69,6 +88,40 @@ export class PortfolioRiskManager {
   maxDailyLoss = 0.03;   // 3% default
   maxOpenRisk = 0.05;    // 5% combined default
   private refreshTimer: NodeJS.Timeout | null = null;
+  
+  // ========================================
+  // 🎯 CORRELATION RISK CONTROLS
+  // ========================================
+  private correlationConfig: CorrelationConfig = {
+    enabled: true,
+    maxCorrelatedRisk: 0.15, // Max 15% of portfolio in correlated assets
+    groups: [
+      {
+        name: 'crypto_major',
+        assets: ['BTC', 'BTCUSD', 'bitcoin'],
+        maxConcurrentPositions: 1,
+        maxGroupRisk: 0.08 // Max 8% in major crypto
+      },
+      {
+        name: 'crypto_alt',
+        assets: ['ETH', 'ETHUSD', 'SOL', 'SOLUSD', 'AVAX', 'AVAXUSD', 'LINK', 'LINKUSD', 'MATIC', 'MATICUSD', 'ARB', 'ARBUSD', 'DOGE', 'DOGEUSD', 'APT', 'APTUSD', 'OP', 'OPUSD'],
+        maxConcurrentPositions: 2,
+        maxGroupRisk: 0.10 // Max 10% in alt crypto
+      },
+      {
+        name: 'tech_stocks',
+        assets: ['AAPL', 'NVDA', 'TSLA', 'META', 'AMZN', 'GOOGL', 'MSFT'],
+        maxConcurrentPositions: 2,
+        maxGroupRisk: 0.12 // Max 12% in tech stocks
+      },
+      {
+        name: 'meme_stocks',
+        assets: ['GME', 'AMC', 'COIN', 'SHOP'],
+        maxConcurrentPositions: 1,
+        maxGroupRisk: 0.05 // Max 5% in meme stocks
+      }
+    ]
+  };
   
   // Enhanced risk tracking
   private lastRiskCheckTime = 0;
@@ -146,6 +199,154 @@ export class PortfolioRiskManager {
     }
   }
   
+  /**
+   * Check correlation risks before allowing new trades
+   */
+  checkCorrelationRisk(newSymbol: string, newRiskAmount: number, agents: Map<string, AssetAgent>): {
+    allowed: boolean;
+    reason: string;
+    correlationGroup?: string;
+    currentGroupRisk?: number;
+    maxGroupRisk?: number;
+    currentPositions?: number;
+    maxPositions?: number;
+  } {
+    if (!this.correlationConfig.enabled) {
+      return { allowed: true, reason: 'correlation_controls_disabled' };
+    }
+
+    // Find which correlation group the new symbol belongs to
+    const correlationGroup = this.correlationConfig.groups.find(group =>
+      group.assets.some(asset => 
+        newSymbol.toLowerCase().includes(asset.toLowerCase()) ||
+        asset.toLowerCase().includes(newSymbol.toLowerCase())
+      )
+    );
+
+    if (!correlationGroup) {
+      return { allowed: true, reason: 'no_correlation_group' };
+    }
+
+    // Calculate current positions and risk in this correlation group
+    let currentPositions = 0;
+    let currentGroupRisk = 0;
+
+    for (const [symbol, agent] of agents) {
+      if (correlationGroup.assets.some(asset => 
+        symbol.toLowerCase().includes(asset.toLowerCase()) ||
+        asset.toLowerCase().includes(symbol.toLowerCase())
+      )) {
+        currentPositions += agent.risk.positions.length;
+        currentGroupRisk += agent.risk.openRisk;
+      }
+    }
+
+    // Convert to percentage of equity
+    const currentGroupRiskPct = currentGroupRisk / this.equity;
+    const newGroupRiskPct = (currentGroupRisk + newRiskAmount) / this.equity;
+
+    // Check position count limit
+    if (currentPositions >= correlationGroup.maxConcurrentPositions) {
+      return {
+        allowed: false,
+        reason: 'max_correlated_positions_reached',
+        correlationGroup: correlationGroup.name,
+        currentPositions,
+        maxPositions: correlationGroup.maxConcurrentPositions
+      };
+    }
+
+    // Check group risk limit
+    if (newGroupRiskPct > correlationGroup.maxGroupRisk) {
+      return {
+        allowed: false,
+        reason: 'max_group_risk_exceeded',
+        correlationGroup: correlationGroup.name,
+        currentGroupRisk: currentGroupRiskPct,
+        maxGroupRisk: correlationGroup.maxGroupRisk
+      };
+    }
+
+    return {
+      allowed: true,
+      reason: 'correlation_check_passed',
+      correlationGroup: correlationGroup.name,
+      currentGroupRisk: currentGroupRiskPct,
+      maxGroupRisk: correlationGroup.maxGroupRisk,
+      currentPositions,
+      maxPositions: correlationGroup.maxConcurrentPositions
+    };
+  }
+
+  /**
+   * Get correlation analysis for monitoring
+   */
+  getCorrelationAnalysis(agents: Map<string, AssetAgent>): {
+    groups: Array<{
+      name: string;
+      currentPositions: number;
+      maxPositions: number;
+      currentRisk: number;
+      maxRisk: number;
+      utilizationRatio: number;
+      assets: string[];
+    }>;
+    totalCorrelatedRisk: number;
+    maxCorrelatedRisk: number;
+    warnings: string[];
+  } {
+    const groupAnalysis = this.correlationConfig.groups.map(group => {
+      let currentPositions = 0;
+      let currentRisk = 0;
+      const activeAssets: string[] = [];
+
+      for (const [symbol, agent] of agents) {
+        if (group.assets.some(asset => 
+          symbol.toLowerCase().includes(asset.toLowerCase()) ||
+          asset.toLowerCase().includes(symbol.toLowerCase())
+        )) {
+          currentPositions += agent.risk.positions.length;
+          currentRisk += agent.risk.openRisk;
+          if (agent.risk.positions.length > 0) {
+            activeAssets.push(symbol);
+          }
+        }
+      }
+
+      const currentRiskPct = currentRisk / this.equity;
+      const utilizationRatio = Math.max(
+        currentPositions / group.maxConcurrentPositions,
+        currentRiskPct / group.maxGroupRisk
+      );
+
+      return {
+        name: group.name,
+        currentPositions,
+        maxPositions: group.maxConcurrentPositions,
+        currentRisk: currentRiskPct,
+        maxRisk: group.maxGroupRisk,
+        utilizationRatio,
+        assets: activeAssets
+      };
+    });
+
+    const totalCorrelatedRisk = groupAnalysis.reduce((sum, group) => sum + group.currentRisk, 0);
+    
+    const warnings: string[] = [];
+    groupAnalysis.forEach(group => {
+      if (group.utilizationRatio > 0.8) {
+        warnings.push(`${group.name}: ${(group.utilizationRatio * 100).toFixed(1)}% utilization`);
+      }
+    });
+
+    return {
+      groups: groupAnalysis,
+      totalCorrelatedRisk,
+      maxCorrelatedRisk: this.correlationConfig.maxCorrelatedRisk,
+      warnings
+    };
+  }
+
   /**
    * Calculate comprehensive risk metrics
    */
