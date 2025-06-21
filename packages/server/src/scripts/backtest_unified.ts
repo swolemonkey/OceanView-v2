@@ -20,8 +20,29 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
   const { SimEngine } = await import('../execution/sim.js');
   const { getStrategyVersion } = await import('../lib/getVersion.js');
   
-  // Use optimized defaultConfig for backtesting instead of database config
-  const cfg = defaultConfig;
+  // ========================================
+  // 🔧 DYNAMIC CONFIGURATION LOADING
+  // Load configuration from database for production parity
+  // ========================================
+  let cfg;
+  try {
+    console.log(`📊 Loading dynamic configuration from database for ${symbol}...`);
+    cfg = await loadConfig();
+    console.log(`✅ Loaded database configuration:`, {
+      symbols: cfg.symbols,
+      riskPct: cfg.riskPct,
+      strategies: Object.entries(cfg.strategyToggle).filter(([_, enabled]) => enabled).map(([name, _]) => name),
+      gatekeeperThresh: cfg.gatekeeperThresh
+    });
+  } catch (error) {
+    console.warn(`⚠️ Failed to load database config, falling back to defaultConfig:`, error);
+    cfg = defaultConfig;
+    console.log(`🔄 Using fallback configuration:`, {
+      symbols: cfg.symbols,
+      riskPct: cfg.riskPct,
+      strategies: Object.entries(cfg.strategyToggle).filter(([_, enabled]) => enabled).map(([name, _]) => name)
+    });
+  }
   
   // Get strategy version
   const stratVersion = getStrategyVersion();
@@ -34,24 +55,70 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
   // Create execution engine
   const simEngine = new SimEngine(1, 'backtest');
   
-  // Create asset agent
+  // Create asset agent with proper initialization
   const versionId = versionRow.id;
   const agent = new AssetAgent(symbol, cfg, 1, versionId, undefined, simEngine);
+  
+  // Initialize agent with optimized configuration (production parity)
+  console.log(`🔧 Initializing agent with asset-specific optimizations for ${symbol}...`);
+  await agent.initialize();
+  console.log(`✅ Agent initialization completed for ${symbol}`);
   
   // Track all executed trades
   const executedTrades: any[] = [];
   
-  // Track round-trip trades for proper PnL calculation
+  // Track round-trip trades for proper PnL calculation with validation
   const openPositions = new Map<string, any>(); // symbol -> position info
+  let positionValidationErrors = 0;
+  let partialFillCount = 0;
+  
+  // Position validation helper
+  function validatePositionState(symbol: string, fill: any, existingPosition: any | null): { isValid: boolean; error?: string } {
+    // Check for quantity consistency
+    if (fill.qty <= 0) {
+      return { isValid: false, error: `Invalid quantity: ${fill.qty}` };
+    }
+    
+    // Check for price consistency
+    if (fill.price <= 0) {
+      return { isValid: false, error: `Invalid price: ${fill.price}` };
+    }
+    
+    // If closing position, validate it exists and quantity matches
+    if (existingPosition) {
+      if (Math.abs(fill.qty - existingPosition.qty) > 0.000001) { // Allow for tiny floating point differences
+        partialFillCount++;
+        console.warn(`⚠️ PARTIAL FILL DETECTED: ${symbol} exit qty ${fill.qty} != entry qty ${existingPosition.qty}`);
+      }
+      
+      if (fill.side === existingPosition.side) {
+        return { isValid: false, error: `Position side mismatch: both ${fill.side}` };
+      }
+    }
+    
+    return { isValid: true };
+  }
   
   // Hook into the agent's execution to capture trade results
   const originalExecute = simEngine.place.bind(simEngine);
   simEngine.place = async (order: any, ctx?: any) => {
     const fill = await originalExecute(order, ctx);
     
-    // Track round-trip trades properly
+    // Track round-trip trades properly with validation
     const positionKey = `${fill.symbol}`;
     const existingPosition = openPositions.get(positionKey);
+    
+    // Validate position state
+    const validation = validatePositionState(fill.symbol, fill, existingPosition);
+    if (!validation.isValid) {
+      positionValidationErrors++;
+      console.error(`❌ POSITION VALIDATION ERROR: ${validation.error}`, {
+        symbol: fill.symbol,
+        fill: fill,
+        existingPosition: existingPosition
+      });
+      // Continue processing but flag the error
+    }
     
     if (!existingPosition) {
       // Opening a new position - store entry details
@@ -61,7 +128,8 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
         qty: fill.qty,
         side: fill.side,
         entryTime: fill.timestamp,
-        entryId: fill.id
+        entryId: fill.id,
+        validated: validation.isValid
       });
       
       // Record entry trade with negative fee as PnL
@@ -75,23 +143,29 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
         pnl: -fill.fee, // Entry fee is a cost
         timestamp: fill.timestamp,
         strategy: ctx?.strategyName || 'backtest',
-        tradeType: 'entry'
+        tradeType: 'entry',
+        validated: validation.isValid
       });
     } else {
-      // Closing position - calculate round-trip PnL
+      // Closing position - calculate round-trip PnL with proper validation
       const entry = existingPosition;
       let roundTripPnL = 0;
       
+      // Use the actual entry quantity for PnL calculation (handles partial fills)
+      const effectiveQty = Math.min(fill.qty, entry.qty);
+      
       if (entry.side === 'buy') {
         // Long position: profit when exit price > entry price
-        roundTripPnL = (fill.price - entry.entryPrice) * fill.qty;
+        roundTripPnL = (fill.price - entry.entryPrice) * effectiveQty;
       } else {
         // Short position: profit when exit price < entry price  
-        roundTripPnL = (entry.entryPrice - fill.price) * fill.qty;
+        roundTripPnL = (entry.entryPrice - fill.price) * effectiveQty;
       }
       
-      // Subtract total fees (entry + exit)
-      const totalFees = entry.entryFee + fill.fee;
+      // Subtract total fees (entry + exit), proportional to qty
+      const entryFeeProrated = entry.entryFee * (effectiveQty / entry.qty);
+      const exitFeeProrated = fill.fee * (effectiveQty / fill.qty);
+      const totalFees = entryFeeProrated + exitFeeProrated;
       roundTripPnL -= totalFees;
       
       // Record completed round-trip trade
@@ -99,19 +173,28 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
         id: fill.id,
         symbol: fill.symbol,
         side: fill.side,
-        qty: fill.qty,
+        qty: effectiveQty, // Use effective qty for consistency
         price: fill.price,
-        fee: fill.fee,
+        fee: exitFeeProrated,
         pnl: roundTripPnL, // This is the actual profit/loss for the complete trade
         timestamp: fill.timestamp,
         strategy: ctx?.strategyName || 'backtest',
         tradeType: 'exit',
         entryPrice: entry.entryPrice,
-        duration: fill.timestamp - entry.entryTime
+        duration: fill.timestamp - entry.entryTime,
+        validated: validation.isValid && entry.validated
       });
       
-      // Remove closed position
-      openPositions.delete(positionKey);
+      // Handle partial fills - update or remove position
+      if (Math.abs(fill.qty - entry.qty) > 0.000001) {
+        // Partial fill - update remaining position
+        entry.qty -= effectiveQty;
+        entry.entryFee -= entryFeeProrated;
+        openPositions.set(positionKey, entry);
+      } else {
+        // Complete fill - remove position
+        openPositions.delete(positionKey);
+      }
     }
     
     return fill;
@@ -159,6 +242,24 @@ async function runReplayViaFeed(symbol: string, dataIterator: AsyncIterable<any>
   
   console.log(`✅ Completed ${symbol}: ${dataPointCount} data points, ${candleCount} candles processed with real strategies`);
   console.log(`💰 Total trades executed: ${executedTrades.length}`);
+  
+  // Report position validation results
+  if (positionValidationErrors > 0 || partialFillCount > 0) {
+    console.warn(`⚠️ POSITION VALIDATION SUMMARY for ${symbol}:`);
+    console.warn(`  - Validation errors: ${positionValidationErrors}`);
+    console.warn(`  - Partial fills detected: ${partialFillCount}`);
+    console.warn(`  - Total validated trades: ${executedTrades.filter(t => t.validated).length}/${executedTrades.length}`);
+  } else {
+    console.log(`✅ POSITION VALIDATION: All trades validated successfully for ${symbol}`);
+  }
+  
+  // Check for unclosed positions
+  if (openPositions.size > 0) {
+    console.warn(`⚠️ UNCLOSED POSITIONS for ${symbol}: ${openPositions.size} positions still open at end of backtest`);
+    for (const [symbol, position] of openPositions) {
+      console.warn(`  - ${symbol}: ${position.side} ${position.qty} @ $${position.entryPrice}`);
+    }
+  }
   
   return executedTrades;
 }
@@ -502,6 +603,8 @@ async function runBacktest(options: {
   console.log('=' .repeat(60));
 }
 
+// Cache management is now handled by dedicated cache_manager.ts script
+
 // CLI interface
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -535,14 +638,15 @@ async function main(): Promise<void> {
       case '-a':
         options.allAssets = true;
         break;
+
       case '--help':
       case '-h':
         console.log(`
-🚀 Unified Backtest Script
+🚀 Unified Backtest Script with Rate Limiting & Caching
 
 Usage: pnpm backtest [options]
 
-Options:
+Backtest Options:
   -s, --symbol <symbol>     Single symbol to backtest (default: X:BTCUSD)
   --symbols <sym1,sym2>     Multiple symbols (comma-separated)
   -a, --all                 Backtest all active tradable assets
@@ -550,13 +654,25 @@ Options:
   --end <YYYY-MM-DD>        End date
   -r, --random              Use random period within last 30 days
   -d, --days <number>       Period length in days (default: 7)
+
+Cache Management:
+  Use dedicated cache manager: npm run cache-stats, npm run cache-clean, etc.
+
+General:
   -h, --help                Show this help
+
+Rate Limiting:
+  • Automatically enforces Polygon free tier limit (5 calls/minute)
+  • Uses intelligent caching to minimize API calls
+  • Cache files are valid for 24 hours
 
 Examples:
   pnpm backtest                           # Default: BTC, random 7 days
   pnpm backtest -s X:ETHUSD -r -d 14     # ETH, random 14 days
   pnpm backtest --start 2024-01-01 --end 2024-01-31  # Custom period
   pnpm backtest -a --start 2024-01-01 --end 2024-01-07  # All assets
+  npm run cache-stats                     # Show cache information
+  npm run cache-clean 48                  # Clear cache older than 48 hours
         `);
         process.exit(0);
         break;

@@ -29,15 +29,96 @@ export class AlpacaPaperEngine implements ExecutionEngine {
       logger.warn('Alpaca API credentials not provided! Using demo mode with limited functionality.');
     }
   }
+
+  /**
+   * Validate and normalize symbol format for Alpaca
+   * Alpaca uses standard stock symbols (e.g., AAPL, TSLA)
+   * and crypto symbols with /USD suffix (e.g., BTC/USD, ETH/USD)
+   */
+  private validateAndNormalizeSymbol(symbol: string): { isValid: boolean; normalizedSymbol: string; error?: string } {
+    if (!symbol || typeof symbol !== 'string') {
+      return { isValid: false, normalizedSymbol: symbol, error: 'Symbol must be a non-empty string' };
+    }
+
+    // Clean up the symbol
+    const cleanSymbol = symbol.toUpperCase().trim();
+    
+    // Check for empty symbol
+    if (!cleanSymbol) {
+      return { isValid: false, normalizedSymbol: symbol, error: 'Symbol cannot be empty' };
+    }
+
+    // Check for invalid characters
+    if (!/^[A-Z0-9\/\-_\.]+$/.test(cleanSymbol)) {
+      return { isValid: false, normalizedSymbol: symbol, error: 'Symbol contains invalid characters' };
+    }
+
+    // Handle crypto symbols from other exchanges (convert to Alpaca format)
+    if (cleanSymbol.startsWith('X_') && cleanSymbol.endsWith('USD')) {
+      // Convert X_BTCUSD to BTC/USD format
+      const cryptoBase = cleanSymbol.substring(2, cleanSymbol.length - 3);
+      const normalizedSymbol = `${cryptoBase}/USD`;
+      
+      logger.info(`🔄 SYMBOL CONVERSION: ${symbol} -> ${normalizedSymbol}`, {
+        original: symbol,
+        normalized: normalizedSymbol,
+        exchange: 'alpaca'
+      });
+      
+      return { isValid: true, normalizedSymbol };
+    }
+
+    // Handle standard stock symbols
+    if (/^[A-Z]{1,5}$/.test(cleanSymbol)) {
+      return { isValid: true, normalizedSymbol: cleanSymbol };
+    }
+
+    // Handle crypto symbols in correct format
+    if (/^[A-Z]+\/USD$/.test(cleanSymbol)) {
+      return { isValid: true, normalizedSymbol: cleanSymbol };
+    }
+
+    // Handle other formats (add validation as needed)
+    if (cleanSymbol.length > 15) {
+      return { isValid: false, normalizedSymbol: symbol, error: 'Symbol too long (max 15 characters)' };
+    }
+
+    // Default to accepting the symbol but log a warning
+    logger.warn(`⚠️ SYMBOL WARNING: Unrecognized symbol format: ${cleanSymbol}`, {
+      symbol: cleanSymbol,
+      exchange: 'alpaca'
+    });
+    
+    return { isValid: true, normalizedSymbol: cleanSymbol };
+  }
   
   async place(order: Order): Promise<Fill> {
     try {
-      logger.info(`Placing ${order.side} order for ${order.qty} ${order.symbol} @ $${order.price}`);
+      // ========================================
+      // 🔍 SYMBOL VALIDATION & NORMALIZATION
+      // ========================================
+      const symbolValidation = this.validateAndNormalizeSymbol(order.symbol);
+      if (!symbolValidation.isValid) {
+        const error = new Error(`Invalid symbol: ${symbolValidation.error}`);
+        logger.error(`❌ SYMBOL VALIDATION FAILED: ${order.symbol}`, {
+          symbol: order.symbol,
+          error: symbolValidation.error,
+          exchange: 'alpaca'
+        });
+        throw error;
+      }
+
+      const normalizedSymbol = symbolValidation.normalizedSymbol;
+      logger.info(`Placing ${order.side} order for ${order.qty} ${normalizedSymbol} @ $${order.price}`, {
+        originalSymbol: order.symbol,
+        normalizedSymbol: normalizedSymbol,
+        symbolConverted: order.symbol !== normalizedSymbol
+      });
       
-      // Create order in local DB first
+      // Create order in local DB first (using normalized symbol)
       const dbOrder = await prisma.order.create({
         data: {
-          symbol: order.symbol,
+          symbol: normalizedSymbol, // Use normalized symbol
           side: order.side,
           qty: order.qty,
           price: order.price,
@@ -49,7 +130,7 @@ export class AlpacaPaperEngine implements ExecutionEngine {
       // Prepare request to Alpaca API
       const requestUrl = `${this.baseUrl}/v2/orders`;
       const requestBody = {
-        symbol: order.symbol,
+        symbol: normalizedSymbol, // Use normalized symbol for API request
         qty: order.qty.toString(),
         side: order.side,
         type: order.type || 'market',

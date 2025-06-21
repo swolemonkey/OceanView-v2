@@ -8,134 +8,10 @@ import { PortfolioRiskManager } from '../../risk/portfolioRisk.js';
 import { RLGatekeeper, FeatureVector } from '../../rl/gatekeeper.js';
 import { createLogger, type EnhancedLogger, type TradeContext, type PortfolioContext, type ExecutionContext, type DatabaseContext } from '../../utils/logger.js';
 import { validationOrchestrator } from '../../utils/validation.js';
+import { DatabaseManager } from '../../utils/databaseManager.js';
 
 // Create enhanced logger for worker
 const logger = createLogger('hypertrades-worker');
-
-// Database utilities for worker
-class WorkerDatabaseManager {
-  public static async verifyConnection(): Promise<boolean> {
-    const dbStartTime = Date.now();
-    try {
-      await prisma.$connect();
-      // Test with a simple query
-      await prisma.$queryRaw`SELECT 1`;
-      
-      logger.logDatabaseOperation({
-        operation: 'worker_connection_verify',
-        success: true,
-        executionTime: Date.now() - dbStartTime
-      });
-      
-      return true;
-    } catch (error) {
-      logger.logDatabaseOperation({
-        operation: 'worker_connection_verify',
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        executionTime: Date.now() - dbStartTime
-      });
-      return false;
-    }
-  }
-
-  static async withRetry<T>(
-    operation: () => Promise<T>,
-    operationName: string,
-    maxRetries: number = 3,
-    tradeId?: string
-  ): Promise<T> {
-    let lastError: any;
-    
-    // Verify connection before operations
-    const isConnected = await this.verifyConnection();
-    if (!isConnected) {
-      throw new Error(`Worker database connection failed before ${operationName}`);
-    }
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const operationStartTime = Date.now();
-      try {
-        const result = await operation();
-        
-        logger.logDatabaseOperation({
-          operation: `worker_${operationName}`,
-          tradeId,
-          attempt: attempt + 1,
-          maxAttempts: maxRetries,
-          success: true,
-          executionTime: Date.now() - operationStartTime
-        });
-        
-        return result;
-      } catch (error) {
-        lastError = error;
-        
-        logger.logDatabaseOperation({
-          operation: `worker_${operationName}`,
-          tradeId,
-          attempt: attempt + 1,
-          maxAttempts: maxRetries,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          executionTime: Date.now() - operationStartTime
-        });
-
-        if (attempt < maxRetries - 1) {
-          // Exponential backoff with jitter
-          const baseDelay = Math.pow(2, attempt) * 1000;
-          const jitter = Math.random() * 500;
-          const delay = baseDelay + jitter;
-          
-          logger.debug(`Worker retrying ${operationName} after ${delay}ms delay`, { tradeId, attempt: attempt + 1 });
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    logger.error(`Worker: All ${maxRetries} attempts failed for ${operationName}`, { lastError, tradeId });
-    throw lastError;
-  }
-
-  static async withTransaction<T>(
-    operations: (tx: any) => Promise<T>,
-    operationName: string,
-    tradeId?: string
-  ): Promise<T> {
-    const transactionId = `worker_${operationName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    return this.withRetry(async () => {
-      const transactionStartTime = Date.now();
-      
-      return await prisma.$transaction(async (tx) => {
-        logger.debug(`Worker starting transaction: ${operationName}`, { transactionId, tradeId });
-        try {
-          const result = await operations(tx);
-          
-          logger.logDatabaseOperation({
-            operation: `worker_${operationName}`,
-            tradeId,
-            transactionId,
-            success: true,
-            executionTime: Date.now() - transactionStartTime
-          });
-          
-          return result;
-        } catch (error) {
-          logger.logDatabaseOperation({
-            operation: `worker_${operationName}`,
-            tradeId,
-            transactionId,
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-            executionTime: Date.now() - transactionStartTime
-          });
-          throw error;
-        }
-      });
-    }, `worker_transaction:${operationName}`, 3, tradeId);
-  }
-}
 
 // Global vars and agent tracking
 let agents = new Map<string, AssetAgent>();
@@ -155,7 +31,7 @@ const rlEntryIds = new Map<string, number>();
 async function init() {
   try {
     // Verify database connection before initialization
-    const isConnected = await WorkerDatabaseManager.verifyConnection();
+    const isConnected = await DatabaseManager.verifyConnection();
     if (!isConnected) {
       logger.error('Worker failed to connect to database during initialization', { 
         context: 'worker_init',
@@ -179,7 +55,7 @@ async function init() {
     });
     
     // Upsert the strategy version with transaction
-    const versionRow = await WorkerDatabaseManager.withTransaction(async (tx) => {
+    const versionRow = await DatabaseManager.withTransaction(async (tx) => {
       return await tx.strategyVersion.upsert({
         where: { hash: stratVersion },
         update: {},
@@ -200,7 +76,13 @@ async function init() {
         symbol,
         phase: 'agent_creation'
       });
-      agents.set(symbol, new AssetAgent(symbol, cfg, botId, versionId));
+      
+      const agent = new AssetAgent(symbol, cfg, botId, versionId);
+      
+      // Initialize agent with optimized configuration
+      await agent.initialize();
+      
+      agents.set(symbol, agent);
       lastCandleTimes.set(symbol, 0);
     }
     
@@ -406,7 +288,7 @@ parentPort?.on('message', async (m) => {
       });
       
       // Use transaction to ensure atomic processing of order result
-      await WorkerDatabaseManager.withTransaction(async (tx) => {
+              await DatabaseManager.withTransaction(async (tx) => {
         // Close the position using agent's closePositions method which updates portfolio risk
         await agent.closePositions(order.price);
         
@@ -562,7 +444,7 @@ parentPort?.on('message', async (m) => {
       
       // Log failed order processing to database for analysis
       try {
-        await WorkerDatabaseManager.withRetry(async () => {
+        await DatabaseManager.withRetry(async () => {
           await prisma.rLDataset.create({
             data: {
               symbol: order.symbol,

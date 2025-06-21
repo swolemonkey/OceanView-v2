@@ -1,5 +1,6 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
 import type { Candle } from '../perception.js';
+import { RegimeConfigManager, type RegimeThresholds } from './regimeConfig.js';
 
 export class TrendFollowMA extends BaseStrategy {
   constructor(symbol: string) {
@@ -7,7 +8,14 @@ export class TrendFollowMA extends BaseStrategy {
   }
 
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {
-    const { ind, perception, cfg } = ctx;
+    const { ind, perception, cfg, regime } = ctx;
+    
+    // 🎯 GET DYNAMIC REGIME-SPECIFIC THRESHOLDS
+    if (!regime) {
+      console.log(`[DEBUG TrendMA] No regime data available for ${this.symbol}`);
+      return null;
+    }
+    const thresholds = RegimeConfigManager.getFinalThresholds(regime, this.symbol);
     
     // Check if we have enough data
     if (!ind.fastMA || !ind.slowMA || !ind.rsi14 || !ind.adx14) {
@@ -37,51 +45,51 @@ export class TrendFollowMA extends BaseStrategy {
     // ENHANCED LONG CONDITIONS
     if (trendAnalysis.direction === 'bullish' && trendAnalysis.strength > 0.003) {
       
-      // Condition 1: Classic pullback to fast MA (enhanced for 5m)
+      // Condition 1: Classic pullback to fast MA (REGIME-ADAPTIVE)
       const priceToFastMA = Math.abs(c.c - ind.fastMA) / c.c;
       if (priceToFastMA < 0.002 && // Tighter entry: Within 0.2% of fast MA for better timing
           momentumSignal.bullish && // Momentum supporting
-          ind.rsi14 > 35 && ind.rsi14 < 60 && // Better RSI range for trend continuation
-          pullbackQuality.quality > 0.7 && // Higher quality for better win rate
-          ind.adx14 > 15) { // Ensure trend strength for better entries
+          ind.rsi14 > thresholds.rsi.neutral_min && ind.rsi14 < thresholds.rsi.neutral_max && // DYNAMIC RSI range
+          pullbackQuality.quality > (thresholds.confidence.high_quality - 0.1) && // DYNAMIC quality threshold
+          ind.adx14 > thresholds.adx.trending_min) { // DYNAMIC ADX requirement
         
-        console.log(`[DEBUG TrendMA] LONG signal: Enhanced pullback to fast MA`);
+        console.log(`[DEBUG TrendMA] LONG signal: Enhanced pullback to fast MA (regime-adaptive)`);
         return { 
           side: 'buy', 
           price: c.c, 
-          reason: 'Enhanced trend MA pullback to fast',
-          confidence: 0.7 + (pullbackQuality.quality * 0.2)
+          reason: `Enhanced trend MA pullback (${regime.regime})`,
+          confidence: Math.min(0.95, thresholds.confidence.high_quality + (pullbackQuality.quality * 0.15))
         };
       }
       
-      // Condition 2: Momentum breakout with volume confirmation
+      // Condition 2: Momentum breakout with volume confirmation (REGIME-ADAPTIVE)
       if (c.c > ind.slowMA && 
-          momentumSignal.score > 0.7 &&
-          ind.adx14 > 20 && 
-          ind.rsi14 < 75 &&
+          momentumSignal.score > (thresholds.confidence.high_quality - 0.1) &&
+          ind.adx14 > thresholds.adx.strong_trend_min && 
+          ind.rsi14 < thresholds.rsi.overbought &&
           volumeProfile.trending) {
         
-        console.log(`[DEBUG TrendMA] LONG signal: Momentum breakout with volume`);
+        console.log(`[DEBUG TrendMA] LONG signal: Momentum breakout with volume (regime-adaptive)`);
         return { 
           side: 'buy', 
           price: c.c, 
-          reason: 'Trend MA momentum breakout + volume',
-          confidence: 0.6 + (momentumSignal.score * 0.3)
+          reason: `Trend MA momentum breakout (${regime.regime})`,
+          confidence: Math.min(0.95, thresholds.confidence.min_entry + (momentumSignal.score * 0.35))
         };
       }
       
-      // Condition 3: Oversold bounce in strong uptrend
-      if (ind.rsi14 < 35 && 
+      // Condition 3: Oversold bounce in strong uptrend (REGIME-ADAPTIVE)
+      if (ind.rsi14 < thresholds.rsi.oversold && 
           c.c > ind.fastMA * 0.998 && // Price near fast MA
-          trendStrength > 0.008 && // Strong trend
+          trendStrength > thresholds.atr.low_volatility_max && // DYNAMIC trend strength
           this.isBouncingOffSupport(candles)) {
         
-        console.log(`[DEBUG TrendMA] LONG signal: Oversold bounce in strong uptrend`);
+        console.log(`[DEBUG TrendMA] LONG signal: Oversold bounce in strong uptrend (regime-adaptive)`);
         return { 
           side: 'buy', 
           price: c.c, 
-          reason: 'Trend MA oversold bounce',
-          confidence: 0.8
+          reason: `Trend MA oversold bounce (${regime.regime})`,
+          confidence: Math.min(0.95, thresholds.confidence.high_quality + 0.1)
         };
       }
       
@@ -104,20 +112,20 @@ export class TrendFollowMA extends BaseStrategy {
     // ENHANCED SHORT CONDITIONS
     if (trendAnalysis.direction === 'bearish' && trendAnalysis.strength > 0.003) {
       
-      // Condition 1: Classic pullback to fast MA (enhanced for 5m)
+      // Condition 1: Classic pullback to fast MA (REGIME-ADAPTIVE)
       const priceToFastMA = Math.abs(c.c - ind.fastMA) / c.c;
       if (priceToFastMA < 0.002 && // Tighter entry: Within 0.2% of fast MA for better timing
           momentumSignal.bearish && // Momentum supporting
-          ind.rsi14 < 65 && ind.rsi14 > 40 && // Better RSI range for trend continuation
-          pullbackQuality.quality > 0.7 && // Higher quality for better win rate
-          ind.adx14 > 15) { // Ensure trend strength for better entries
+          ind.rsi14 < thresholds.rsi.neutral_max && ind.rsi14 > thresholds.rsi.neutral_min && // DYNAMIC RSI range
+          pullbackQuality.quality > (thresholds.confidence.high_quality - 0.1) && // DYNAMIC quality threshold
+          ind.adx14 > thresholds.adx.trending_min) { // DYNAMIC ADX requirement
         
-        console.log(`[DEBUG TrendMA] SHORT signal: Enhanced pullback to fast MA`);
+        console.log(`[DEBUG TrendMA] SHORT signal: Enhanced pullback to fast MA (regime-adaptive)`);
         return { 
           side: 'sell', 
           price: c.c, 
-          reason: 'Enhanced trend MA pullback to fast (short)',
-          confidence: 0.7 + (pullbackQuality.quality * 0.2)
+          reason: `Enhanced trend MA pullback short (${regime.regime})`,
+          confidence: Math.min(0.95, thresholds.confidence.high_quality + (pullbackQuality.quality * 0.15))
         };
       }
       

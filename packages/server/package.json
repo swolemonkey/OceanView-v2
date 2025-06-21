@@ -20,7 +20,22 @@
     "start:nodb": "node dist/src/index.js",
     "prepare": "if [ \"$CI\" != \"true\" ]; then concurrently \"pnpm run clean\" \"tsc\"; fi",
     "test-multi-asset": "tsx test-multi-asset.ts",
-    "run:multi-asset": "node scripts/run-multi-asset.js"
+    "run:multi-asset": "node scripts/run-multi-asset.js",
+    "cache-manager": "tsx src/scripts/cache_manager.ts",
+    "cache-stats": "tsx src/scripts/cache_manager.ts stats",
+    "cache-clean": "tsx src/scripts/cache_manager.ts clean",
+    "cache-clear": "tsx src/scripts/cache_manager.ts clear",
+    "cache-maintenance": "tsx src/scripts/cache_manager.ts maintenance",
+    "backtest": "tsx src/scripts/backtest_unified.ts",
+    "optimize-risk": "tsx src/scripts/optimize_risk_settings.ts",
+    "optimize-risk:apply": "tsx src/scripts/optimize_risk_settings.ts --apply",
+    "optimize-strategies": "tsx src/scripts/optimize_strategies.ts",
+    "optimize-strategies:apply": "tsx src/scripts/optimize_strategies.ts --apply",
+    "optimize-all": "npm run optimize-risk && npm run optimize-strategies",
+    "reset-portfolio": "tsx src/scripts/reset_portfolio_state.ts",
+    "reset-portfolio:confirm": "tsx src/scripts/reset_portfolio_state.ts --confirm",
+    "optimize-all:apply": "npm run optimize-risk:apply && npm run optimize-strategies:apply",
+    "backtest-isolated": "tsx src/scripts/backtest_isolated.ts"
   },
   "dependencies": {
     "@fastify/websocket": "^8.2.0",

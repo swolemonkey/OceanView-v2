@@ -1,0 +1,82 @@
+{
+  "results": [
+    {
+      "symbol": "AAPL",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    },
+    {
+      "symbol": "X:BTCUSD",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    },
+    {
+      "symbol": "TSLA",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    },
+    {
+      "symbol": "NVDA",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    },
+    {
+      "symbol": "GOOGL",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    },
+    {
+      "symbol": "META",
+      "trades": 0,
+      "pnl": 0,
+      "winRate": 0,
+      "maxDrawdown": 0,
+      "sharpeRatio": 0,
+      "totalReturn": 0,
+      "riskBreachRate": 0,
+      "avgTradeSize": 0,
+      "avgHoldTime": 0
+    }
+  ],
+  "summary": {
+    "totalPnL": 0,
+    "totalTrades": 0,
+    "avgWinRate": 0,
+    "avgRiskBreach": 0
+  }
+}

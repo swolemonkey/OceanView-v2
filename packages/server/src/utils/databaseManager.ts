@@ -30,6 +30,137 @@ export class DatabaseManager {
   }
 
   /**
+   * Verify database connection
+   */
+  public static async verifyConnection(): Promise<boolean> {
+    const dbStartTime = Date.now();
+    try {
+      await prisma.$connect();
+      // Test with a simple query
+      await prisma.$queryRaw`SELECT 1`;
+      
+      logger.logDatabaseOperation({
+        operation: 'connection_verify',
+        success: true,
+        executionTime: Date.now() - dbStartTime
+      });
+      
+      return true;
+    } catch (error) {
+      logger.logDatabaseOperation({
+        operation: 'connection_verify',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        executionTime: Date.now() - dbStartTime
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Execute operation with retry logic
+   */
+  public static async withRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = 3,
+    tradeId?: string
+  ): Promise<T> {
+    let lastError: any;
+    
+    // Verify connection before operations
+    const isConnected = await this.verifyConnection();
+    if (!isConnected) {
+      throw new Error(`Database connection failed before ${operationName}`);
+    }
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const operationStartTime = Date.now();
+      try {
+        const result = await operation();
+        
+        logger.logDatabaseOperation({
+          operation: operationName,
+          tradeId,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries,
+          success: true,
+          executionTime: Date.now() - operationStartTime
+        });
+        
+        return result;
+      } catch (error) {
+        lastError = error;
+        
+        logger.logDatabaseOperation({
+          operation: operationName,
+          tradeId,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          executionTime: Date.now() - operationStartTime
+        });
+
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff with jitter
+          const baseDelay = Math.pow(2, attempt) * 1000;
+          const jitter = Math.random() * 500;
+          const delay = baseDelay + jitter;
+          
+          logger.debug(`Retrying ${operationName} after ${delay}ms delay`, { tradeId, attempt: attempt + 1 });
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    logger.error(`All ${maxRetries} attempts failed for ${operationName}`, { lastError, tradeId });
+    throw lastError;
+  }
+
+  /**
+   * Execute transaction with retry logic
+   */
+  public static async withTransaction<T>(
+    operations: (tx: any) => Promise<T>,
+    operationName: string,
+    tradeId?: string
+  ): Promise<T> {
+    const transactionId = `${operationName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return this.withRetry(async () => {
+      const transactionStartTime = Date.now();
+      
+      return await prisma.$transaction(async (tx) => {
+        logger.debug(`Starting transaction: ${operationName}`, { transactionId, tradeId });
+        try {
+          const result = await operations(tx);
+          
+          logger.logDatabaseOperation({
+            operation: operationName,
+            tradeId,
+            transactionId,
+            success: true,
+            executionTime: Date.now() - transactionStartTime
+          });
+          
+          return result;
+        } catch (error) {
+          logger.logDatabaseOperation({
+            operation: operationName,
+            tradeId,
+            transactionId,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+            executionTime: Date.now() - transactionStartTime
+          });
+          throw error;
+        }
+      });
+    }, `transaction:${operationName}`, 3, tradeId);
+  }
+
+  /**
    * Execute a database operation with monitoring and retry logic
    */
   async execute<T>(operation: DatabaseOperation<T>): Promise<T> {

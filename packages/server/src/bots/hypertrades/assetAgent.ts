@@ -25,6 +25,7 @@ import { logCompletedTrade } from './execution.js';
 import { expectancyManager, TradeOutcome } from './expectancyManager.js';
 import { MarketRegimeDetector } from './marketRegimeDetector.js';
 import { assetOptimizer } from './assetOptimizer.js';
+import { DatabaseManager } from '../../utils/databaseManager.js';
 
 // Create enhanced logger
 const logger = createLogger('assetAgent');
@@ -33,131 +34,6 @@ const logger = createLogger('assetAgent');
 let portfolioRisk: PortfolioRiskManager | null = null;
 // Global collection of all agent instances
 const allAgents = new Map<string, AssetAgent>();
-
-// Database utilities
-class DatabaseManager {
-  public static async verifyConnection(): Promise<boolean> {
-    const dbStartTime = Date.now();
-    try {
-      await prisma.$connect();
-      // Test with a simple query
-      await prisma.$queryRaw`SELECT 1`;
-      
-      logger.logDatabaseOperation({
-        operation: 'connection_verify',
-        success: true,
-        executionTime: Date.now() - dbStartTime
-      });
-      
-      return true;
-    } catch (error) {
-      logger.logDatabaseOperation({
-        operation: 'connection_verify',
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        executionTime: Date.now() - dbStartTime
-      });
-      return false;
-    }
-  }
-
-  static async withRetry<T>(
-    operation: () => Promise<T>,
-    operationName: string,
-    maxRetries: number = 3,
-    tradeId?: string
-  ): Promise<T> {
-    let lastError: any;
-    
-    // Verify connection before operations
-    const isConnected = await this.verifyConnection();
-    if (!isConnected) {
-      throw new Error(`Database connection failed before ${operationName}`);
-    }
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const operationStartTime = Date.now();
-      try {
-        const result = await operation();
-        
-        logger.logDatabaseOperation({
-          operation: operationName,
-          tradeId,
-          attempt: attempt + 1,
-          maxAttempts: maxRetries,
-          success: true,
-          executionTime: Date.now() - operationStartTime
-        });
-        
-        return result;
-      } catch (error) {
-        lastError = error;
-        
-        logger.logDatabaseOperation({
-          operation: operationName,
-          tradeId,
-          attempt: attempt + 1,
-          maxAttempts: maxRetries,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          executionTime: Date.now() - operationStartTime
-        });
-
-        if (attempt < maxRetries - 1) {
-          // Exponential backoff with jitter
-          const baseDelay = Math.pow(2, attempt) * 1000;
-          const jitter = Math.random() * 500;
-          const delay = baseDelay + jitter;
-          
-          logger.debug(`Retrying ${operationName} after ${delay}ms delay`, { tradeId, attempt: attempt + 1 });
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    logger.error(`All ${maxRetries} attempts failed for ${operationName}`, { lastError, tradeId });
-    throw lastError;
-  }
-
-  static async withTransaction<T>(
-    operations: (tx: any) => Promise<T>,
-    operationName: string,
-    tradeId?: string
-  ): Promise<T> {
-    const transactionId = `${operationName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    return this.withRetry(async () => {
-      const transactionStartTime = Date.now();
-      
-      return await prisma.$transaction(async (tx) => {
-        logger.debug(`Starting transaction: ${operationName}`, { transactionId, tradeId });
-        try {
-          const result = await operations(tx);
-          
-          logger.logDatabaseOperation({
-            operation: operationName,
-            tradeId,
-            transactionId,
-            success: true,
-            executionTime: Date.now() - transactionStartTime
-          });
-          
-          return result;
-        } catch (error) {
-          logger.logDatabaseOperation({
-            operation: operationName,
-            tradeId,
-            transactionId,
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-            executionTime: Date.now() - transactionStartTime
-          });
-          throw error;
-        }
-      });
-    }, `transaction:${operationName}`, 3, tradeId);
-  }
-}
 
 // Define TradeIdea type to match what executeIdea expects
 type TradeIdea = {
@@ -207,14 +83,9 @@ export class AssetAgent {
     executionEngine?: ExecutionEngine
   ) {
     this.symbol = symbol;
-    this.cfg = cfg; // Initialize temporarily
+    this.cfg = cfg; // Initialize temporarily - will be updated after optimization loading
     this.perception = new Perception();
     this.risk = new RiskManager(botId, cfg);
-    
-    // Apply asset-specific optimizations to config after initialization
-    this.initializeOptimizedConfig(cfg).catch(err => 
-      logger.error(`Failed to initialize optimized config for ${symbol}`, { error: err })
-    );
     this.indCache = new Indicators.Default();
     
     // store versionId inside risk for trade logging
@@ -273,6 +144,52 @@ export class AssetAgent {
 
     this.regimeDetector = new MarketRegimeDetector();
     this.loadStrategies();
+  }
+
+  /**
+   * Initialize the agent with optimized configuration
+   * This must be called after construction and before trading begins
+   */
+  async initialize(): Promise<void> {
+    logger.info(`🔧 AGENT INIT: Initializing AssetAgent for ${this.symbol}`, {
+      symbol: this.symbol,
+      phase: 'initialization'
+    });
+
+    try {
+      // Load optimized configuration
+      const originalConfig = this.cfg;
+      const optimizedConfig = await assetOptimizer.getOptimizedConfig(this.symbol, originalConfig);
+      
+      // Only update if optimization changed something
+      if (optimizedConfig !== originalConfig) {
+        this.cfg = optimizedConfig;
+        
+        // Update risk manager with new config
+        const currentBotId = (this.risk as any).botId;
+        const currentVersionId = (this.risk as any).versionId;
+        this.risk = new RiskManager(currentBotId, optimizedConfig);
+        (this.risk as any).versionId = currentVersionId; // Preserve version ID
+        
+        logger.info(`✅ AGENT INIT: Configuration optimized for ${this.symbol}`, {
+          symbol: this.symbol,
+          riskPct: optimizedConfig.riskPct,
+          strategiesEnabled: Object.entries(optimizedConfig.strategyToggle)
+            .filter(([_, enabled]) => enabled)
+            .map(([name, _]) => name)
+        });
+      } else {
+        logger.info(`ℹ️ AGENT INIT: No optimization needed for ${this.symbol}`, {
+          symbol: this.symbol
+        });
+      }
+    } catch (error) {
+      logger.error(`❌ AGENT INIT: Failed to initialize optimized config for ${this.symbol}`, {
+        symbol: this.symbol,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      // Keep using base config if optimization fails
+    }
   }
 
   // Method to set data feed after construction
@@ -1153,6 +1070,95 @@ export class AssetAgent {
         executionTime: Date.now() - executionStartTs
       });
       
+      // ========================================
+      // 🧹 COMPREHENSIVE ERROR CLEANUP
+      // ========================================
+      
+      try {
+        // 1. Clean up risk manager state - ensure no phantom positions
+        const originalPositionCount = this.risk.positions.length;
+        this.risk.positions = this.risk.positions.filter(pos => {
+          // Validate each position to ensure it's real
+          if (!pos.entry || pos.entry <= 0 || !pos.qty || pos.qty <= 0) {
+            logger.warn(`Removing invalid position during cleanup`, {
+              tradeId: tradeIdea.tradeId,
+              symbol: this.symbol,
+              position: pos
+            });
+            return false;
+          }
+          return true;
+        });
+        
+        if (this.risk.positions.length !== originalPositionCount) {
+          logger.info(`🧹 CLEANUP: Removed ${originalPositionCount - this.risk.positions.length} invalid positions from risk manager`, {
+            tradeId: tradeIdea.tradeId,
+            symbol: this.symbol,
+            originalCount: originalPositionCount,
+            cleanedCount: this.risk.positions.length
+          });
+        }
+        
+        // 2. Reset trade frequency counters if error was due to rate limiting
+        if (error instanceof Error && error.message.includes('rate limit')) {
+          this.tradesThisHour = Math.max(0, this.tradesThisHour - 1);
+          logger.info(`🧹 CLEANUP: Adjusted trade frequency counter due to rate limit error`, {
+            tradeId: tradeIdea.tradeId,
+            symbol: this.symbol,
+            tradesThisHour: this.tradesThisHour
+          });
+        }
+        
+        // 3. Update expectancy manager with failed trade outcome
+        if (tradeIdea.strategyName) {
+          const failedOutcome = {
+            strategyName: tradeIdea.strategyName,
+            symbol: this.symbol,
+            pnl: -Math.abs(qty * candle.c * 0.001), // Assume small loss from fees/slippage
+            isWin: false,
+            timestamp: new Date()
+          };
+          await expectancyManager.updateMetrics(failedOutcome);
+          
+          logger.debug(`🧹 CLEANUP: Updated expectancy manager with failed trade`, {
+            tradeId: tradeIdea.tradeId,
+            strategy: tradeIdea.strategyName,
+            symbol: this.symbol
+          });
+        }
+        
+        // 4. Clear any pending trade signals or state
+        logger.clearTradeId(this.symbol, tradeIdea.side);
+        
+        // 5. Validate portfolio risk manager state
+        if (portfolioRisk) {
+          portfolioRisk.recalc(allAgents); // Recalculate to ensure consistency
+          
+          if (!portfolioRisk.canTrade()) {
+            logger.warn(`🧹 CLEANUP: Portfolio risk limits exceeded after error cleanup`, {
+              tradeId: tradeIdea.tradeId,
+              symbol: this.symbol,
+              openRisk: portfolioRisk.openRiskPct,
+              dayPnL: portfolioRisk.dayPnl
+            });
+          }
+        }
+        
+        logger.info(`✅ CLEANUP: Error cleanup completed successfully`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          error: 'execution_failed'
+        });
+        
+      } catch (cleanupError) {
+        logger.error(`❌ CLEANUP: Error during cleanup process`, {
+          tradeId: tradeIdea.tradeId,
+          symbol: this.symbol,
+          originalError: error instanceof Error ? error.message : String(error),
+          cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        });
+      }
+      
       // Log failed execution
       logger.logOrderExecution({
         tradeId: tradeIdea.tradeId,
@@ -1176,7 +1182,8 @@ export class AssetAgent {
                 error: error instanceof Error ? error.message : String(error),
                 executionTime: Date.now() - executionStartTs,
                 orderQty: qty,
-                orderSide: tradeIdea.side
+                orderSide: tradeIdea.side,
+                cleanupCompleted: true
               }),
               action: 'execution_failed',
               outcome: -1, // Negative outcome for failed execution
@@ -1188,14 +1195,6 @@ export class AssetAgent {
         logger.error('Failed to log execution error to database', { 
           tradeId: tradeIdea.tradeId,
           dbError: dbError instanceof Error ? dbError.message : String(dbError) 
-        });
-      }
-
-      // Only check portfolio risk limits
-      if (portfolioRisk && !portfolioRisk.canTrade()) {
-        logger.warn(`BLOCKED: Portfolio risk limits exceeded for ${this.symbol.toUpperCase()}`, {
-          tradeId: tradeIdea.tradeId,
-          symbol: this.symbol
         });
       }
     }

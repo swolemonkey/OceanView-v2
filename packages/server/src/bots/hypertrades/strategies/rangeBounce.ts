@@ -1,5 +1,6 @@
 import { BaseStrategy, TradeIdea, StrategyCtx } from './baseStrategy.js';
 import type { Candle } from '../perception.js';
+import { RegimeConfigManager, type RegimeThresholds } from './regimeConfig.js';
 
 export class RangeBounce extends BaseStrategy {
   constructor(symbol: string) {
@@ -7,7 +8,14 @@ export class RangeBounce extends BaseStrategy {
   }
 
   onCandle(c: Candle, ctx: StrategyCtx): TradeIdea | null {
-    const { perception: p, ind } = ctx;
+    const { perception: p, ind, regime } = ctx;
+    
+    // 🎯 GET DYNAMIC REGIME-SPECIFIC THRESHOLDS
+    if (!regime) {
+      console.log(`[DEBUG RangeBounce] No regime data available for ${this.symbol}`);
+      return null;
+    }
+    const thresholds = RegimeConfigManager.getFinalThresholds(regime, this.symbol);
     
     // ========================================
     // 🚀 ENHANCED RANGE BOUNCE STRATEGY FOR 5M TIMEFRAMES
@@ -40,8 +48,8 @@ export class RangeBounce extends BaseStrategy {
         volumeProfile.supportingBounce) {
       
       const distanceFromSupport = (c.c - supportResistance.support) / supportResistance.support;
-      const rsiOversold = ind.rsi14 < 35;
-      const lowVolatility = ind.atr14 / c.c < 0.008; // ATR < 0.8% indicates low volatility range
+      const rsiOversold = ind.rsi14 < thresholds.rsi.oversold; // DYNAMIC RSI threshold
+      const lowVolatility = ind.atr14 / c.c < thresholds.atr.low_volatility_max; // DYNAMIC volatility threshold
       
       // Condition 1: Classic oversold bounce with volume confirmation
       if (rsiOversold && 
@@ -49,12 +57,12 @@ export class RangeBounce extends BaseStrategy {
           orderFlow.bullishImbalance &&
           lowVolatility) {
         
-        console.log(`[DEBUG RangeBounce] LONG signal: Classic oversold bounce at support`);
+        console.log(`[DEBUG RangeBounce] LONG signal: Classic oversold bounce at support (regime-adaptive)`);
         return { 
           side: 'buy', 
           price: c.c, 
-          reason: 'Range bounce oversold at support + volume',
-          confidence: 0.7 + (rangeAnalysis.confidence * 0.2)
+          reason: `Range bounce oversold support (${regime.regime})`,
+          confidence: Math.min(0.95, thresholds.confidence.high_quality + (rangeAnalysis.confidence * 0.15))
         };
       }
       
